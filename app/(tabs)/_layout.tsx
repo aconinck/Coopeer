@@ -7,7 +7,7 @@ export default function TabsLayout() {
     <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>
       <Tabs.Screen name="discover" />
       <Tabs.Screen name="teams" />
-      <Tabs.Screen name="schedule" />
+      <Tabs.Screen name="feed" />
       <Tabs.Screen name="ranking" />
       <Tabs.Screen name="profile" />
     </Tabs>

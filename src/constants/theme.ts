@@ -33,6 +33,13 @@ export const colors = {
   // Gamification
   gold: '#F9CF3C',
   goldText: '#B08C09',
+
+  // AllTrails premium surfaces
+  surface2: '#F7F5F2',       // warm off-white background
+  surfaceDark: '#111318',    // FACEIT-style dark feed background
+  cardDark: '#1C2029',       // dark feed card background
+  borderDark: '#2A2F3E',     // dark card borders
+  accent: '#FF6100',         // alias for primary orange
 } as const;
 
 export const typography = {
@@ -50,6 +57,8 @@ export const typography = {
     lg: 20,
     xl: 24,
     xxl: 32,
+    hero: 28,
+    display: 40,
   },
 
   weights: {
@@ -131,3 +140,21 @@ export const sports = [
 ];
 
 export type SportId = 'soccer' | 'pickleball' | 'basketball' | 'tennis' | 'running';
+
+// Elevation shadow presets
+export const shadows = {
+  card: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  elevated: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+} as const;

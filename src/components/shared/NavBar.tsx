@@ -27,10 +27,10 @@ const TABS: TabItem[] = [
     label: 'My Teams',
   },
   {
-    route: '/(tabs)/schedule',
-    icon: 'calendar-outline',
-    activeIcon: 'calendar',
-    label: 'Schedule',
+    route: '/(tabs)/feed',
+    icon: 'newspaper-outline',
+    activeIcon: 'newspaper',
+    label: 'Feed',
   },
   {
     route: '/(tabs)/ranking',
