@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Coopeer",
+    "slug": "coopeer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "coopeer",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFF8ED"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.coopeer.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Coopeer uses your location to find sports teams near you.",
+        "NSLocationAlwaysUsageDescription": "Coopeer uses your location to find sports teams near you."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FFF8ED"
+      },
+      "package": "app.coopeer.mobile",
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Coopeer uses your location to find sports teams near you."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
