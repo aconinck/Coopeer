@@ -1,7 +1,12 @@
 # Coopeer
 
 Sports discovery app — find, join, and manage local amateur sports teams.
-Think "Airbnb for local sports." Built with Expo + React Native + TypeScript.
+Think "Airbnb for local sports."
+
+> **The primary app is now native iOS (SwiftUI, iOS 26, Liquid Glass) in `ios/`.**
+> Read `ios/README.md` first: it defines the Place · Club · Game model and the
+> action-placement rules every screen follows. Scope is soccer + pickleball only.
+> The Expo/React Native app documented below is the earlier prototype.
 
 ## What this app does
 

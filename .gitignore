@@ -5,3 +5,8 @@ web-build/
 .env
 .env.local
 *.log
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
