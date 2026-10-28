@@ -149,8 +149,14 @@ export default function CreateGame() {
         <View style={styles.divider} />
         <Pressable accessibilityRole="button" onPress={() => setPicker('members')} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
           <Ionicons name="people-outline" size={20} color={colors.label2} />
-          <Text style={[type.body, styles.flex, invited.size === 0 && styles.placeholder]}>
-            {allInvited ? 'All members' : invited.size === 0 ? 'No members invited' : `${invited.size} members invited`}
+          <Text style={[type.body, styles.flex, invited.size === 0 && others.length > 0 && styles.placeholder]}>
+            {others.length === 0
+              ? 'Just you for now — share the club code to invite people'
+              : allInvited
+                ? 'All members'
+                : invited.size === 0
+                  ? 'No members invited'
+                  : `${invited.size} members invited`}
           </Text>
           <Ionicons name="pencil" size={16} color={colors.label2} />
         </Pressable>

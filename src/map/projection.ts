@@ -1,4 +1,4 @@
-import { WORLD } from './streetData';
+import { WORLD } from './mapData';
 
 // Same Web Mercator projection the street data was baked with.
 const merc = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));

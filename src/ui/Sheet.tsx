@@ -24,6 +24,7 @@ import { spring } from '../constants/motion';
 import { AttendeesDetail } from '../details/AttendeesDetail';
 import { ClubDetail } from '../details/ClubDetail';
 import { GameDetail } from '../details/GameDetail';
+import { PitchDetail } from '../details/PitchDetail';
 import { PlaceDetail } from '../details/PlaceDetail';
 import { IconButton } from './Buttons';
 import { DetailHost, type DetailLayoutProps, type DetailNav, type SheetRoute } from './DetailLayout';
@@ -296,6 +297,8 @@ function RouteContent({ route }: { route: SheetRoute }) {
       return <ClubDetail id={route.id} />;
     case 'attendees':
       return <AttendeesDetail id={route.id} />;
+    case 'pitch':
+      return <PitchDetail id={route.id} />;
   }
 }
 

@@ -143,10 +143,18 @@ export const flow = {
   grabberHeight: 6,
 } as const;
 
-// Stylized street map: grayscale, streets only.
+// Stylized map, Apple Maps–like grayscale: soft ground, parks a shade darker,
+// white streets (residential ones fade in with zoom), illustrated fields/courts.
 export const mapColors = {
-  ground: '#E7E7EA',
+  ground: '#EDEDEF',
+  park: '#DFE1DD',
+  water: '#D3D8DE',
   street: '#FFFFFF',
-  majorCasing: '#D2D2D7',
+  majorCasing: '#D8D8DC',
   pinName: '#3A3A3C',
+  label: '#8E8E93',
+  labelHalo: '#F4F4F6',
+  soccerField: '#CDD3CB',
+  court: '#C9CDD7',
+  fieldLine: '#FFFFFF',
 } as const;

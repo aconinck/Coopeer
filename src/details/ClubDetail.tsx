@@ -169,7 +169,11 @@ function GamesTab({ club }: { club: Club }) {
       <View style={styles.empty}>
         <Ionicons name="calendar-outline" size={36} color={colors.label3} />
         <Text style={[type.subhead, styles.secondary]}>No games scheduled</Text>
-        {isAdmin && <PrimaryButton title="New game" icon="add" onPress={newGame} />}
+        {isAdmin && (
+          <View style={styles.emptyAction}>
+            <PrimaryButton title="New game" icon="add" onPress={newGame} />
+          </View>
+        )}
       </View>
     );
   }
@@ -305,6 +309,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.xl },
+  emptyAction: { flexDirection: 'row', width: 200, marginTop: space.sm },
   newGame: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.xs },
   photo: { width: 72, height: 72, borderRadius: radius.card },
   block: { gap: space.sm, alignItems: 'stretch' },

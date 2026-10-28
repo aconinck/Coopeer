@@ -17,7 +17,8 @@ export type SheetRoute =
   | { kind: 'place'; id: string }
   | { kind: 'game'; id: string }
   | { kind: 'club'; id: string }
-  | { kind: 'attendees'; id: string };
+  | { kind: 'attendees'; id: string }
+  | { kind: 'pitch'; id: string };
 
 export interface DetailNav {
   place: (id: string) => void;

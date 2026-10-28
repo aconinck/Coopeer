@@ -25,6 +25,7 @@ import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
 import { StreetMap, type StreetMapHandle } from '../../src/map/StreetMap';
 import { summarize } from '../../src/map/PlacePin';
+import { pitchById } from '../../src/map/pitches';
 import { Chip, IconButton } from '../../src/ui/Buttons';
 import { SectionHeader } from '../../src/ui/Display';
 import { Glass } from '../../src/ui/Glass';
@@ -64,6 +65,7 @@ export default function MapScreen() {
         : root?.kind === 'club'
           ? store.club(root.id)?.homePlaceId ?? null
           : null;
+  const selectedPitchId = root?.kind === 'pitch' ? root.id : null;
 
   useEffect(() => {
     const place = selectedPlaceId ? store.place(selectedPlaceId) : undefined;
@@ -71,6 +73,12 @@ export default function MapScreen() {
     // Only when the selection changes, not on every store tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlaceId]);
+
+  useEffect(() => {
+    const pitch = selectedPitchId ? pitchById(selectedPitchId) : undefined;
+    if (pitch) map.current?.focus(pitch, insets.top + 56, height * (1 - SHEET_HALF));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPitchId]);
 
   const matches = useCallback(
     (...texts: (string | undefined)[]) => {
@@ -139,6 +147,11 @@ export default function MapScreen() {
         summaries={summaries}
         selectedId={selectedPlaceId}
         onSelect={selectPlace}
+        selectedPitchId={selectedPitchId}
+        onPitchPress={(pitch) => {
+          setExpanded(false);
+          sheetController.open({ kind: 'pitch', id: pitch.id });
+        }}
         onBackgroundPress={() => {
           if (sheet.isOpen) sheetController.close();
           else setExpanded(false);
