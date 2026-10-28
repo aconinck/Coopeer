@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Alert, Image, Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
@@ -10,19 +11,28 @@ import { colors, flow, radius, space, type } from '../../src/constants/theme';
 import { enter } from '../../src/constants/motion';
 import { dollars, shareText } from '../../src/lib/format';
 import { COOPEER_FEE, inviteUrl, memberPrice, sportIds, sports, type Club, type ClubLink, type SportId } from '../../src/state/models';
-import { useStore } from '../../src/state/store';
+import { pitchPlace, useStore } from '../../src/state/store';
+import { pitchById } from '../../src/map/pitches';
 import { SportIcon } from '../../src/ui/Display';
 import { HeroButton } from '../../src/ui/Hero';
 import { StepScaffold, UnderlineField } from '../../src/ui/StepFlow';
 import { CheckBadge, ChoiceChip, CodeBoxes, FieldLabel, LightPill, haptics } from '../../src/create/ui';
 
+/** Close the flow; opened from a deep link there is nothing to go back to. */
+const leave = () => (router.canGoBack() ? router.back() : router.replace('/map'));
+
 type Step = 'details' | 'photo' | 'sport' | 'place' | 'price' | 'payout';
-const order: Step[] = ['details', 'photo', 'sport', 'place', 'price', 'payout'];
-const progress: Record<Step, number> = { details: 0.2, photo: 0.36, sport: 0.52, place: 0.68, price: 0.84, payout: 1 };
+const fullOrder: Step[] = ['details', 'photo', 'sport', 'place', 'price', 'payout'];
+// Started from a field/court on the map: sport and home are already known.
+const pitchOrder: Step[] = ['details', 'photo', 'price', 'payout'];
 
 /** Figma "Criando Equipe" + "Pricing": everything a creator needs to open a club. */
 export default function CreateClub() {
   const store = useStore();
+  const { pitch: pitchParam } = useLocalSearchParams<{ pitch?: string }>();
+  const pitch = pitchParam ? pitchById(pitchParam) : undefined;
+  const pitchHome = pitch ? pitchPlace(pitch, store.places) : undefined;
+  const order = pitch ? pitchOrder : fullOrder;
   const [step, setStep] = useState<Step>('details');
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
 
@@ -30,8 +40,8 @@ export default function CreateClub() {
   const [link, setLink] = useState('');
   const [about, setAbout] = useState('');
   const [photoUri, setPhotoUri] = useState<string | undefined>();
-  const [sport, setSport] = useState<SportId | null>(null);
-  const [placeId, setPlaceId] = useState<string | null>(null);
+  const [sport, setSport] = useState<SportId | null>(pitch?.sport ?? null);
+  const [placeId, setPlaceId] = useState<string | null>(pitchHome?.id ?? null);
   const [price, setPrice] = useState('');
   const [routing, setRouting] = useState('');
   const [account, setAccount] = useState('');
@@ -41,7 +51,7 @@ export default function CreateClub() {
   const go = (delta: 1 | -1) => {
     const next = order[order.indexOf(step) + delta];
     if (!next) {
-      if (delta === -1) router.back();
+      if (delta === -1) leave();
       return;
     }
     setDirection(delta === 1 ? 'forward' : 'back');
@@ -49,14 +59,15 @@ export default function CreateClub() {
   };
 
   const create = () => {
-    if (!sport || !placeId) return;
+    const homePlaceId = pitch ? store.placeForPitch(pitch.id)?.id : placeId;
+    if (!sport || !homePlaceId) return;
     const links: ClubLink[] = link.trim() ? [{ title: 'Website', url: link.trim().startsWith('http') ? link.trim() : `https://${link.trim()}` }] : [];
     const club = store.createClub({
       name,
       about,
       links,
       sport,
-      homePlaceId: placeId,
+      homePlaceId,
       monthlyPrice: Number(price),
       photoUri,
       payoutLast4: account.slice(-4),
@@ -67,12 +78,18 @@ export default function CreateClub() {
 
   if (created) return <Done club={created} />;
 
-  const common = { progress: progress[step], direction, onBack: () => go(-1), backIcon: step === 'details' ? ('close' as const) : ('arrow-back' as const) };
+  const common = { progress: (order.indexOf(step) + 1) / order.length, direction, onBack: () => go(-1), backIcon: step === 'details' ? ('close' as const) : ('arrow-back' as const) };
 
   switch (step) {
     case 'details':
       return (
-        <StepScaffold {...common} title="Club name" canContinue={name.trim().length >= 2} onNext={() => go(1)}>
+        <StepScaffold
+          {...common}
+          title="Club name"
+          subtitle={pitchHome && pitch ? `${sports[pitch.sport].label} · plays at ${pitchHome.name}` : undefined}
+          canContinue={name.trim().length >= 2}
+          onNext={() => go(1)}
+        >
           <View style={styles.fields}>
             <View style={styles.field}>
               <FieldLabel>Club name</FieldLabel>
@@ -305,14 +322,12 @@ function Done({ club }: { club: Club }) {
   const reduceMotion = useReducedMotion();
   const fade = (i: number) => (reduceMotion ? undefined : enter(i));
 
+  const [copied, setCopied] = useState(false);
   const copy = async () => {
-    haptics.selection();
-    if (Platform.OS === 'web') {
-      await globalThis.navigator?.clipboard?.writeText(club.code);
-      window.alert('Club code copied');
-      return;
-    }
-    await Share.share({ message: club.code });
+    await Clipboard.setStringAsync(club.code);
+    haptics.success();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
   };
 
   return (
@@ -330,7 +345,7 @@ function Done({ club }: { club: Club }) {
         <CodeBoxes code={club.code} />
         <View style={styles.codeFooter}>
           <Text style={[flow.heroBody, { fontWeight: '600' }]}>Club code</Text>
-          <LightPill compact title="Copy code" onPress={copy} />
+          <LightPill compact title={copied ? 'Copied ✓' : 'Copy code'} onPress={copy} />
         </View>
       </Animated.View>
 

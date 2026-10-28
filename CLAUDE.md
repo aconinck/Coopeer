@@ -3,15 +3,18 @@
 Sports discovery app — find a game nearby or join a club that plays every week.
 Think "Airbnb for local sports." Launch market: Bentonville, AR. Sports: **soccer and pickleball only** for now.
 
-Users browse the map without an account, tap "I'm in" on a one-time game ($7 drop-in)
-or join a club (monthly). Login is phone number + SMS code only, asked only when they act.
+Every screen requires an account (phone number + SMS code, no password); signed-out users only
+see the welcome screen. Players tap "I'm in" on a one-time game ($7 drop-in) or join a club (monthly),
+and anyone can start an open game or create a club (Figma "Criando Equipe" / "Criando Partida").
 
 ## Tech stack
 
 - Expo SDK 55 + Expo Router (file-based routes in `app/`), React Native, TypeScript strict
-- Custom SVG street map (`src/map/StreetMap.tsx`): grayscale, streets only, thick simplified shapes,
-  identical on iOS/Android/web. Street data is baked from OpenStreetMap into `src/map/streetData.ts`
-  (Bentonville bbox); pan/pinch/double-tap via gesture-handler + Reanimated.
+- Custom SVG map (`src/map/StreetMap.tsx`), Apple Maps–like grayscale: parks/water as soft shapes,
+  residential streets faint until zoomed, street names only when zoomed in, OpenStreetMap soccer
+  fields and pickleball courts drawn as small illustrations (tap → sheet → start a game/club there).
+  Data is baked by `scripts/build_map.py` into `src/map/mapData.ts` (Bentonville bbox).
+- `expo-video` for the welcome background and feed clips (assets/video, Mixkit free license)
 - `react-native-reanimated` 4 for all motion; `expo-haptics` for feedback (never on web)
 - `expo-glass-effect` (real iOS 26 Liquid Glass) with an `expo-blur` fallback — always via `src/ui/Glass.tsx`
 - `expo-camera` (QR scanning), `react-native-qrcode-svg` (invite QR), `expo-haptics`, AsyncStorage
@@ -23,7 +26,8 @@ or join a club (monthly). Login is phone number + SMS code only, asked only when
 
 - **Place**: where people play. **Every map pin is a Place**, never a club or a game.
 - **Club**: a recurring group ("Every Fri · 8 PM"). Join once (code, QR, link or "Join club"); its games land in Schedule.
-- **Game**: one occurrence at a place and time. Hosted by a club, or open (`clubId: null`). RSVP with "I'm in".
+- **Game**: one occurrence at a place and time. Hosted by a club, or open (`clubId: null`) — a game never
+  requires a club. RSVP with "I'm in". Create via `/create/game` (optionally `?club=` or `?pitch=`).
 
 Visual language that teaches the difference — keep it consistent:
 - Games are always shown with a **DateTile** (LIVE / TODAY / weekday + time) and a "Club game"/"Open game" KindTag.
@@ -60,7 +64,9 @@ app/
   index.tsx              Redirect: /welcome or /explore
   welcome.tsx            Hero (Figma Login)
   auth.tsx               Phone → code → name → welcome (one route, internal steps)
-  (tabs)/                explore (map), clubs, schedule, profile — custom glass TabBar
+  (tabs)/                map, clubs, explore (feed, center tab), schedule, profile — custom glass TabBar
+  create/club.tsx        Create a club (name → photo → sport → place → price → payout → done)
+  create/game.tsx        Create a game: open or club, date/time, repeat, location, members
   place|game|club|attendees/[id].tsx   Thin route wrappers (deep links, Clubs tab page) around src/details/*
   join/index.tsx         Scan QR or type 8-digit code → "club found" panel
   join/[code].tsx        Deep link coopeer://join/<code>
@@ -89,9 +95,10 @@ Liquid Glass styling from `src/ui`.
 
 ## Motion
 
-Motion should feel physical and quick: springs (not linear timing) for anything the finger moves,
-stagger list entrances by ~45ms, confirm success with a morph + haptic, shake + error haptic on
-wrong input. Always honor `useReducedMotion()`. Never put `entering`/`exiting`/`layout` on the same
+Use only the tokens in `src/constants/motion.ts` (Apple's duration + bounce spring model, WWDC23).
+Bounce 0 by default (≤0.1 for small choice controls), no scale "pops", lists just fade with a tiny
+capped stagger, gestures hand their velocity to the spring. Haptics only for selections, sheet
+detent snaps and outcomes (success/error) — never for ordinary button taps. Always honor `useReducedMotion()`. Never put `entering`/`exiting`/`layout` on the same
 `Animated.View` that has an animated transform/opacity — wrap it.
 
 ## Code rules

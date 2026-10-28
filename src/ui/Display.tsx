@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   LinearTransition,
@@ -90,6 +90,9 @@ export function SportIcon({ sport, size = 28, ring }: { sport: SportId; size?: n
 /** Clubs are always a rounded square; games are always a date tile. */
 export function ClubLogo({ club, size = 52 }: { club: Club; size?: number }) {
   const info = sports[club.sport];
+  if (club.photoUri) {
+    return <Image source={{ uri: club.photoUri }} style={{ width: size, height: size, borderRadius: size * 0.28, backgroundColor: info.color }} />;
+  }
   return (
     <View style={[styles.center, { width: size, height: size, borderRadius: size * 0.28, backgroundColor: info.color }]}>
       <MaterialCommunityIcons name={info.icon} size={size * 0.5} color={colors.white} />

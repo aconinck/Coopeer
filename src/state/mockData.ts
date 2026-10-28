@@ -14,10 +14,10 @@ const crowd = (count: number, offset = 0) =>
 
 export const places: Place[] = [
   { id: 'p1', name: 'Lawrence Plaza Field', address: '100 NW 1st St, Bentonville, AR', latitude: 36.3729, longitude: -94.2088, sports: ['soccer'] },
-  { id: 'p2', name: 'Memorial Park', address: '800 SW 14th St, Bentonville, AR', latitude: 36.3592, longitude: -94.2185, sports: ['soccer', 'pickleball'] },
-  { id: 'p3', name: 'Crystal Bridges Courts', address: '600 Museum Way, Bentonville, AR', latitude: 36.3818, longitude: -94.199, sports: ['pickleball'] },
-  { id: 'p4', name: 'Orchard Park Courts', address: '800 SW Bark Park Dr, Bentonville, AR', latitude: 36.3668, longitude: -94.2033, sports: ['pickleball'] },
-  { id: 'p5', name: 'Phillips Park', address: '2001 SE J St, Bentonville, AR', latitude: 36.3462, longitude: -94.1994, sports: ['soccer'] },
+  { id: 'p2', name: 'Memorial Park', address: '1100 NE J St, Bentonville, AR', latitude: 36.37621, longitude: -94.19123, sports: ['soccer', 'pickleball'] },
+  { id: 'p3', name: 'Osage Park Courts', address: 'Osage Park, Bentonville, AR', latitude: 36.3554, longitude: -94.21726, sports: ['pickleball'] },
+  { id: 'p4', name: 'Creekside Park Courts', address: 'Creekside Park, Bentonville, AR', latitude: 36.34012, longitude: -94.23727, sports: ['pickleball'] },
+  { id: 'p5', name: 'Phillips Park', address: '2001 SE J St, Bentonville, AR', latitude: 36.3537, longitude: -94.2042, sports: ['soccer'] },
   { id: 'p6', name: 'Community Center', address: '1101 SW Citizens Cir, Bentonville, AR', latitude: 36.3631, longitude: -94.229, sports: ['soccer', 'pickleball'] },
 ];
 
@@ -34,8 +34,8 @@ export const clubs: Club[] = [
     links: [], members: crowd(10, 3), memberCount: 48, monthlyPrice: 35, level: 'Competitive', code: '22446688',
   },
   {
-    id: 'c3', name: 'Crystal Bridges Picklers', sport: 'pickleball', homePlaceId: 'p3', cadence: 'Every Sat · 9 AM',
-    about: 'Weekend round robins next to the museum trails. Beginners get paired with experienced players.',
+    id: 'c3', name: 'Osage Park Picklers', sport: 'pickleball', homePlaceId: 'p3', cadence: 'Every Sat · 9 AM',
+    about: 'Weekend round robins at the Osage Park courts. Beginners get paired with experienced players.',
     links: [], members: crowd(8, 5), memberCount: 22, monthlyPrice: 24, level: 'All levels', code: '33557799', isNew: true,
   },
   {

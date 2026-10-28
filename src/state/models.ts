@@ -77,7 +77,9 @@ export interface NewClub {
 }
 
 export interface NewGame {
-  clubId: string;
+  /** null = open game, anyone can join. */
+  clubId: string | null;
+  sport: SportId;
   title: string;
   details: string;
   start: Date;

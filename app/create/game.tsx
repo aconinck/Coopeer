@@ -6,14 +6,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../../src/constants/theme';
 import { monthDay, time, weekday } from '../../src/lib/format';
 import { open } from '../../src/lib/nav';
-import { ME, type Member, type Repeat, type SportId } from '../../src/state/models';
-import { useStore } from '../../src/state/store';
+import { ME, sportIds, sports, type Member, type Repeat, type SportId } from '../../src/state/models';
+import { pitchPlace, useStore } from '../../src/state/store';
+import { pitchById } from '../../src/map/pitches';
 import { Avatar } from '../../src/ui/Display';
 import { HeroButton } from '../../src/ui/Hero';
-import { FieldLabel, OptionRow, OptionSheet, haptics } from '../../src/create/ui';
+import { ChoiceChip, FieldLabel, OptionRow, OptionSheet, haptics } from '../../src/create/ui';
+
+/** Close the flow; opened from a deep link there is nothing to go back to. */
+const leave = () => (router.canGoBack() ? router.back() : router.replace('/map'));
 
 type Picker = 'date' | 'start' | 'end' | 'repeat' | 'place' | 'members' | null;
 
+const OPEN = 'open';
 const DAY = 24 * 3600 * 1000;
 const SLOT = 30;
 const slots = Array.from({ length: (23 - 6) * 2 + 1 }, (_, i) => 6 * 60 + i * SLOT);
@@ -26,12 +31,20 @@ const startOfDay = (date: Date) => {
 const at = (day: Date, minutes: number) => new Date(day.getTime() + minutes * 60_000);
 const label = (minutes: number) => time(at(startOfDay(new Date()), minutes));
 
-/** Figma "Criando Partida" (Evento): an admin schedules a game for their club. */
+/** Figma "Criando Partida" (Evento): schedule an open game, or a game for a club you run. */
 export default function CreateGame() {
-  const { club: clubId } = useLocalSearchParams<{ club: string }>();
+  const { club: clubParam, pitch: pitchParam } = useLocalSearchParams<{ club?: string; pitch?: string }>();
   const store = useStore();
   const insets = useSafeAreaInsets();
-  const club = clubId ? store.club(clubId) : undefined;
+  const pitch = pitchParam ? pitchById(pitchParam) : undefined;
+  const pitchPreview = pitch ? pitchPlace(pitch, store.places) : undefined;
+  const adminClubs = store.clubs.filter((c) => store.isAdmin(c.id) && (!pitch || c.sport === pitch.sport));
+  const initialClub = clubParam && store.isAdmin(clubParam) ? store.club(clubParam) : undefined;
+
+  const [host, setHost] = useState<string>(initialClub?.id ?? OPEN);
+  const club = host === OPEN ? undefined : store.club(host);
+  const [openSport, setOpenSport] = useState<SportId>(pitch?.sport ?? 'soccer');
+  const sport: SportId = pitch?.sport ?? club?.sport ?? openSport;
 
   const [title, setTitle] = useState('');
   const [details, setDetails] = useState('');
@@ -39,21 +52,21 @@ export default function CreateGame() {
   const [startMin, setStartMin] = useState(19 * 60);
   const [endMin, setEndMin] = useState(20 * 60 + 30);
   const [repeat, setRepeat] = useState<Repeat>('never');
-  const [placeId, setPlaceId] = useState(club?.homePlaceId ?? null);
+  const [placeId, setPlaceId] = useState<string | null>(pitchPreview?.id ?? initialClub?.homePlaceId ?? null);
   const others = useMemo(() => (club?.members ?? []).filter((m) => m.id !== ME.id), [club]);
   const [invited, setInvited] = useState<Set<string>>(() => new Set(others.map((m) => m.id)));
   const [picker, setPicker] = useState<Picker>(null);
   const [focused, setFocused] = useState<'title' | 'details' | null>(null);
 
-  if (!club) {
-    return (
-      <View style={[styles.root, { paddingTop: insets.top + space.lg }]}>
-        <Text style={[type.body, styles.muted]}>This club couldn&apos;t be found.</Text>
-      </View>
-    );
-  }
+  const chooseHost = (id: string) => {
+    setHost(id);
+    const next = id === OPEN ? undefined : store.club(id);
+    setInvited(new Set((next?.members ?? []).filter((m) => m.id !== ME.id).map((m) => m.id)));
+    if (!pitch && next) setPlaceId(next.homePlaceId);
+  };
 
-  const place = placeId ? store.place(placeId) : undefined;
+  const picked = placeId ? store.place(placeId) : undefined;
+  const place = pitchPreview ?? (picked && picked.sports.includes(sport) ? picked : undefined);
   const start = at(day, startMin);
   const end = at(day, endMin);
   const valid = title.trim().length >= 2 && !!place && endMin > startMin && start.getTime() > Date.now();
@@ -62,18 +75,20 @@ export default function CreateGame() {
 
   const create = () => {
     if (!valid || !place) return;
+    const finalPlace = pitch ? (store.placeForPitch(pitch.id) ?? place) : place;
     const game = store.createGame({
-      clubId: club.id,
+      clubId: club?.id ?? null,
+      sport,
       title,
       details,
       start,
       end,
-      placeId: place.id,
+      placeId: finalPlace.id,
       repeat,
       inviteeIds: allInvited ? null : [...invited],
     });
     haptics.success();
-    router.back();
+    leave();
     open.game(game.id);
   };
 
@@ -83,13 +98,35 @@ export default function CreateGame() {
         <Text style={type.headline} accessibilityRole="header">
           New game
         </Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close" hitSlop={12} onPress={() => router.back()}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close" hitSlop={12} onPress={() => leave()}>
           <Ionicons name="close" size={22} color={colors.label} />
         </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Text style={[type.footnote, styles.muted]}>{club.name}</Text>
+        <View style={styles.field}>
+          <FieldLabel>Who&apos;s it for?</FieldLabel>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+            <ChoiceChip title="Open game" selected={host === OPEN} onPress={() => chooseHost(OPEN)} />
+            {adminClubs.map((c) => (
+              <ChoiceChip key={c.id} title={c.name} selected={host === c.id} onPress={() => chooseHost(c.id)} />
+            ))}
+          </ScrollView>
+          <Text style={[type.footnote, styles.muted]}>
+            {club ? `${club.name} members are invited automatically.` : 'Anyone on Coopeer can see it on the map and join.'}
+          </Text>
+        </View>
+
+        {!pitch && !club && (
+          <View style={styles.field}>
+            <FieldLabel>Sport</FieldLabel>
+            <View style={styles.chips}>
+              {sportIds.map((id) => (
+                <ChoiceChip key={id} title={sports[id].label} selected={openSport === id} onPress={() => setOpenSport(id)} />
+              ))}
+            </View>
+          </View>
+        )}
 
         <View style={styles.field}>
           <FieldLabel>Game name</FieldLabel>
@@ -111,7 +148,7 @@ export default function CreateGame() {
           <TextInput
             value={details}
             onChangeText={setDetails}
-            placeholder="Write something for your members"
+            placeholder={club ? 'Write something for your members' : 'Level, what to bring, how teams are picked'}
             placeholderTextColor={colors.label3}
             multiline
             onFocus={() => setFocused('details')}
@@ -128,12 +165,22 @@ export default function CreateGame() {
           <Text style={styles.muted}>–</Text>
           <ValueChip text={label(endMin)} onPress={() => setPicker('end')} label="End time" />
         </View>
-        <Pressable accessibilityRole="button" onPress={() => setPicker('repeat')} style={({ pressed }) => [styles.repeat, pressed && styles.pressed]}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setPicker('repeat')}
+          style={({ pressed }) => [styles.repeat, pressed && styles.pressed]}
+        >
           <Text style={[type.subhead, { fontWeight: '600' }]}>{repeatLabel}</Text>
         </Pressable>
 
         <View style={styles.divider} />
-        <Pressable accessibilityRole="button" onPress={() => setPicker('place')} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !!pitch }}
+          disabled={!!pitch}
+          onPress={() => setPicker('place')}
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        >
           <Ionicons name="location-outline" size={20} color={colors.label2} />
           {place ? (
             <View style={styles.flex}>
@@ -143,23 +190,29 @@ export default function CreateGame() {
           ) : (
             <Text style={[type.body, styles.flex, styles.placeholder]}>Location</Text>
           )}
-          <Ionicons name="pencil" size={16} color={colors.label2} />
+          <Ionicons name={pitch ? 'lock-closed' : 'pencil'} size={16} color={colors.label2} />
         </Pressable>
 
-        <View style={styles.divider} />
-        <Pressable accessibilityRole="button" onPress={() => setPicker('members')} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-          <Ionicons name="people-outline" size={20} color={colors.label2} />
-          <Text style={[type.body, styles.flex, invited.size === 0 && others.length > 0 && styles.placeholder]}>
-            {others.length === 0
-              ? 'Just you for now — share the club code to invite people'
-              : allInvited
-                ? 'All members'
-                : invited.size === 0
-                  ? 'No members invited'
-                  : `${invited.size} members invited`}
-          </Text>
-          <Ionicons name="pencil" size={16} color={colors.label2} />
-        </Pressable>
+        {club && <View style={styles.divider} />}
+        {club && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setPicker('members')}
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+          >
+            <Ionicons name="people-outline" size={20} color={colors.label2} />
+            <Text style={[type.body, styles.flex, invited.size === 0 && others.length > 0 && styles.placeholder]}>
+              {others.length === 0
+                ? 'Just you for now — share the club code to invite people'
+                : allInvited
+                  ? 'All members'
+                  : invited.size === 0
+                    ? 'No members invited'
+                    : `${invited.size} members invited`}
+            </Text>
+            <Ionicons name="pencil" size={16} color={colors.label2} />
+          </Pressable>
+        )}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space.lg) }]}>
@@ -182,7 +235,11 @@ export default function CreateGame() {
         ))}
       </OptionSheet>
 
-      <OptionSheet visible={picker === 'start' || picker === 'end'} onClose={() => setPicker(null)} header={<SheetTitle>{picker === 'end' ? 'Ends' : 'Starts'}</SheetTitle>}>
+      <OptionSheet
+        visible={picker === 'start' || picker === 'end'}
+        onClose={() => setPicker(null)}
+        header={<SheetTitle>{picker === 'end' ? 'Ends' : 'Starts'}</SheetTitle>}
+      >
         {slots
           .filter((m) => picker !== 'end' || m > startMin)
           .map((m) => (
@@ -206,16 +263,33 @@ export default function CreateGame() {
 
       <RepeatSheet visible={picker === 'repeat'} value={repeat} start={start} onClose={() => setPicker(null)} onApply={setRepeat} />
 
-      <PlaceSheet visible={picker === 'place'} sport={club.sport} selectedId={placeId} onClose={() => setPicker(null)} onSelect={(id) => setPlaceId(id)} />
+      <PlaceSheet
+        visible={picker === 'place'}
+        sport={sport}
+        selectedId={placeId}
+        onClose={() => setPicker(null)}
+        onSelect={(id) => setPlaceId(id)}
+      />
 
-      <MembersSheet visible={picker === 'members'} members={others} invited={invited} onChange={setInvited} onClose={() => setPicker(null)} />
+      <MembersSheet
+        visible={picker === 'members'}
+        members={others}
+        invited={invited}
+        onChange={setInvited}
+        onClose={() => setPicker(null)}
+      />
     </View>
   );
 }
 
 function ValueChip({ text, onPress, label: a11y }: { text: string; onPress: () => void; label: string }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${a11y}: ${text}`} onPress={onPress} style={({ pressed }) => [styles.chip, pressed && styles.pressed]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${a11y}: ${text}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+    >
       <Text style={[type.subhead, { fontWeight: '500', fontVariant: ['tabular-nums'] }]}>{text}</Text>
     </Pressable>
   );
@@ -226,7 +300,19 @@ function SheetTitle({ children }: { children: string }) {
 }
 
 /** Figma "Repetir": pick, then Apply. */
-function RepeatSheet({ visible, value, start, onClose, onApply }: { visible: boolean; value: Repeat; start: Date; onClose: () => void; onApply: (r: Repeat) => void }) {
+function RepeatSheet({
+  visible,
+  value,
+  start,
+  onClose,
+  onApply,
+}: {
+  visible: boolean;
+  value: Repeat;
+  start: Date;
+  onClose: () => void;
+  onApply: (r: Repeat) => void;
+}) {
   const [draft, setDraft] = useState<Repeat>(value);
   const options: [Repeat, string][] = [
     ['never', 'Never'],
@@ -364,7 +450,12 @@ function MembersSheet({
                   <Ionicons name="close-circle" size={24} color={colors.brand} />
                 </Pressable>
               ) : (
-                <Pressable accessibilityRole="button" accessibilityLabel={`Invite ${m.name}`} onPress={() => toggle(m.id)} style={({ pressed }) => [styles.smallPill, pressed && styles.pressed]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Invite ${m.name}`}
+                  onPress={() => toggle(m.id)}
+                  style={({ pressed }) => [styles.smallPill, pressed && styles.pressed]}
+                >
                   <Text style={[type.footnote, { fontWeight: '600' }]}>Invite</Text>
                 </Pressable>
               )
@@ -405,6 +496,7 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 44, textAlignVertical: 'top' },
   underline: { height: 1, backgroundColor: colors.separator },
   underlineFocused: { height: 2, backgroundColor: colors.brand },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   whenRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   chip: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: 10, borderWidth: 1, borderColor: colors.separator },
   repeat: { height: 36, borderRadius: radius.tile, backgroundColor: colors.fill, alignItems: 'center', justifyContent: 'center' },
@@ -427,7 +519,13 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: colors.label, paddingVertical: 0, outlineStyle: 'none' } as never,
   membersHeader: { gap: space.sm },
   membersBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.xl },
-  smallPill: { paddingHorizontal: space.md, height: 28, borderRadius: radius.full, backgroundColor: colors.fill2, alignItems: 'center', justifyContent: 'center' },
+  smallPill: {
+    paddingHorizontal: space.md,
+    height: 28,
+    borderRadius: radius.full,
+    backgroundColor: colors.fill2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   emptyText: { padding: space.lg, textAlign: 'center' },
 });
-

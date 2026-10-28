@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ME, gameStatus, type Club, type Game, type NewClub, type NewGame, type Payment, type Place, type RSVP } from './models';
 import { time, weekday } from '../lib/format';
+import { pitchById, pitchTitle, placeForPitch as nearestPlace, type Pitch } from '../map/pitches';
 import * as mock from './mockData';
 
 // In-memory data layer. To use a real backend, replace the internals of this
@@ -30,8 +31,24 @@ interface Store {
   cancelPayment: (paymentId: string) => void;
   /** Creates a club owned by the current user (member + admin) with a fresh 8-digit code. */
   createClub: (input: NewClub) => Club;
-  /** Creates a club game (plus repeats). Returns the first occurrence. */
+  /** Creates a club or open game (plus repeats). Returns the first occurrence. */
   createGame: (input: NewGame) => Game;
+  /** The place a map field/court belongs to; creates (and stores) one if none is nearby. */
+  placeForPitch: (pitchId: string) => Place | undefined;
+}
+
+/** Existing place near the pitch, or the place that would be created for it (not stored). */
+export function pitchPlace(pitch: Pitch, places: Place[]): Place {
+  return (
+    nearestPlace(pitch, places) ?? {
+      id: `pitch-${pitch.id}`,
+      name: pitch.park ? `${pitch.park} ${pitch.sport === 'soccer' ? 'Field' : 'Courts'}` : pitchTitle(pitch),
+      address: pitch.park ?? 'Bentonville, AR',
+      latitude: pitch.latitude,
+      longitude: pitch.longitude,
+      sports: [pitch.sport],
+    }
+  );
 }
 
 const DAY = 24 * 3600 * 1000;
@@ -53,6 +70,7 @@ const StoreContext = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => new Date());
+  const [places, setPlaces] = useState<Place[]>(mock.places);
   const [clubs, setClubs] = useState(mock.clubs);
   const [games, setGames] = useState(() => mock.makeGames(new Date()));
   const [memberships, setMemberships] = useState<Set<string>>(() => new Set(['c1', 'c4']));
@@ -139,11 +157,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const createGame = useCallback(
     (input: NewGame): Game => {
-      const club = clubs.find((c) => c.id === input.clubId);
-      const sport = club?.sport ?? 'soccer';
-      const invited = (input.inviteeIds === null ? club?.members ?? [] : (club?.members ?? []).filter((m) => input.inviteeIds?.includes(m.id))).filter(
-        (m) => m.id !== ME.id,
-      );
+      const club = input.clubId ? clubs.find((c) => c.id === input.clubId) : undefined;
+      const sport = club?.sport ?? input.sport;
+      const roster = club?.members ?? [];
+      const invited = (input.inviteeIds === null ? roster : roster.filter((m) => input.inviteeIds?.includes(m.id))).filter((m) => m.id !== ME.id);
       const stamp = Date.now();
       const created: Game[] = occurrences(input.start, input.repeat).map((offset, index) => ({
         id: `g-${stamp}-${index}`,
@@ -164,13 +181,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         isNew: true,
       }));
       setGames((list) => [...list, ...created]);
-      if (input.repeat !== 'never') {
+      if (club && input.repeat !== 'never') {
         const cadence = input.repeat === 'weekly' ? `Every ${weekday(input.start)} · ${time(input.start)}` : `Weekdays · ${time(input.start)}`;
-        setClubs((list) => list.map((c) => (c.id === input.clubId ? { ...c, cadence } : c)));
+        setClubs((list) => list.map((c) => (c.id === club.id ? { ...c, cadence } : c)));
       }
       return created[0];
     },
     [clubs],
+  );
+
+  const placeForPitch = useCallback(
+    (pitchId: string): Place | undefined => {
+      const pitch = pitchById(pitchId);
+      if (!pitch) return undefined;
+      const place = pitchPlace(pitch, places);
+      if (!places.some((p) => p.id === place.id)) setPlaces((list) => (list.some((p) => p.id === place.id) ? list : [...list, place]));
+      return place;
+    },
+    [places],
   );
 
   const value = useMemo<Store>(() => {
@@ -180,11 +208,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     return {
       now,
-      places: mock.places,
+      places,
       clubs,
       games,
       payments,
-      place: (id) => mock.places.find((p) => p.id === id),
+      place: (id) => places.find((p) => p.id === id),
       club: (id) => clubs.find((c) => c.id === id),
       game: (id) => games.find((g) => g.id === id),
       upcomingGamesAt: (placeId) => games.filter((g) => g.placeId === placeId && active(g) && !g.isCanceled).sort(byStart),
@@ -207,8 +235,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cancelPayment: (paymentId) => setPayments((list) => list.filter((p) => p.id !== paymentId)),
       createClub,
       createGame,
+      placeForPitch,
     };
-  }, [now, clubs, games, payments, memberships, join, leave, setRSVP, createClub, createGame]);
+  }, [now, places, clubs, games, payments, memberships, join, leave, setRSVP, createClub, createGame, placeForPitch]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
