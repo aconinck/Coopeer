@@ -3,18 +3,17 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from '
 import Animated, {
   FadeIn,
   FadeOut,
-  ZoomIn,
   interpolateColor,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, layout, radius, space, type } from '../constants/theme';
+import { pressScale, spring, timing } from '../constants/motion';
 import { Glass } from './Glass';
 
 // Action placement rules (same on every screen):
@@ -28,9 +27,6 @@ export type IconName = ComponentProps<typeof Ionicons>['name'];
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const PRESS_IN = { damping: 18, stiffness: 420 } as const;
-const PRESS_OUT = { damping: 9, stiffness: 260 } as const;
-
 export const haptic = {
   light: () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -43,8 +39,8 @@ export const haptic = {
   },
 };
 
-/** Spring "squish" on press-in, slight overshoot on release. */
-export function usePressScale(to = 0.96, dim = 1) {
+/** Apple-style press: a quick, subtle dip on touch-down and a smooth (no overshoot) release. */
+export function usePressScale(to = pressScale, dim = 1) {
   const reduceMotion = useReducedMotion();
   const pressed = useSharedValue(0);
   const style = useAnimatedStyle(() => ({
@@ -54,10 +50,10 @@ export function usePressScale(to = 0.96, dim = 1) {
   return {
     style,
     onPressIn: () => {
-      pressed.value = reduceMotion ? 1 : withSpring(1, PRESS_IN);
+      pressed.value = reduceMotion ? 1 : withTiming(1, timing.press);
     },
     onPressOut: () => {
-      pressed.value = reduceMotion ? 0 : withSpring(0, PRESS_OUT);
+      pressed.value = reduceMotion ? 0 : withSpring(0, spring.quick);
     },
   };
 }
@@ -72,11 +68,11 @@ interface ButtonProps {
 
 export function PrimaryButton({ title, icon, onPress, disabled, loading, success }: ButtonProps & { success?: boolean }) {
   const inactive = disabled || loading || success;
-  const press = usePressScale(0.96);
+  const press = usePressScale();
   const tint = useSharedValue(success ? 1 : 0);
 
   useEffect(() => {
-    tint.value = withSpring(success ? 1 : 0, { damping: 16, stiffness: 180 });
+    tint.value = withSpring(success ? 1 : 0, spring.smooth);
   }, [success, tint]);
 
   const bg = useAnimatedStyle(() => ({
@@ -87,17 +83,14 @@ export function PrimaryButton({ title, icon, onPress, disabled, loading, success
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityState={{ disabled: !!disabled, busy: !!loading }}
-      onPress={() => {
-        haptic.light();
-        onPress();
-      }}
+      onPress={onPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       disabled={inactive}
       style={[styles.button, bg, press.style]}
     >
       {success ? (
-        <Animated.View key="success" entering={ZoomIn.springify().damping(12)} style={styles.row}>
+        <Animated.View key="success" entering={FadeIn.duration(timing.fade.duration)} style={styles.row}>
           <Ionicons name="checkmark-circle" size={20} color={colors.white} />
           <Text style={[type.headline, styles.white]}>{title}</Text>
         </Animated.View>
@@ -117,7 +110,7 @@ export function PrimaryButton({ title, icon, onPress, disabled, loading, success
 
 export function SecondaryButton({ title, icon, onPress, disabled, destructive }: ButtonProps & { destructive?: boolean }) {
   const color = destructive ? colors.live : colors.label;
-  const press = usePressScale(0.96);
+  const press = usePressScale();
   return (
     <AnimatedPressable
       accessibilityRole="button"
@@ -151,7 +144,7 @@ export function ActionBar({ caption, children }: { caption?: string | null; chil
 }
 
 export function NextButton({ enabled, loading, onPress }: { enabled: boolean; loading?: boolean; onPress: () => void }) {
-  const press = usePressScale(0.92);
+  const press = usePressScale();
   return (
     <AnimatedPressable
       accessibilityRole="button"
@@ -170,7 +163,7 @@ export function NextButton({ enabled, loading, onPress }: { enabled: boolean; lo
 
 /** Round glass button for headers and map controls. */
 export function IconButton({ icon, label, onPress, tint }: { icon: IconName; label: string; onPress: () => void; tint?: string }) {
-  const press = usePressScale(0.9);
+  const press = usePressScale(0.94);
   return (
     <AnimatedPressable
       accessibilityRole="button"
@@ -201,21 +194,19 @@ export function Chip({
   selected: boolean;
   onPress: () => void;
 }) {
-  const press = usePressScale(0.94);
+  const press = usePressScale();
   const reduceMotion = useReducedMotion();
   const on = useSharedValue(selected ? 1 : 0);
-  const iconPop = useSharedValue(1);
 
   useEffect(() => {
-    on.value = withTiming(selected ? 1 : 0, { duration: 180 });
-    if (selected && !reduceMotion) iconPop.value = withSequence(withSpring(1.3, { damping: 8, stiffness: 400 }), withSpring(1, { damping: 10 }));
-  }, [selected, on, iconPop, reduceMotion]);
+    on.value = reduceMotion ? (selected ? 1 : 0) : withSpring(selected ? 1 : 0, spring.snappy);
+  }, [selected, on, reduceMotion]);
 
+  // The selected fill simply fades/settles in; no icon pop.
   const fillStyle = useAnimatedStyle(() => ({
     opacity: on.value,
-    transform: [{ scale: 0.85 + on.value * 0.15 }],
+    transform: [{ scale: 0.96 + on.value * 0.04 }],
   }));
-  const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: iconPop.value }] }));
 
   return (
     <AnimatedPressable
@@ -230,14 +221,14 @@ export function Chip({
       style={[styles.chip, press.style]}
     >
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.chipFill, { backgroundColor: color }, fillStyle]} />
-      {icon ? <Animated.View style={iconStyle}>{icon}</Animated.View> : null}
+      {icon ?? null}
       <Text style={[type.subhead, { fontWeight: '600', color: selected ? colors.white : colors.label }]}>{title}</Text>
     </AnimatedPressable>
   );
 }
 
 export function TextButton({ title, onPress, disabled, color = colors.brand }: { title: string; onPress: () => void; disabled?: boolean; color?: string }) {
-  const press = usePressScale(0.94, 0.6);
+  const press = usePressScale(1, 0.5);
   return (
     <AnimatedPressable
       accessibilityRole="button"
