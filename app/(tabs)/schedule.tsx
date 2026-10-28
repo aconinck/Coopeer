@@ -44,12 +44,12 @@ export default function ScheduleScreen() {
         />
       )}
       {today.length > 0 && <SectionHeader title="Today" />}
-      {today.map((game) => (
-        <GameRow key={game.id} game={game} onPress={() => open.game(game.id)} />
+      {today.map((game, index) => (
+        <GameRow key={game.id} index={index} game={game} onPress={() => open.game(game.id)} />
       ))}
       {upcoming.length > 0 && <SectionHeader title="Upcoming" />}
-      {upcoming.map((game) => (
-        <GameRow key={game.id} game={game} onPress={() => open.game(game.id)} />
+      {upcoming.map((game, index) => (
+        <GameRow key={game.id} index={today.length + index} game={game} onPress={() => open.game(game.id)} />
       ))}
     </Screen>
   );

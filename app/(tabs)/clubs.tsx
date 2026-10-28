@@ -34,10 +34,10 @@ export default function ClubsScreen() {
         />
       }>
       {clubs.length > 0 ? (
-        rows.map((row) => (
+        rows.map((row, rowIndex) => (
           <View key={row.map((c) => c.id).join('-')} style={styles.gridRow}>
-            {row.map((club) => (
-              <ClubCard key={club.id} club={club} onPress={() => open.clubPage(club.id)} />
+            {row.map((club, col) => (
+              <ClubCard key={club.id} index={rowIndex * 2 + col} club={club} onPress={() => open.clubPage(club.id)} />
             ))}
             {row.length === 1 && <View style={styles.flex} />}
           </View>

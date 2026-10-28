@@ -1,14 +1,50 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, space, type } from '../constants/theme';
 import { gameStatus, spotsLeft, type Club, type Game } from '../state/models';
 import { useStore } from '../state/store';
 import { time, weekday } from '../lib/format';
-import { TextButton } from './Buttons';
+import { TextButton, usePressScale } from './Buttons';
 import { AvatarStack, ClubLogo, DateTile, KindTag, StatusBadge, card, gameBadge } from './Display';
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/** Tappable card: springs down on press, and staggers in when given a list index. */
+function PressCard({
+  index,
+  onPress,
+  style,
+  grow,
+  children,
+}: {
+  index?: number;
+  onPress: () => void;
+  style: StyleProp<ViewStyle>;
+  grow?: boolean;
+  children: ReactNode;
+}) {
+  const reduceMotion = useReducedMotion();
+  const press = usePressScale(0.98, 0.85);
+  const entering = index === undefined || reduceMotion ? undefined : FadeInDown.delay(40 + index * 50).springify().damping(18);
+  return (
+    <Animated.View entering={entering} style={grow && styles.grow}>
+      <AnimatedPressable
+        accessibilityRole="button"
+        onPress={onPress}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        style={[style, press.style]}
+      >
+        {children}
+      </AnimatedPressable>
+    </Animated.View>
+  );
+}
+
 /** The one way a game is shown in any list. */
-export function GameRow({ game, showPlace = true, onPress }: { game: Game; showPlace?: boolean; onPress: () => void }) {
+export function GameRow({ game, showPlace = true, onPress, index }: { game: Game; showPlace?: boolean; onPress: () => void; index?: number }) {
   const store = useStore();
   const club = game.clubId ? store.club(game.clubId) : undefined;
   const place = store.place(game.placeId);
@@ -18,11 +54,7 @@ export function GameRow({ game, showPlace = true, onPress }: { game: Game; showP
   const host = club?.name ?? 'Open to everyone';
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, isLive && styles.liveCard, pressed && styles.pressed]}
-    >
+    <PressCard index={index} onPress={onPress} style={[styles.card, isLive && styles.liveCard]}>
       <DateTile game={game} now={store.now} />
       <View style={styles.body}>
         <View style={styles.topLine}>
@@ -42,16 +74,16 @@ export function GameRow({ game, showPlace = true, onPress }: { game: Game; showP
           <AvatarStack members={game.going} size={20} limit={3} />
         </View>
       </View>
-    </Pressable>
+    </PressCard>
   );
 }
 
 /** The one way a club is shown in any list. */
-export function ClubRow({ club, onPress }: { club: Club; onPress: () => void }) {
+export function ClubRow({ club, onPress, index }: { club: Club; onPress: () => void; index?: number }) {
   const store = useStore();
   const isMember = store.isMember(club.id);
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+    <PressCard index={index} onPress={onPress} style={styles.card}>
       <ClubLogo club={club} />
       <View style={styles.body}>
         <View style={styles.topLine}>
@@ -69,12 +101,12 @@ export function ClubRow({ club, onPress }: { club: Club; onPress: () => void }) 
           <AvatarStack members={club.members} total={club.memberCount} size={20} limit={3} />
         </View>
       </View>
-    </Pressable>
+    </PressCard>
   );
 }
 
 /** Figma "Seus Clubes" grid card. */
-export function ClubCard({ club, onPress }: { club: Club; onPress: () => void }) {
+export function ClubCard({ club, onPress, index }: { club: Club; onPress: () => void; index?: number }) {
   const store = useStore();
   const next = store.nextGameFor(club.id);
   const status = next ? gameStatus(next, store.now) : null;
@@ -87,11 +119,7 @@ export function ClubCard({ club, onPress }: { club: Club; onPress: () => void })
         : `${weekday(next.start)} · ${time(next.start)}`;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.gridCard, club.isNew && styles.newCard, pressed && styles.pressed]}
-    >
+    <PressCard index={index} onPress={onPress} grow style={[styles.gridCard, club.isNew && styles.newCard]}>
       <View style={styles.topLine}>
         <ClubLogo club={club} size={40} />
         {club.isNew && <StatusBadge kind="new" />}
@@ -106,13 +134,13 @@ export function ClubCard({ club, onPress }: { club: Club; onPress: () => void })
         </Text>
       </View>
       <AvatarStack members={club.members} total={club.memberCount} size={22} limit={3} />
-    </Pressable>
+    </PressCard>
   );
 }
 
-export function LinkRow({ title, subtitle, icon, onPress }: { title: string; subtitle: string; icon: 'location' | 'link'; onPress: () => void }) {
+export function LinkRow({ title, subtitle, icon, onPress, index }: { title: string; subtitle: string; icon: 'location' | 'link'; onPress: () => void; index?: number }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.card, { alignItems: 'center' }, pressed && styles.pressed]}>
+    <PressCard index={index} onPress={onPress} style={[styles.card, { alignItems: 'center' }]}>
       <Ionicons name={icon} size={20} color={colors.brand} style={{ width: 28, textAlign: 'center' }} />
       <View style={styles.body}>
         <Text style={[type.subhead, { fontWeight: '600' }]}>{title}</Text>
@@ -121,7 +149,7 @@ export function LinkRow({ title, subtitle, icon, onPress }: { title: string; sub
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={16} color={colors.label3} />
-    </Pressable>
+    </PressCard>
   );
 }
 
@@ -165,5 +193,5 @@ const styles = StyleSheet.create({
   body: { flex: 1, gap: 3 },
   topLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   strike: { textDecorationLine: 'line-through' },
-  pressed: { opacity: 0.75 },
+  grow: { flex: 1 },
 });

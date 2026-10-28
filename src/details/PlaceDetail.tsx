@@ -49,13 +49,13 @@ export function PlaceDetail({ id }: { id: string }) {
 
       <SectionHeader title="Games here" caption="One-time. Tap one, say you're in, show up." />
       {games.length === 0 && <Text style={[type.subhead, { color: colors.label2 }]}>No games scheduled here yet.</Text>}
-      {games.map((game) => (
-        <GameRow key={game.id} game={game} showPlace={false} onPress={() => nav.game(game.id)} />
+      {games.map((game, index) => (
+        <GameRow key={game.id} index={index} game={game} showPlace={false} onPress={() => nav.game(game.id)} />
       ))}
 
       {clubs.length > 0 && <SectionHeader title="Clubs that play here" caption="Recurring groups. Join once, play every week." />}
-      {clubs.map((club) => (
-        <ClubRow key={club.id} club={club} onPress={() => nav.club(club.id)} />
+      {clubs.map((club, index) => (
+        <ClubRow key={club.id} index={games.length + index} club={club} onPress={() => nav.club(club.id)} />
       ))}
     </DetailLayout>
   );

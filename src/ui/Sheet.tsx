@@ -218,7 +218,12 @@ function SheetHost({
     [closed, half, clear, beginClose, start, y],
   );
 
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
+  // The sheet grows/shrinks (height) between full and half, and only slides (translate) below half.
+  // Its bottom stays on the screen edge, so the action bar and scroll area are always reachable.
+  const sheetStyle = useAnimatedStyle(() => ({
+    height: sheetHeight - Math.min(y.value, half),
+    transform: [{ translateY: Math.max(0, y.value - half) }],
+  }));
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: interpolate(y.value, [full, half], [1, 0], Extrapolation.CLAMP),
   }));
@@ -254,13 +259,13 @@ function SheetHost({
   const exiting = direction === 'forward' ? SlideOutLeft.duration(220) : direction === 'back' ? SlideOutRight.duration(220) : FadeOut.duration(120);
 
   return (
-    <View pointerEvents={hidden ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, hidden && styles.hidden]}>
+    <View pointerEvents={hidden ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, styles.host, hidden && styles.hidden]} aria-hidden={hidden}>
       <Animated.View pointerEvents={atFull && isOpen ? 'auto' : 'none'} style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}>
         <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Collapse" onPress={() => snapTo('half')} />
       </Animated.View>
       <Animated.View
         pointerEvents={isOpen ? 'box-none' : 'none'}
-        style={[styles.sheet, { top: insets.top + space.sm, height: sheetHeight }, sheetStyle]}
+        style={[styles.sheet, sheetStyle]}
       >
         <Glass radius={radius.sheet} style={styles.glass}>
           <ChromeContext.Provider value={chrome}>
@@ -297,18 +302,13 @@ function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
   const insets = useSafeAreaInsets();
   const [footerHeight, setFooterHeight] = useState(0);
 
-  // Keep the action bar on the visible part of the sheet, whatever its height.
-  const footerStyle = useAnimatedStyle(() => {
-    const offset = chrome ? Math.min(Math.max(chrome.y.value, 0), chrome.half) : 0;
-    return { transform: [{ translateY: -offset }] };
-  });
 
   if (!chrome) return null;
 
   return (
     <View style={styles.flex}>
       <GestureDetector gesture={chrome.pan}>
-        <View collapsable={false} style={styles.header}>
+        <View collapsable={false} style={[styles.header, styles.noSelect]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Resize sheet" onPress={chrome.toggle} style={styles.grabberHit}>
             <View style={styles.grabber} />
           </Pressable>
@@ -338,7 +338,7 @@ function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
 
       {footer ? (
         <Animated.View
-          style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space.sm) }, footerStyle]}
+          style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space.sm) }]}
           onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
         >
           {footer}
@@ -350,10 +350,14 @@ function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  hidden: { opacity: 0 },
+  // Clip the off-screen part of the sheet so browsers don't scroll the whole app to reveal it.
+  host: { overflow: 'hidden' },
+  noSelect: { userSelect: 'none' } as never,
+  // display:none so nothing inside can catch touches while a full-screen flow is on top.
+  hidden: { display: 'none' },
   backdrop: { backgroundColor: colors.scrim },
-  sheet: { position: 'absolute', left: 0, right: 0 },
-  glass: { flex: 1, overflow: 'hidden' },
+  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  glass: { flex: 1, overflow: 'hidden', userSelect: 'none' } as never,
   header: { paddingHorizontal: space.lg, paddingBottom: space.xs },
   grabberHit: { alignItems: 'center', paddingTop: space.sm, paddingBottom: space.xs },
   grabber: { width: 40, height: 5, borderRadius: radius.full, backgroundColor: colors.label3 },

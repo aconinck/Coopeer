@@ -1,15 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  LinearTransition,
+  ZoomIn,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { colors, radius, space, type } from '../constants/theme';
 import { DetailLayout, useDetailNav } from '../ui/DetailLayout';
 import { gameStatus, inviteUrl, isToday, type Club } from '../state/models';
 import { useSession } from '../state/session';
 import { useStore } from '../state/store';
 import { confirmDestructive, dollars, shareText } from '../lib/format';
-import { ActionBar, PrimaryButton, SecondaryButton, TextButton } from '../ui/Buttons';
+import { ActionBar, PrimaryButton, SecondaryButton, TextButton, haptic } from '../ui/Buttons';
 import { Avatar, ClubLogo, KindTag, SectionHeader, card } from '../ui/Display';
 import { GameRow, LinkRow } from '../ui/Rows';
 import { MoreMenu, type MenuItem } from '../ui/Screen';
@@ -26,13 +36,17 @@ export function ClubDetail({ id }: { id: string }) {
   const club = id ? store.club(id) : undefined;
   const isMember = club ? store.isMember(club.id) : false;
 
-  const wasMember = useRef(isMember);
+  const reduceMotion = useReducedMotion();
+  const [celebrating, setCelebrating] = useState(false);
+  const mounted = useRef(false);
   useEffect(() => {
-    if (isMember && !wasMember.current && Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    wasMember.current = isMember;
-  }, [isMember]);
+    mounted.current = true;
+  }, []);
+  useEffect(() => {
+    if (!celebrating) return;
+    const timer = setTimeout(() => setCelebrating(false), 1200);
+    return () => clearTimeout(timer);
+  }, [celebrating]);
 
   if (!club) {
     return (
@@ -64,10 +78,23 @@ export function ClubDetail({ id }: { id: string }) {
       title={club.name}
       trailing={<MoreMenu items={menu} />}
       footer={
-        isMember ? null : (
+        celebrating ? (
+          <ActionBar caption="Its games are now on your schedule.">
+            <PrimaryButton title="Welcome to the club" success onPress={() => undefined} />
+          </ActionBar>
+        ) : isMember ? null : (
           <ActionBar caption={`${dollars(club.monthlyPrice)}/month · all club games included · cancel anytime`}>
             {next && <SecondaryButton title="Try a game" onPress={() => nav.game(next.id)} />}
-            <PrimaryButton title="Join club" onPress={() => session.requireAuth(() => store.join(club.id))} />
+            <PrimaryButton
+              title="Join club"
+              onPress={() =>
+                session.requireAuth(() => {
+                  haptic.success();
+                  store.join(club.id);
+                  setCelebrating(true);
+                })
+              }
+            />
           </ActionBar>
         )
       }
@@ -79,26 +106,41 @@ export function ClubDetail({ id }: { id: string }) {
           <Text style={type.title2}>{club.name}</Text>
           <Text style={[type.subhead, styles.secondary]}>{club.cadence}</Text>
           {isMember && (
-            <View style={styles.memberRow}>
+            <Animated.View entering={mounted.current && !reduceMotion ? ZoomIn.springify().damping(10) : undefined} style={styles.memberRow}>
               <Ionicons name="checkmark-circle" size={14} color={colors.going} />
               <Text style={[type.footnote, { color: colors.going, fontWeight: '600' }]}>You're a member</Text>
-            </View>
+            </Animated.View>
           )}
         </View>
       </View>
 
       <Segmented value={tab} onChange={setTab} />
 
-      {tab === 'Games' && <GamesTab club={club} />}
-      {tab === 'About' && <AboutTab club={club} />}
-      {tab === 'Members' && <MembersTab club={club} />}
+      <Animated.View key={tab} entering={FadeIn.duration(220)} exiting={FadeOut.duration(100)} style={styles.tabBody}>
+        {tab === 'Games' && <GamesTab club={club} />}
+        {tab === 'About' && <AboutTab club={club} />}
+        {tab === 'Members' && <MembersTab club={club} />}
+      </Animated.View>
     </DetailLayout>
   );
 }
 
 function Segmented({ value, onChange }: { value: Tab; onChange: (tab: Tab) => void }) {
+  const [width, setWidth] = useState(0);
+  const index = tabs.indexOf(value);
+  const segment = (width - 6) / tabs.length;
+  const x = useSharedValue(0);
+  const ready = width > 0;
+
+  useEffect(() => {
+    if (ready) x.value = withSpring(index * segment, { damping: 18, stiffness: 240 });
+  }, [index, segment, ready, x]);
+
+  const pillStyle = useAnimatedStyle(() => ({ width: segment, opacity: ready ? 1 : 0, transform: [{ translateX: x.value }] }));
+
   return (
-    <View style={styles.segmented} accessibilityRole="tablist">
+    <View style={styles.segmented} accessibilityRole="tablist" onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      <Animated.View pointerEvents="none" style={[styles.segmentPill, pillStyle]} />
       {tabs.map((tab) => {
         const selected = tab === value;
         return (
@@ -106,8 +148,11 @@ function Segmented({ value, onChange }: { value: Tab; onChange: (tab: Tab) => vo
             key={tab}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            onPress={() => onChange(tab)}
-            style={[styles.segment, selected && styles.segmentSelected]}
+            onPress={() => {
+              if (!selected) haptic.selection();
+              onChange(tab);
+            }}
+            style={styles.segment}
           >
             <Text style={[type.subhead, { fontWeight: selected ? '600' : '500' }]}>{tab}</Text>
           </Pressable>
@@ -136,12 +181,12 @@ function GamesTab({ club }: { club: Club }) {
   return (
     <>
       {today.length > 0 && <SectionHeader title="Today" />}
-      {today.map((game) => (
-        <GameRow key={game.id} game={game} onPress={() => nav.game(game.id)} />
+      {today.map((game, index) => (
+        <GameRow key={game.id} index={index} game={game} onPress={() => nav.game(game.id)} />
       ))}
       {upcoming.length > 0 && <SectionHeader title="Upcoming" />}
-      {upcoming.map((game) => (
-        <GameRow key={game.id} game={game} onPress={() => nav.game(game.id)} />
+      {upcoming.map((game, index) => (
+        <GameRow key={game.id} index={today.length + index} game={game} onPress={() => nav.game(game.id)} />
       ))}
     </>
   );
@@ -220,11 +265,17 @@ function MembersTab({ club }: { club: Club }) {
         />
       </View>
       <Text style={type.headline}>{club.memberCount} members</Text>
-      {filtered.map((member) => (
-        <View key={member.id} style={styles.memberItem}>
+      {filtered.map((member, index) => (
+        <Animated.View
+          key={member.id}
+          layout={LinearTransition.springify().damping(18)}
+          entering={FadeInDown.delay(Math.min(index, 8) * 30)}
+          exiting={FadeOut.duration(120)}
+          style={styles.memberItem}
+        >
           <Avatar member={member} size={36} />
           <Text style={type.body}>{member.name}</Text>
-        </View>
+        </Animated.View>
       ))}
     </>
   );
@@ -237,7 +288,13 @@ const styles = StyleSheet.create({
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   segmented: { flexDirection: 'row', backgroundColor: colors.fill, borderRadius: radius.full, padding: 3 },
   segment: { flex: 1, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full },
-  segmentSelected: {
+  tabBody: { gap: space.md },
+  segmentPill: {
+    position: 'absolute',
+    left: 3,
+    top: 3,
+    height: 34,
+    borderRadius: radius.full,
     backgroundColor: colors.surface,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },

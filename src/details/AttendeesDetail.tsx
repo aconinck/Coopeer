@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
 import { DetailLayout } from '../ui/DetailLayout';
@@ -52,10 +53,16 @@ function Section({ title, members }: { title: string; members: Member[] }) {
       </Text>
       <View style={card}>
         {members.map((member, index) => (
-          <View key={member.id} style={[styles.row, index > 0 && styles.divider]}>
+          <Animated.View
+            key={member.id}
+            layout={LinearTransition.springify().damping(18)}
+            entering={FadeIn.delay(Math.min(index, 10) * 30)}
+            exiting={FadeOut.duration(120)}
+            style={[styles.row, index > 0 && styles.divider]}
+          >
             <Avatar member={member} size={32} />
             <Text style={type.body}>{member.name}</Text>
-          </View>
+          </Animated.View>
         ))}
       </View>
     </View>

@@ -1,4 +1,15 @@
+import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  LinearTransition,
+  ZoomIn,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
 import { gameStatus, initials, sports, spotsLeft, type Club, type Game, type Member, type SportId } from '../state/models';
@@ -22,25 +33,40 @@ export function Avatar({ member, size = 36 }: { member: Member; size?: number })
 }
 
 export function AvatarStack({ members, total, size = 24, limit = 4 }: { members: Member[]; total?: number; size?: number; limit?: number }) {
+  const mounted = useMounted();
   const shown = members.slice(0, limit);
   const extra = (total ?? members.length) - shown.length;
   const ring = { borderWidth: 2, borderColor: colors.surface, borderRadius: size };
   return (
     <View style={styles.row} accessibilityLabel={`${total ?? members.length} people`}>
       {shown.map((member, index) => (
-        <View key={member.id} style={[ring, { marginLeft: index === 0 ? 0 : -size * 0.32 }]}>
+        <Animated.View
+          key={member.id}
+          layout={LinearTransition.springify().damping(18)}
+          entering={mounted && member.id === 'me' ? ZoomIn.springify().damping(10) : undefined}
+          style={[ring, { marginLeft: index === 0 ? 0 : -size * 0.32 }]}
+        >
           <Avatar member={member} size={size} />
-        </View>
+        </Animated.View>
       ))}
       {extra > 0 && (
-        <View style={[ring, { marginLeft: -size * 0.32 }]}>
+        <Animated.View layout={LinearTransition.springify().damping(18)} style={[ring, { marginLeft: -size * 0.32 }]}>
           <View style={[styles.center, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.fill2 }]}>
             <Text style={{ fontSize: size * 0.36, fontWeight: '700', color: colors.label2 }}>+{extra}</Text>
           </View>
-        </View>
+        </Animated.View>
       )}
     </View>
   );
+}
+
+/** True after the first render — lets "something changed" animations skip the initial mount. */
+function useMounted() {
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
+  return mounted.current;
 }
 
 export function SportIcon({ sport, size = 28, ring }: { sport: SportId; size?: number; ring?: boolean }) {
@@ -76,12 +102,26 @@ export function DateTile({ game, now }: { game: Game; now: Date }) {
   const topColor = status === 'live' ? colors.live : status === 'later' || status === 'ended' ? colors.label2 : colors.brand;
   return (
     <View style={styles.dateTile}>
-      <Text style={[type.caption2, { color: topColor, fontWeight: '800' }]}>{top}</Text>
+      <TileTop text={top} color={topColor} pulse={status === 'live'} />
       <Text style={styles.tileTime} numberOfLines={1} adjustsFontSizeToFit>
         {time(game.start)}
       </Text>
     </View>
   );
+}
+
+function TileTop({ text, color, pulse }: { text: string; color: string; pulse: boolean }) {
+  const reduceMotion = useReducedMotion();
+  const opacity = useSharedValue(1);
+  useEffect(() => {
+    if (!pulse || reduceMotion) {
+      opacity.value = 1;
+      return;
+    }
+    opacity.value = withRepeat(withSequence(withTiming(0.35, { duration: 700 }), withTiming(1, { duration: 700 })), -1);
+  }, [pulse, reduceMotion, opacity]);
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return <Animated.Text style={[type.caption2, { color, fontWeight: '800' }, style]}>{text}</Animated.Text>;
 }
 
 export type BadgeKind = 'live' | 'going' | 'notGoing' | 'reply' | 'new' | 'canceled' | 'full' | 'member';
@@ -116,14 +156,15 @@ export function gameBadge(game: Game, isMember: boolean, now: Date): BadgeKind |
 }
 
 export function StatusBadge({ kind }: { kind: BadgeKind }) {
+  const mounted = useMounted();
   const { title, tone } = badgeInfo[kind];
   const { color, bg } = tones[tone];
   return (
-    <View style={[styles.badge, { backgroundColor: bg }]}>
+    <Animated.View key={kind} entering={mounted ? ZoomIn.springify().damping(11) : undefined} style={[styles.badge, { backgroundColor: bg }]}>
       {kind === 'live' && <View style={styles.liveDot} />}
       {kind === 'member' && <Ionicons name="checkmark" size={12} color={color} />}
       <Text style={[type.caption, { color, fontWeight: '600' }]}>{title}</Text>
-    </View>
+    </Animated.View>
   );
 }
 

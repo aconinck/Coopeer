@@ -1,15 +1,14 @@
-import { useEffect, useRef } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown, FadeInUp, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { colors, radius, space, type } from '../constants/theme';
 import { DetailLayout, useDetailNav } from '../ui/DetailLayout';
 import { gameStatus, sports, spotsLeft, type Club, type Game } from '../state/models';
 import { useSession } from '../state/session';
 import { useStore } from '../state/store';
 import { dollars, monthDay, openDirections, shareText, time } from '../lib/format';
-import { ActionBar, IconButton, PrimaryButton, SecondaryButton } from '../ui/Buttons';
+import { ActionBar, IconButton, PrimaryButton, SecondaryButton, haptic } from '../ui/Buttons';
 import { AvatarStack, ClubLogo, InfoChip, KindTag, StatusBadge, gameBadge } from '../ui/Display';
 
 /** Figma "Evento": one game, its time and place, who's going, and Decline / I'm in. */
@@ -18,15 +17,6 @@ export function GameDetail({ id }: { id: string }) {
   const store = useStore();
   const game = id ? store.game(id) : undefined;
   const place = game ? store.place(game.placeId) : undefined;
-
-  const wasGoing = useRef(game?.myRSVP === 'going');
-  useEffect(() => {
-    const going = game?.myRSVP === 'going';
-    if (going && !wasGoing.current && Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    wasGoing.current = going;
-  }, [game?.myRSVP]);
 
   if (!game || !place) {
     return (
@@ -43,57 +33,99 @@ export function GameDetail({ id }: { id: string }) {
 
   return (
     <DetailLayout title="Game" footer={<Footer game={game} isMember={isMember} />}>
-      <View style={styles.topLine}>
-        <KindTag kind={club ? 'clubGame' : 'openGame'} />
-        {badge && <StatusBadge kind={badge} />}
-      </View>
-      <Text style={[type.largeTitle, game.isCanceled && styles.strike]}>{game.title}</Text>
-      <HostRow club={club} />
-      <Text style={[type.body, styles.secondary]}>{game.details}</Text>
-
-      <View style={styles.divider} />
-
-      <View style={styles.chips}>
-        <InfoChip text={monthDay(game.start)} />
-        <View style={styles.flex} />
-        <InfoChip text={time(game.start)} />
-        <Text style={styles.secondary}>–</Text>
-        <InfoChip text={time(game.end)} />
-      </View>
-
-      <Pressable accessibilityRole="button" onPress={() => openDirections(place)} style={({ pressed }) => [styles.location, pressed && styles.pressed]}>
-        <Ionicons name="location-outline" size={22} color={colors.label2} />
-        <View style={styles.flex}>
-          <Text style={type.headline}>{place.name}</Text>
-          <Text style={[type.subhead, styles.secondary, styles.underline]}>{place.address}</Text>
+      <Stagger index={0}>
+        <View style={styles.topLine}>
+          <KindTag kind={club ? 'clubGame' : 'openGame'} />
+          {badge && <StatusBadge kind={badge} />}
         </View>
-        <Ionicons name="navigate" size={20} color={colors.brand} />
-      </Pressable>
+        <Text style={[type.largeTitle, game.isCanceled && styles.strike]}>{game.title}</Text>
+        <HostRow club={club} />
+        <Text style={[type.body, styles.secondary]}>{game.details}</Text>
+      </Stagger>
 
       <View style={styles.divider} />
 
-      <View style={styles.topLine}>
-        <Text style={type.headline}>Going</Text>
-        <Text style={[type.subhead, styles.secondary, { fontWeight: '600', fontVariant: ['tabular-nums'] }]}>
-          {game.going.length} of {game.capacity}
-        </Text>
-      </View>
-      <View style={styles.track}>
-        <View style={[styles.trackFill, { width: `${progress * 100}%` }]} />
-      </View>
-      <View style={styles.goingRow}>
-        <AvatarStack members={game.going} size={28} limit={3} />
-        <View style={styles.flex} />
-        <Pressable accessibilityRole="button" onPress={() => nav.attendees(game.id)} style={({ pressed }) => [styles.pill, pressed && styles.pressed]}>
-          <Text style={[type.subhead, { fontWeight: '600' }]}>See who's going</Text>
+      <Stagger index={1}>
+        <View style={styles.chips}>
+          <InfoChip text={monthDay(game.start)} />
+          <View style={styles.flex} />
+          <InfoChip text={time(game.start)} />
+          <Text style={styles.secondary}>–</Text>
+          <InfoChip text={time(game.end)} />
+        </View>
+
+        <Pressable accessibilityRole="button" onPress={() => openDirections(place)} style={({ pressed }) => [styles.location, pressed && styles.pressed]}>
+          <Ionicons name="location-outline" size={22} color={colors.label2} />
+          <View style={styles.flex}>
+            <Text style={type.headline}>{place.name}</Text>
+            <Text style={[type.subhead, styles.secondary, styles.underline]}>{place.address}</Text>
+          </View>
+          <Ionicons name="navigate" size={20} color={colors.brand} />
         </Pressable>
-        <IconButton
-          icon="share-outline"
-          label="Share"
-          onPress={() => shareText(`${game.title} · ${monthDay(game.start)} ${time(game.start)} at ${place.name}`, `coopeer://game/${game.id}`)}
-        />
-      </View>
+      </Stagger>
+
+      <View style={styles.divider} />
+
+      <Stagger index={2}>
+        <View style={styles.topLine}>
+          <Text style={type.headline}>Going</Text>
+          <RollingCount value={game.going.length} suffix={` of ${game.capacity}`} />
+        </View>
+        <ProgressTrack value={progress} />
+        <View style={styles.goingRow}>
+          <AvatarStack members={game.going} size={28} limit={3} />
+          <View style={styles.flex} />
+          <Pressable accessibilityRole="button" onPress={() => nav.attendees(game.id)} style={({ pressed }) => [styles.pill, pressed && styles.pressed]}>
+            <Text style={[type.subhead, { fontWeight: '600' }]}>See who's going</Text>
+          </Pressable>
+          <IconButton
+            icon="share-outline"
+            label="Share"
+            onPress={() => shareText(`${game.title} · ${monthDay(game.start)} ${time(game.start)} at ${place.name}`, `coopeer://game/${game.id}`)}
+          />
+        </View>
+      </Stagger>
     </DetailLayout>
+  );
+}
+
+function Stagger({ index, children }: { index: number; children: ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <Animated.View entering={reduceMotion ? undefined : FadeInDown.delay(60 + index * 70).springify().damping(18)} style={styles.group}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Going bar fills with a spring whenever the count changes. */
+function ProgressTrack({ value }: { value: number }) {
+  const [width, setWidth] = useState(0);
+  const fill = useSharedValue(0);
+  useEffect(() => {
+    fill.value = withSpring(value, { damping: 16, stiffness: 120 });
+  }, [value, fill]);
+  const style = useAnimatedStyle(() => ({ width: fill.value * width }));
+  return (
+    <View style={styles.track} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      <Animated.View style={[styles.trackFill, style]} />
+    </View>
+  );
+}
+
+/** The number slides in from below when it changes. */
+function RollingCount({ value, suffix }: { value: number; suffix: string }) {
+  const first = useRef(true);
+  useEffect(() => {
+    first.current = false;
+  }, []);
+  return (
+    <View style={styles.countRow}>
+      <Animated.Text key={value} entering={first.current ? undefined : FadeInUp.springify().damping(14)} style={[type.subhead, styles.count]}>
+        {value}
+      </Animated.Text>
+      <Text style={[type.subhead, styles.count]}>{suffix}</Text>
+    </View>
   );
 }
 
@@ -122,9 +154,30 @@ function Footer({ game, isMember }: { game: Game; isMember: boolean }) {
   const store = useStore();
   const session = useSession();
   const status = gameStatus(game, store.now);
+  const [celebrating, setCelebrating] = useState(false);
+
+  useEffect(() => {
+    if (!celebrating) return;
+    const timer = setTimeout(() => setCelebrating(false), 1200);
+    return () => clearTimeout(timer);
+  }, [celebrating]);
+
+  const imIn = () =>
+    session.requireAuth(() => {
+      haptic.success();
+      store.setRSVP(game.id, 'going');
+      setCelebrating(true);
+    });
 
   if (game.isCanceled) return <ActionBar caption="This game was canceled." />;
   if (status === 'ended') return <ActionBar caption="This game has ended." />;
+  if (celebrating) {
+    return (
+      <ActionBar caption="See you there!">
+        <PrimaryButton title="You're in" success onPress={() => undefined} />
+      </ActionBar>
+    );
+  }
   if (game.myRSVP === 'going') {
     return (
       <ActionBar caption="You're in. See you there!">
@@ -142,7 +195,7 @@ function Footer({ game, isMember }: { game: Game; isMember: boolean }) {
         disabled={declined}
         onPress={() => session.requireAuth(() => store.setRSVP(game.id, 'declined'))}
       />
-      <PrimaryButton title={full ? 'Full' : "I'm in"} disabled={full} onPress={() => session.requireAuth(() => store.setRSVP(game.id, 'going'))} />
+      <PrimaryButton title={full ? 'Full' : "I'm in"} disabled={full} onPress={imIn} />
     </ActionBar>
   );
 }
@@ -160,6 +213,9 @@ const styles = StyleSheet.create({
   location: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   track: { height: 8, borderRadius: radius.full, backgroundColor: colors.fill2, overflow: 'hidden' },
   trackFill: { height: 8, borderRadius: radius.full, backgroundColor: colors.brand },
+  group: { gap: space.md },
+  countRow: { flexDirection: 'row', overflow: 'hidden' },
+  count: { color: colors.label2, fontWeight: '600', fontVariant: ['tabular-nums'] },
   goingRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   pill: { height: 40, paddingHorizontal: space.lg, borderRadius: radius.full, backgroundColor: colors.fill, justifyContent: 'center' },
 });

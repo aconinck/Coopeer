@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown, ZoomIn, useReducedMotion } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../../src/constants/theme';
@@ -18,48 +20,94 @@ export default function ProfileScreen() {
 
   return (
     <Screen variant="tab" title="Profile">
-      <View style={styles.header}>
-        {user ? (
-          <>
-            <Avatar member={{ id: user.id, name: user.name }} size={88} />
-            <Text style={[type.title2, styles.white]}>{user.name}</Text>
-            <Text style={[type.subhead, styles.whiteSoft]}>
-              {store.myClubs.length} clubs · {goingCount} games coming up
-            </Text>
-          </>
-        ) : (
-          <>
-            <Ionicons name="person-circle" size={80} color={colors.white} />
-            <Text style={[type.title3, styles.white]}>You're browsing as a guest</Text>
-            <Pressable accessibilityRole="button" onPress={() => router.push('/auth')} style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.7 }]}>
-              <Text style={[type.headline, styles.white]}>Sign in with phone</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
+      <Stagger index={0}>
+        <View style={styles.header}>
+          {user ? (
+            <>
+              <Animated.View entering={ZoomIn.delay(120).springify().damping(12)}>
+                <Avatar member={{ id: user.id, name: user.name }} size={88} />
+              </Animated.View>
+              <Text style={[type.title2, styles.white]}>{user.name}</Text>
+              <Text style={[type.subhead, styles.whiteSoft]}>
+                {store.myClubs.length} clubs · {goingCount} games coming up
+              </Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="person-circle" size={80} color={colors.white} />
+              <Text style={[type.title3, styles.white]}>You're browsing as a guest</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/auth')}
+                style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={[type.headline, styles.white]}>Sign in with phone</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      </Stagger>
 
-      <View style={card}>
-        {user && <Row icon="person-outline" label="Personal info" onPress={() => router.push('/personal-info')} />}
-        {user && <Row icon="card-outline" label="Payments" onPress={() => router.push('/payments')} divider />}
-        <Row icon="help-circle-outline" label="How Coopeer works" onPress={() => router.push('/how-it-works')} divider={!!user} />
-      </View>
+      <Stagger index={1}>
+        <View style={card}>
+          {user && <Row icon="person-outline" label="Personal info" onPress={() => router.push('/personal-info')} />}
+          {user && <Row icon="card-outline" label="Payments" onPress={() => router.push('/payments')} divider />}
+          <Row icon="help-circle-outline" label="How Coopeer works" onPress={() => router.push('/how-it-works')} divider={!!user} />
+        </View>
+      </Stagger>
 
       {user && (
-        <View style={card}>
-          <Row
-            label="Sign out"
-            destructive
-            onPress={() =>
-              confirmDestructive('Sign out of Coopeer?', 'You can sign back in anytime with your phone number.', 'Sign out', session.signOut)
-            }
-          />
-        </View>
+        <Stagger index={2}>
+          <View style={card}>
+            <Row
+              label="Sign out"
+              destructive
+              onPress={() =>
+                confirmDestructive(
+                  'Sign out of Coopeer?',
+                  'You can sign back in anytime with your phone number.',
+                  'Sign out',
+                  session.signOut,
+                )
+              }
+            />
+          </View>
+        </Stagger>
       )}
     </Screen>
   );
 }
 
-function Row({ icon, label, onPress, divider, destructive }: { icon?: IconName; label: string; onPress: () => void; divider?: boolean; destructive?: boolean }) {
+function Stagger({ index, children }: { index: number; children: ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <Animated.View
+      entering={
+        reduceMotion
+          ? undefined
+          : FadeInDown.delay(40 + index * 70)
+              .springify()
+              .damping(18)
+      }
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+function Row({
+  icon,
+  label,
+  onPress,
+  divider,
+  destructive,
+}: {
+  icon?: IconName;
+  label: string;
+  onPress: () => void;
+  divider?: boolean;
+  destructive?: boolean;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
