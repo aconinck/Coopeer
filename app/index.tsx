@@ -1,5 +1,8 @@
 import { Redirect } from 'expo-router';
+import { useSession } from '../src/state/session';
 
 export default function Index() {
-  return <Redirect href="/(tabs)/discover" />;
+  const session = useSession();
+  if (!session.isReady) return null;
+  return <Redirect href={session.hasOnboarded ? '/explore' : '/welcome'} />;
 }

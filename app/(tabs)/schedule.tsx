@@ -1,146 +1,75 @@
-// Schedule — all upcoming events across all of the user's teams.
-// Useful for multi-sport users. Groups events by date.
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  SectionList,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { EventCard } from '../../src/components/event/EventCard';
-import { NavBar } from '../../src/components/shared/NavBar';
-import { getMyEvents } from '../../src/services/api';
-import { colors, typography, spacing } from '../../src/constants/theme';
-import type { Event } from '../../src/types';
+import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, space, type } from '../../src/constants/theme';
+import { gameStatus, isToday } from '../../src/state/models';
+import { useSession } from '../../src/state/session';
+import { useStore } from '../../src/state/store';
+import { open } from '../../src/lib/nav';
+import { PrimaryButton } from '../../src/ui/Buttons';
+import { SectionHeader } from '../../src/ui/Display';
+import { GameRow } from '../../src/ui/Rows';
+import { Screen } from '../../src/ui/Screen';
 
-interface Section {
-  title: string;
-  data: Event[];
-}
-
-function groupEventsByDate(events: Event[]): Section[] {
-  const map = new Map<string, Event[]>();
-
-  events
-    .filter((e) => e.date >= new Date())
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .forEach((event) => {
-      const dateKey = event.date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-      });
-      if (!map.has(dateKey)) map.set(dateKey, []);
-      map.get(dateKey)!.push(event);
-    });
-
-  return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
-}
-
+/** Figma "Hoje": games from your clubs plus games you said you're in for. */
 export default function ScheduleScreen() {
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
+  const store = useStore();
+  const session = useSession();
 
-  useEffect(() => {
-    getMyEvents().then((events) => {
-      setSections(groupEventsByDate(events));
-      setLoading(false);
-    });
-  }, []);
+  if (!session.isSignedIn) {
+    return (
+      <Screen variant="tab" title="Schedule">
+        <Empty
+          title="Your games live here"
+          text="Sign in with your phone number to keep track of the games you're playing."
+          action="Sign in"
+          onPress={() => router.push('/auth')}
+        />
+      </Screen>
+    );
+  }
+
+  const games = store.mySchedule;
+  const today = games.filter((g) => isToday(gameStatus(g, store.now)));
+  const upcoming = games.filter((g) => gameStatus(g, store.now) === 'later');
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Schedule</Text>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      ) : sections.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>No upcoming games</Text>
-          <Text style={styles.emptySubtitle}>
-            Join a team to see your schedule here
-          </Text>
-        </View>
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-            </View>
-          )}
-          renderItem={({ item }) => (
-            <EventCard event={item} />
-          )}
-          stickySectionHeadersEnabled={false}
+    <Screen variant="tab" title="Schedule">
+      {games.length === 0 && (
+        <Empty
+          title="Nothing scheduled"
+          text="Find a game on the map, or join a club to get its games here automatically."
+          action="Explore the map"
+          onPress={() => router.navigate('/explore')}
         />
       )}
+      {today.length > 0 && <SectionHeader title="Today" />}
+      {today.map((game) => (
+        <GameRow key={game.id} game={game} onPress={() => open.game(game.id)} />
+      ))}
+      {upcoming.length > 0 && <SectionHeader title="Upcoming" />}
+      {upcoming.map((game) => (
+        <GameRow key={game.id} game={game} onPress={() => open.game(game.id)} />
+      ))}
+    </Screen>
+  );
+}
 
-      <NavBar />
-    </SafeAreaView>
+function Empty({ title, text, action, onPress }: { title: string; text: string; action: string; onPress: () => void }) {
+  return (
+    <View style={styles.empty}>
+      <Ionicons name="calendar" size={44} color={colors.label3} />
+      <Text style={type.title2}>{title}</Text>
+      <Text style={[type.subhead, styles.text]}>{text}</Text>
+      <View style={styles.action}>
+        <PrimaryButton title={action} onPress={onPress} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    height: 64,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.primaryBorder,
-  },
-  headerTitle: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    color: colors.black,
-    letterSpacing: typography.tracking.tight,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  emptyTitle: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    color: colors.black,
-    marginBottom: spacing.sm,
-  },
-  emptySubtitle: {
-    fontSize: typography.sizes.base,
-    color: colors.gray500,
-    textAlign: 'center',
-  },
-  list: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: 100,
-    gap: spacing.sm,
-  },
-  sectionHeader: {
-    paddingVertical: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.bold,
-    color: colors.gray500,
-  },
+  empty: { alignItems: 'center', gap: space.md, paddingVertical: space.xxl },
+  text: { color: colors.label2, textAlign: 'center', paddingHorizontal: space.lg },
+  action: { flexDirection: 'row', alignSelf: 'stretch', marginTop: space.sm },
 });

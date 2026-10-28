@@ -1,35 +1,40 @@
-import { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet } from 'react-native';
+import { colors } from '../src/constants/theme';
+import { SessionProvider } from '../src/state/session';
+import { StoreProvider } from '../src/state/store';
 
-SplashScreen.preventAutoHideAsync();
+const sheet = {
+  presentation: 'formSheet',
+  sheetGrabberVisible: true,
+  sheetCornerRadius: 32,
+} as const;
 
 export default function RootLayout() {
-  useEffect(() => {
-    // Hide splash after fonts/assets are loaded.
-    // In production, wait for useFonts hook here.
-    SplashScreen.hideAsync();
-  }, []);
-
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="team/[id]" />
-        <Stack.Screen name="event/[id]" />
-        <Stack.Screen name="live/[id]" />
-        <Stack.Screen name="result/[id]" />
-        <Stack.Screen name="checkout/index" />
-        <Stack.Screen name="onboarding/index" />
-      </Stack>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SessionProvider>
+        <StoreProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+            <Stack.Screen name="auth" options={{ presentation: 'fullScreenModal' }} />
+            <Stack.Screen name="place/[id]" options={{ ...sheet, sheetAllowedDetents: [0.55, 1], sheetLargestUndimmedDetentIndex: 0 }} />
+            <Stack.Screen name="game/[id]" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="club/[id]" />
+            <Stack.Screen name="attendees/[id]" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
+            <Stack.Screen name="join/index" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="join/[code]" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="invite/[id]" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="personal-info" />
+            <Stack.Screen name="payments" />
+            <Stack.Screen name="how-it-works" />
+          </Stack>
+        </StoreProvider>
+      </SessionProvider>
     </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-});

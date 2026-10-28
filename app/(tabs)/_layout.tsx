@@ -1,14 +1,12 @@
 import { Tabs } from 'expo-router';
+import { TabBar } from '../../src/ui/TabBar';
 
-// Tabs are rendered without the default tab bar — we use our custom NavBar overlay
-// in each screen. The tab navigator is still needed for routing.
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>
-      <Tabs.Screen name="discover" />
-      <Tabs.Screen name="teams" />
-      <Tabs.Screen name="feed" />
-      <Tabs.Screen name="ranking" />
+    <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...props} />}>
+      <Tabs.Screen name="explore" />
+      <Tabs.Screen name="clubs" />
+      <Tabs.Screen name="schedule" />
       <Tabs.Screen name="profile" />
     </Tabs>
   );

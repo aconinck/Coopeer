@@ -1,160 +1,104 @@
-// Design tokens — single source of truth for all visual constants.
-// Never hardcode colors, spacing, or radius values in components.
+// Design tokens — Liquid Glass (Apple iOS 26). Single source of truth:
+// never hardcode colors, sizes or radii in screens.
+import { Platform, type TextStyle } from 'react-native';
 
 export const colors = {
-  // Brand — #FF6100 is the actual brand color from the logo SVG
-  primary: '#FF6100',
-  primaryLight: '#FFF4ED',
-  primaryBorder: '#FFD4A8',
-  primaryMid: '#FFEBCF',
+  brand: '#FF6100',
+  brandSoft: 'rgba(255,97,0,0.12)',
 
-  // Neutral
-  black: '#1A1A1A',
-  white: '#FFFFFF',
-  background: '#FAFAFA',
+  bg: '#F2F2F7',
   surface: '#FFFFFF',
-  gray100: '#D1D1D1',
-  gray500: '#5D5D5D',
-  gray600: '#4F4F4F',
-  gray800: '#3D3D3D',
+  label: '#000000',
+  label2: 'rgba(60,60,67,0.62)',
+  label3: 'rgba(60,60,67,0.32)',
+  separator: 'rgba(60,60,67,0.14)',
+  fill: 'rgba(120,120,128,0.12)',
+  fill2: 'rgba(120,120,128,0.20)',
+  gray3: '#C7C7CC',
+  white: '#FFFFFF',
+  black: '#000000',
 
-  // Sport pin colors — each sport has a fixed color
-  soccer: '#FF6100',
-  pickleball: '#7F77DD',
-  basketball: '#D85A30',
-  tennis: '#1D9E75',
-  running: '#378ADD',
+  glass: 'rgba(255,255,255,0.62)',
+  glassBorder: 'rgba(255,255,255,0.75)',
+  glassEdge: 'rgba(0,0,0,0.06)',
+  scrim: 'rgba(0,0,0,0.3)',
 
-  // Semantic
-  success: '#1D9E75',
-  error: '#E24B4A',
-  warning: '#EF9F27',
+  soccer: '#30B35A',
+  pickleball: '#5B5BD6',
+  live: '#FF3B30',
+  going: '#30B35A',
+  orange: '#FF9500',
 
-  // Gamification
-  gold: '#F9CF3C',
-  goldText: '#B08C09',
-
-  // AllTrails premium surfaces
-  surface2: '#F7F5F2',       // warm off-white background
-  surfaceDark: '#111318',    // FACEIT-style dark feed background
-  cardDark: '#1C2029',       // dark feed card background
-  borderDark: '#2A2F3E',     // dark card borders
-  accent: '#FF6100',         // alias for primary orange
+  heroDark: '#0B0603',
+  heroGlow: '#FF6100',
+  heroGlowDeep: '#6B2400',
 } as const;
 
-export const typography = {
-  // Nunito Sans throughout — falls back to system font until loaded
-  fontFamily: {
-    regular: 'NunitoSans_400Regular',
-    bold: 'NunitoSans_700Bold',
-  },
+const fontFamily = Platform.select({
+  web: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif',
+  default: undefined,
+});
 
-  sizes: {
-    xs: 10,
-    sm: 12,
-    base: 14,
-    md: 16,
-    lg: 20,
-    xl: 24,
-    xxl: 32,
-    hero: 28,
-    display: 40,
-  },
+const t = (fontSize: number, lineHeight: number, fontWeight: TextStyle['fontWeight'], letterSpacing = 0): TextStyle => ({
+  fontFamily,
+  fontSize,
+  lineHeight,
+  fontWeight,
+  letterSpacing,
+});
 
-  weights: {
-    regular: '400' as const,
-    bold: '700' as const,
-  },
-
-  // Letter spacing from Figma
-  tracking: {
-    tight: -0.44,
-    normal: -0.308,
-  },
+// Apple text styles
+export const type = {
+  hero: t(44, 50, '800', -0.5),
+  largeTitle: t(34, 41, '700', 0.37),
+  title: t(28, 34, '700', 0.36),
+  title2: t(22, 28, '700', 0.35),
+  title3: t(20, 25, '600', 0.38),
+  headline: t(17, 22, '600', -0.41),
+  body: t(17, 22, '400', -0.41),
+  callout: t(16, 21, '400', -0.32),
+  subhead: t(15, 20, '400', -0.24),
+  footnote: t(13, 18, '400', -0.08),
+  caption: t(12, 16, '400', 0),
+  caption2: t(11, 13, '700', 0.3),
+  code: t(36, 44, '600', 1),
 } as const;
 
-export const spacing = {
+export const space = {
   xs: 4,
   sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
 } as const;
 
 export const radius = {
-  sm: 8,
-  md: 10,
-  lg: 16,
+  tile: 14,
+  card: 22,
+  sheet: 32,
   full: 999,
 } as const;
 
-// Component-level tokens derived from Figma specs
-export const components = {
-  button: {
-    height: 64,
-    paddingHorizontal: 24,
-    borderRadius: radius.full,
-  },
-  header: {
-    height: 113,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    background: colors.primaryLight,
-  },
-  navBar: {
-    width: 240,
-    height: 52,
-    borderRadius: radius.full,
-    padding: 6,
-    itemSize: 40,
-    background: colors.primaryMid,
-    border: colors.primaryBorder,
-  },
-  teamCard: {
-    width: 174,
-    height: 140,
-    borderRadius: radius.md,
-    paddingVertical: 18,
-    paddingHorizontal: spacing.lg,
-    border: colors.gray100,
-  },
-  eventCard: {
-    width: 355,
-    height: 116,
-    borderRadius: radius.md,
-  },
-  pin: {
-    size: 28,
-    borderWidth: 2,
-    borderColor: colors.white,
-  },
+export const layout = {
+  tabBarHeight: 62,
+  control: 50,
+  iconButton: 44,
 } as const;
 
-// Sport definitions — static config for all supported sports
-export const sports = [
-  { id: 'soccer' as const, label: 'Soccer', emoji: '⚽', color: colors.soccer },
-  { id: 'pickleball' as const, label: 'Pickleball', emoji: '🏓', color: colors.pickleball },
-  { id: 'basketball' as const, label: 'Basketball', emoji: '🏀', color: colors.basketball },
-  { id: 'tennis' as const, label: 'Tennis', emoji: '🎾', color: colors.tennis },
-  { id: 'running' as const, label: 'Running', emoji: '🏃', color: colors.running },
-];
-
-export type SportId = 'soccer' | 'pickleball' | 'basketball' | 'tennis' | 'running';
-
-// Elevation shadow presets
-export const shadows = {
-  card: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  elevated: {
+export const shadow = {
+  glass: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.12,
     shadowRadius: 24,
     elevation: 8,
+  },
+  soft: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 2,
   },
 } as const;
