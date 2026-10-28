@@ -5,8 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, useReducedMotion, ZoomIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, useReducedMotion } from 'react-native-reanimated';
 import { colors, flow, flowColors, radius, space, type } from '../../src/constants/theme';
+import { spring, timing } from '../../src/constants/motion';
 import { TEAM_CODE_LENGTH, dollars, extractTeamCode } from '../../src/lib/format';
 import { sports, type Club } from '../../src/state/models';
 import { useSession } from '../../src/state/session';
@@ -205,7 +206,7 @@ function FoundPanel({ club, onCancel }: { club: Club; onCancel: () => void }) {
     wasMember.current = isMember;
   }, [isMember]);
 
-  const pop = reduceMotion ? undefined : ZoomIn.springify().damping(11).stiffness(220);
+  const pop = reduceMotion ? undefined : FadeIn.duration(timing.fade.duration);
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -213,7 +214,7 @@ function FoundPanel({ club, onCancel }: { club: Club; onCancel: () => void }) {
         <Pressable style={[StyleSheet.absoluteFill, styles.backdrop]} onPress={onCancel} accessibilityLabel="Dismiss" />
       </Animated.View>
       <Animated.View
-        entering={reduceMotion ? FadeIn : SlideInDown.springify().damping(20).stiffness(170)}
+        entering={reduceMotion ? FadeIn : SlideInDown.springify().mass(1).stiffness(spring.smooth.stiffness).damping(spring.smooth.damping)}
         exiting={reduceMotion ? FadeOut : SlideOutDown.duration(220)}
         style={styles.panelWrap}
       >

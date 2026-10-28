@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
+  Easing,
   LinearTransition,
-  ZoomIn,
+  FadeIn,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -12,6 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
+import { spring, timing } from '../constants/motion';
 import { gameStatus, initials, sports, spotsLeft, type Club, type Game, type Member, type SportId } from '../state/models';
 import { isTomorrow, time, weekday } from '../lib/format';
 
@@ -42,15 +44,15 @@ export function AvatarStack({ members, total, size = 24, limit = 4 }: { members:
       {shown.map((member, index) => (
         <Animated.View
           key={member.id}
-          layout={LinearTransition.springify().damping(18)}
-          entering={mounted && member.id === 'me' ? ZoomIn.springify().damping(10) : undefined}
+          layout={LinearTransition.springify().mass(1).stiffness(spring.smooth.stiffness).damping(spring.smooth.damping)}
+          entering={mounted && member.id === 'me' ? FadeIn.duration(timing.fade.duration) : undefined}
           style={[ring, { marginLeft: index === 0 ? 0 : -size * 0.32 }]}
         >
           <Avatar member={member} size={size} />
         </Animated.View>
       ))}
       {extra > 0 && (
-        <Animated.View layout={LinearTransition.springify().damping(18)} style={[ring, { marginLeft: -size * 0.32 }]}>
+        <Animated.View layout={LinearTransition.springify().mass(1).stiffness(spring.smooth.stiffness).damping(spring.smooth.damping)} style={[ring, { marginLeft: -size * 0.32 }]}>
           <View style={[styles.center, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.fill2 }]}>
             <Text style={{ fontSize: size * 0.36, fontWeight: '700', color: colors.label2 }}>+{extra}</Text>
           </View>
@@ -118,7 +120,7 @@ function TileTop({ text, color, pulse }: { text: string; color: string; pulse: b
       opacity.value = 1;
       return;
     }
-    opacity.value = withRepeat(withSequence(withTiming(0.35, { duration: 700 }), withTiming(1, { duration: 700 })), -1);
+    opacity.value = withRepeat(withSequence(withTiming(0.55, { duration: 1100, easing: Easing.inOut(Easing.sin) }), withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.sin) })), -1);
   }, [pulse, reduceMotion, opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return <Animated.Text style={[type.caption2, { color, fontWeight: '800' }, style]}>{text}</Animated.Text>;
@@ -160,7 +162,7 @@ export function StatusBadge({ kind }: { kind: BadgeKind }) {
   const { title, tone } = badgeInfo[kind];
   const { color, bg } = tones[tone];
   return (
-    <Animated.View key={kind} entering={mounted ? ZoomIn.springify().damping(11) : undefined} style={[styles.badge, { backgroundColor: bg }]}>
+    <Animated.View key={kind} entering={mounted ? FadeIn.duration(timing.fade.duration) : undefined} style={[styles.badge, { backgroundColor: bg }]}>
       {kind === 'live' && <View style={styles.liveDot} />}
       {kind === 'member' && <Ionicons name="checkmark" size={12} color={color} />}
       <Text style={[type.caption, { color, fontWeight: '600' }]}>{title}</Text>

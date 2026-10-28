@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { mapColors } from '../constants/theme';
+import { spring } from '../constants/motion';
 import type { Place } from '../state/models';
 import { PlacePin, type PlaceSummary } from './PlacePin';
 import { BENTONVILLE_CENTER, DEFAULT_SPAN, RENDER_HEIGHT, RENDER_WIDTH, project } from './projection';
@@ -33,7 +34,7 @@ interface StreetMapProps {
   onBackgroundPress?: () => void;
 }
 
-const CAMERA_SPRING = { damping: 22, stiffness: 110, mass: 1 } as const;
+const CAMERA_SPRING = spring.camera;
 
 /** Grayscale, streets-only map of Bentonville drawn in SVG. Same look on iOS, Android and web. */
 export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function StreetMap(
@@ -165,7 +166,6 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
 
-
   return (
     <View
       style={[StyleSheet.absoluteFill, styles.ground]}
@@ -241,20 +241,10 @@ function Marker({
   }));
 
   const pinStyle = useAnimatedStyle(() => ({
-    opacity: withSpring(dimmed ? 0.45 : 1),
+    opacity: withSpring(dimmed ? 0.5 : 1, spring.smooth),
     transform: [
-      {
-        translateY: withSpring(selected ? -6 : 0, {
-          damping: 12,
-          stiffness: 220,
-        }),
-      },
-      {
-        scale: withSpring((selected ? 1.18 : 1) * (1 - pressed.value * 0.1), {
-          damping: 12,
-          stiffness: 260,
-        }),
-      },
+      { translateY: withSpring(selected ? -4 : 0, spring.smooth) },
+      { scale: withSpring((selected ? 1.1 : 1) * (1 - pressed.value * 0.04), pressed.value ? spring.quick : spring.smooth) },
     ],
   }));
 
@@ -267,29 +257,34 @@ function Marker({
     <Animated.View pointerEvents="box-none" style={[styles.anchor, { zIndex: selected ? 3 : summary.live ? 2 : 1 }, position]}>
       <View pointerEvents="box-none" style={styles.pinBox}>
         <Animated.View
-          entering={ZoomIn.springify()
-            .damping(13)
-            .delay(120 + index * 70)}
+          entering={ZoomIn.withInitialValues({ transform: [{ scale: 0.9 }] })
+            .springify()
+            .mass(1)
+            .stiffness(spring.smooth.stiffness)
+            .damping(spring.smooth.damping)
+            .delay(120 + Math.min(index, 8) * 40)}
         >
-          <Animated.View style={pinStyle}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={summary.place.name}
-              onPress={onPress}
-              onPressIn={() => {
-                pressed.value = 1;
-              }}
-              onPressOut={() => {
-                pressed.value = 0;
-              }}
-              hitSlop={8}
-            >
-              <PlacePin summary={summary} />
-            </Pressable>
+          <Animated.View entering={FadeIn.duration(260).delay(120 + Math.min(index, 8) * 40)}>
+            <Animated.View style={pinStyle}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={summary.place.name}
+                onPress={onPress}
+                onPressIn={() => {
+                  pressed.value = 1;
+                }}
+                onPressOut={() => {
+                  pressed.value = 0;
+                }}
+                hitSlop={8}
+              >
+                <PlacePin summary={summary} />
+              </Pressable>
+            </Animated.View>
           </Animated.View>
         </Animated.View>
       </View>
-      <Animated.View entering={FadeIn.delay(300 + index * 70)} pointerEvents="none" style={styles.nameBox}>
+      <Animated.View entering={FadeIn.duration(260).delay(300 + Math.min(index, 8) * 40)} pointerEvents="none" style={styles.nameBox}>
         <Animated.Text numberOfLines={1} style={[styles.name, nameStyle]}>
           {summary.place.name}
         </Animated.Text>

@@ -27,6 +27,8 @@ export default function RootLayout() {
               <Stack.Screen name="join/index" options={{ presentation: 'modal' }} />
               <Stack.Screen name="join/[code]" options={{ presentation: 'modal' }} />
               <Stack.Screen name="invite/[id]" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="create/club" options={{ presentation: 'fullScreenModal' }} />
+              <Stack.Screen name="create/game" options={{ presentation: 'modal' }} />
               <Stack.Screen name="personal-info" />
               <Stack.Screen name="payments" />
               <Stack.Screen name="how-it-works" />

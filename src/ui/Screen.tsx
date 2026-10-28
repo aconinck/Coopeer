@@ -1,11 +1,12 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import { enter, spring, timing } from '../constants/motion';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, layout, radius, space, type } from '../constants/theme';
-import { IconButton, haptic, type IconName } from './Buttons';
+import { IconButton, type IconName } from './Buttons';
 import { Glass } from './Glass';
 
 export const useTabBarSpace = () => {
@@ -106,14 +107,13 @@ export function MoreMenu({ items, icon = 'ellipsis-horizontal', label = 'More' }
     if (Platform.OS !== 'ios') setTimeout(runPending, Platform.OS === 'web' ? 250 : 0);
   };
   const show = () => {
-    haptic.light();
     setOpen(true);
     progress.value = 0;
-    progress.value = reduceMotion ? 1 : withSpring(1, { damping: 18, stiffness: 260 });
+    progress.value = reduceMotion ? 1 : withSpring(1, spring.smooth);
   };
   const hide = (then?: () => void) => {
     pending.current = then ?? null;
-    progress.value = withTiming(0, { duration: 140 }, (finished) => {
+    progress.value = withTiming(0, { duration: 160, easing: timing.fade.easing }, (finished) => {
       if (!finished) return;
       runOnJS(setOpen)(false);
       runOnJS(afterClose)();
@@ -123,7 +123,7 @@ export function MoreMenu({ items, icon = 'ellipsis-horizontal', label = 'More' }
   const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
   const cardStyle = useAnimatedStyle(() => ({
     opacity: Math.min(progress.value * 1.5, 1),
-    transform: [{ scale: 0.85 + progress.value * 0.15 }],
+    transform: [{ scale: 0.92 + progress.value * 0.08 }],
   }));
 
   return (
@@ -136,7 +136,7 @@ export function MoreMenu({ items, icon = 'ellipsis-horizontal', label = 'More' }
         <Animated.View style={[styles.menu, { top: insets.top + 56 }, cardStyle]}>
           <Glass radius={radius.card} style={styles.menuCard}>
             {items.map((item, index) => (
-              <Animated.View key={item.label} entering={reduceMotion ? undefined : FadeInDown.delay(40 + index * 40).springify().damping(18)}>
+              <Animated.View key={item.label} entering={reduceMotion ? undefined : enter(index)}>
                 <Pressable
                   accessibilityRole="menuitem"
                   onPress={() => hide(item.onPress)}

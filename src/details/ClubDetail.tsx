@@ -1,21 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeOut,
-  LinearTransition,
-  ZoomIn,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { Image, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
+import { enter, exit, spring } from '../constants/motion';
 import { DetailLayout, useDetailNav } from '../ui/DetailLayout';
-import { gameStatus, inviteUrl, isToday, type Club } from '../state/models';
+import { ME, gameStatus, inviteUrl, isToday, type Club } from '../state/models';
 import { useSession } from '../state/session';
 import { useStore } from '../state/store';
 import { confirmDestructive, dollars, shareText } from '../lib/format';
@@ -35,6 +26,7 @@ export function ClubDetail({ id }: { id: string }) {
   const [tab, setTab] = useState<Tab>('Games');
   const club = id ? store.club(id) : undefined;
   const isMember = club ? store.isMember(club.id) : false;
+  const isAdmin = club ? store.isAdmin(club.id) : false;
 
   const reduceMotion = useReducedMotion();
   const [celebrating, setCelebrating] = useState(false);
@@ -58,10 +50,11 @@ export function ClubDetail({ id }: { id: string }) {
 
   const next = store.nextGameFor(club.id);
   const menu: MenuItem[] = [
+    ...(isAdmin ? [{ label: 'New game', icon: 'add-circle-outline' as const, onPress: () => router.push(`/create/game?club=${club.id}`) }] : []),
     { label: 'Invite with QR code', icon: 'qr-code-outline', onPress: () => router.push(`/invite/${club.id}`) },
     { label: 'Share invite link', icon: 'share-outline', onPress: () => shareText(`Join ${club.name} on Coopeer`, inviteUrl(club)) },
   ];
-  if (isMember) {
+  if (isMember && club.ownerId !== ME.id) {
     menu.push({
       label: 'Leave club',
       icon: 'exit-outline',
@@ -100,15 +93,15 @@ export function ClubDetail({ id }: { id: string }) {
       }
     >
       <View style={styles.header}>
-        <ClubLogo club={club} size={72} />
+        {club.photoUri ? <Image source={{ uri: club.photoUri }} style={styles.photo} accessibilityIgnoresInvertColors /> : <ClubLogo club={club} size={72} />}
         <View style={styles.headerText}>
           <KindTag kind="club" />
           <Text style={type.title2}>{club.name}</Text>
           <Text style={[type.subhead, styles.secondary]}>{club.cadence}</Text>
           {isMember && (
-            <Animated.View entering={mounted.current && !reduceMotion ? ZoomIn.springify().damping(10) : undefined} style={styles.memberRow}>
-              <Ionicons name="checkmark-circle" size={14} color={colors.going} />
-              <Text style={[type.footnote, { color: colors.going, fontWeight: '600' }]}>You're a member</Text>
+            <Animated.View entering={mounted.current && !reduceMotion ? FadeIn.duration(260) : undefined} style={styles.memberRow}>
+              <Ionicons name={isAdmin ? 'shield-checkmark' : 'checkmark-circle'} size={14} color={colors.going} />
+              <Text style={[type.footnote, { color: colors.going, fontWeight: '600' }]}>{isAdmin ? "You're an admin" : "You're a member"}</Text>
             </Animated.View>
           )}
         </View>
@@ -133,7 +126,7 @@ function Segmented({ value, onChange }: { value: Tab; onChange: (tab: Tab) => vo
   const ready = width > 0;
 
   useEffect(() => {
-    if (ready) x.value = withSpring(index * segment, { damping: 18, stiffness: 240 });
+    if (ready) x.value = withSpring(index * segment, spring.snappy);
   }, [index, segment, ready, x]);
 
   const pillStyle = useAnimatedStyle(() => ({ width: segment, opacity: ready ? 1 : 0, transform: [{ translateX: x.value }] }));
@@ -168,18 +161,27 @@ function GamesTab({ club }: { club: Club }) {
   const games = store.gamesFor(club.id);
   const today = games.filter((g) => isToday(gameStatus(g, store.now)));
   const upcoming = games.filter((g) => gameStatus(g, store.now) === 'later');
+  const isAdmin = store.isAdmin(club.id);
+  const newGame = () => router.push(`/create/game?club=${club.id}`);
 
   if (games.length === 0) {
     return (
       <View style={styles.empty}>
         <Ionicons name="calendar-outline" size={36} color={colors.label3} />
         <Text style={[type.subhead, styles.secondary]}>No games scheduled</Text>
+        {isAdmin && <PrimaryButton title="New game" icon="add" onPress={newGame} />}
       </View>
     );
   }
 
   return (
     <>
+      {isAdmin && (
+        <Pressable accessibilityRole="button" onPress={newGame} style={({ pressed }) => [styles.newGame, pressed && { opacity: 0.6 }]}>
+          <Ionicons name="add-circle" size={22} color={colors.brand} />
+          <Text style={[type.headline, { color: colors.brand }]}>New game</Text>
+        </Pressable>
+      )}
       {today.length > 0 && <SectionHeader title="Today" />}
       {today.map((game, index) => (
         <GameRow key={game.id} index={index} game={game} onPress={() => nav.game(game.id)} />
@@ -268,9 +270,9 @@ function MembersTab({ club }: { club: Club }) {
       {filtered.map((member, index) => (
         <Animated.View
           key={member.id}
-          layout={LinearTransition.springify().damping(18)}
-          entering={FadeInDown.delay(Math.min(index, 8) * 30)}
-          exiting={FadeOut.duration(120)}
+          layout={LinearTransition.duration(240)}
+          entering={enter(index)}
+          exiting={exit()}
           style={styles.memberItem}
         >
           <Avatar member={member} size={36} />
@@ -303,6 +305,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.xl },
+  newGame: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.xs },
+  photo: { width: 72, height: 72, borderRadius: radius.card },
   block: { gap: space.sm, alignItems: 'stretch' },
   facts: { padding: space.lg, gap: space.sm },
   fact: { flexDirection: 'row', gap: space.lg },

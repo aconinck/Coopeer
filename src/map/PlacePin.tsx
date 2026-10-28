@@ -58,13 +58,13 @@ export function PlacePin({ summary }: { summary: PlaceSummary }) {
 
   useEffect(() => {
     if (!isLive || reduceMotion) return;
-    pulse.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.out(Easing.quad) }), -1, false);
+    pulse.value = withRepeat(withTiming(1, { duration: 2400, easing: Easing.out(Easing.sin) }), -1, false);
     return () => cancelAnimation(pulse);
   }, [isLive, reduceMotion, pulse]);
 
   const pulseStyle = useAnimatedStyle(() => ({
-    opacity: 0.55 * (1 - pulse.value),
-    transform: [{ scale: 1 + pulse.value * 0.6 }],
+    opacity: 0.35 * (1 - pulse.value),
+    transform: [{ scale: 1 + pulse.value * 0.4 }],
   }));
 
   return (

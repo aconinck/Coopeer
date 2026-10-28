@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown, FadeInUp, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { FadeIn, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
+import { enter, spring, timing } from '../constants/motion';
 import { DetailLayout, useDetailNav } from '../ui/DetailLayout';
 import { gameStatus, sports, spotsLeft, type Club, type Game } from '../state/models';
 import { useSession } from '../state/session';
@@ -92,18 +93,18 @@ export function GameDetail({ id }: { id: string }) {
 function Stagger({ index, children }: { index: number; children: ReactNode }) {
   const reduceMotion = useReducedMotion();
   return (
-    <Animated.View entering={reduceMotion ? undefined : FadeInDown.delay(60 + index * 70).springify().damping(18)} style={styles.group}>
+    <Animated.View entering={reduceMotion ? undefined : enter(index)} style={styles.group}>
       {children}
     </Animated.View>
   );
 }
 
-/** Going bar fills with a spring whenever the count changes. */
+/** Going bar eases to its new width whenever the count changes. */
 function ProgressTrack({ value }: { value: number }) {
   const [width, setWidth] = useState(0);
   const fill = useSharedValue(0);
   useEffect(() => {
-    fill.value = withSpring(value, { damping: 16, stiffness: 120 });
+    fill.value = withSpring(value, spring.smooth);
   }, [value, fill]);
   const style = useAnimatedStyle(() => ({ width: fill.value * width }));
   return (
@@ -113,7 +114,7 @@ function ProgressTrack({ value }: { value: number }) {
   );
 }
 
-/** The number slides in from below when it changes. */
+/** The number cross-fades when it changes. */
 function RollingCount({ value, suffix }: { value: number; suffix: string }) {
   const first = useRef(true);
   useEffect(() => {
@@ -121,7 +122,7 @@ function RollingCount({ value, suffix }: { value: number; suffix: string }) {
   }, []);
   return (
     <View style={styles.countRow}>
-      <Animated.Text key={value} entering={first.current ? undefined : FadeInUp.springify().damping(14)} style={[type.subhead, styles.count]}>
+      <Animated.Text key={value} entering={first.current ? undefined : FadeIn.duration(timing.fade.duration)} style={[type.subhead, styles.count]}>
         {value}
       </Animated.Text>
       <Text style={[type.subhead, styles.count]}>{suffix}</Text>

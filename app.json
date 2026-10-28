@@ -44,7 +44,14 @@
           "recordAudioAndroid": false
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Coopeer uses your photos to set your club picture.",
+          "cameraPermission": "Coopeer uses the camera to take your club picture."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

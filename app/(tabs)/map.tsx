@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  FadeInDown,
+  Easing,
+  FadeIn,
   FadeOut,
   LinearTransition,
   runOnJS,
@@ -18,6 +19,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../../src/constants/theme';
+import { enter as fadeEnter, spring } from '../../src/constants/motion';
 import { gameStatus, isToday, sportIds, sports, type Place, type SportId } from '../../src/state/models';
 import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
@@ -32,7 +34,7 @@ import { SHEET_HALF, useSheet } from '../../src/ui/Sheet';
 import { sheetController } from '../../src/ui/sheetController';
 
 const EXPLAINER_KEY = 'explore.explainerDismissed';
-const DRAWER_SPRING = { damping: 20, stiffness: 220 } as const;
+const DRAWER_SPRING = spring.smooth;
 
 export default function MapScreen() {
   const store = useStore();
@@ -128,7 +130,7 @@ export default function MapScreen() {
     });
 
   let row = 0;
-  const enter = () => FadeInDown.delay(60 + row++ * 45).springify().damping(18);
+  const enter = () => fadeEnter(row++);
 
   return (
     <View style={styles.root}>
@@ -149,7 +151,7 @@ export default function MapScreen() {
       </View>
 
       <Animated.View pointerEvents={sheet.isOpen ? 'none' : 'box-none'} style={[styles.drawerWrap, { bottom: tabBarSpace }, drawerStyle]}>
-        <Animated.View layout={LinearTransition.springify().damping(20)}>
+        <Animated.View layout={LinearTransition.springify().mass(1).stiffness(spring.smooth.stiffness).damping(spring.smooth.damping)}>
           <Glass radius={radius.sheet} style={styles.drawer}>
             <GestureDetector gesture={drawerPan}>
               <View collapsable={false}>
@@ -204,7 +206,7 @@ export default function MapScreen() {
                 </ScrollView>
 
                 {!expanded && (
-                  <Animated.Text entering={FadeInDown.duration(220)} exiting={FadeOut.duration(120)} style={[type.footnote, styles.summary]}>
+                  <Animated.Text entering={FadeIn.duration(220)} exiting={FadeOut.duration(120)} style={[type.footnote, styles.summary]}>
                     {summaryLine}
                   </Animated.Text>
                 )}
@@ -274,7 +276,7 @@ function LivePill({ count, active, onPress }: { count: number; active: boolean; 
   const beat = useSharedValue(1);
   useEffect(() => {
     if (reduceMotion) return;
-    beat.value = withRepeat(withSequence(withTiming(1.5, { duration: 500 }), withTiming(1, { duration: 700 })), -1);
+    beat.value = withRepeat(withSequence(withTiming(1.25, { duration: 1100, easing: Easing.inOut(Easing.sin) }), withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.sin) })), -1);
   }, [beat, reduceMotion]);
   const dotStyle = useAnimatedStyle(() => ({ transform: [{ scale: beat.value }] }));
 

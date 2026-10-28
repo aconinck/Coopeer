@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
+import Animated, { useReducedMotion } from 'react-native-reanimated';
+import { enter } from '../constants/motion';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, space, type } from '../constants/theme';
 import { gameStatus, spotsLeft, type Club, type Game } from '../state/models';
@@ -26,8 +27,8 @@ function PressCard({
   children: ReactNode;
 }) {
   const reduceMotion = useReducedMotion();
-  const press = usePressScale(0.98, 0.85);
-  const entering = index === undefined || reduceMotion ? undefined : FadeInDown.delay(40 + index * 50).springify().damping(18);
+  const press = usePressScale(0.98, 0.9);
+  const entering = index === undefined || reduceMotion ? undefined : enter(index);
   return (
     <Animated.View entering={entering} style={grow && styles.grow}>
       <AnimatedPressable

@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { colors, radius, space, type } from '../constants/theme';
+import { spring } from '../constants/motion';
 import { AttendeesDetail } from '../details/AttendeesDetail';
 import { ClubDetail } from '../details/ClubDetail';
 import { GameDetail } from '../details/GameDetail';
@@ -29,7 +30,8 @@ import { DetailHost, type DetailLayoutProps, type DetailNav, type SheetRoute } f
 import { Glass } from './Glass';
 import { sheetController } from './sheetController';
 
-export const SPRING = { damping: 24, stiffness: 240, mass: 0.9 } as const;
+/** Sheets glide without bounce; gestures hand their release velocity to this spring. */
+export const SPRING = spring.smooth;
 /** Fraction of the screen the sheet covers at its resting ("half") height. */
 export const SHEET_HALF = 0.52;
 
@@ -60,8 +62,8 @@ const ChromeContext = createContext<Chrome | null>(null);
 // Routes where the sheet steps aside (full-screen flows presented above it).
 const HIDDEN_ON = ['/auth', '/join', '/invite', '/welcome', '/create', '/personal-info', '/payments', '/how-it-works'];
 
-const selection = () => {
-  if (Platform.OS !== 'web') Haptics.selectionAsync();
+const detentHaptic = () => {
+  if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 };
 
 export function SheetProvider({ children }: { children: ReactNode }) {
@@ -71,14 +73,12 @@ export function SheetProvider({ children }: { children: ReactNode }) {
   const [closing, setClosing] = useState(false);
 
   const open = useCallback((route: SheetRoute) => {
-    selection();
     setDirection('open');
     setClosing(false);
     setStack([route]);
     setOpenToken((n) => n + 1);
   }, []);
   const push = useCallback((route: SheetRoute) => {
-    selection();
     setDirection('forward');
     setStack((current) => [...current, route]);
   }, []);
@@ -213,6 +213,7 @@ function SheetHost({
           }
           const target = projected < half / 2 ? full : half;
           y.value = withSpring(target, { ...SPRING, velocity: e.velocityY });
+          runOnJS(detentHaptic)();
           runOnJS(setAtFull)(target === full);
         }),
     [closed, half, clear, beginClose, start, y],
@@ -255,7 +256,9 @@ function SheetHost({
   );
 
   const top = stack[stack.length - 1];
-  const entering = direction === 'forward' ? SlideInRight.springify().damping(22) : direction === 'back' ? SlideInLeft.springify().damping(22) : FadeIn.duration(180);
+  const slide = (builder: typeof SlideInRight | typeof SlideInLeft) =>
+    builder.springify().mass(1).stiffness(SPRING.stiffness).damping(SPRING.damping);
+  const entering = direction === 'forward' ? slide(SlideInRight) : direction === 'back' ? slide(SlideInLeft) : FadeIn.duration(200);
   const exiting = direction === 'forward' ? SlideOutLeft.duration(220) : direction === 'back' ? SlideOutRight.duration(220) : FadeOut.duration(120);
 
   return (

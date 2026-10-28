@@ -3,6 +3,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
+import { spring } from '../constants/motion';
 import { DetailLayout } from '../ui/DetailLayout';
 import type { Member } from '../state/models';
 import { useStore } from '../state/store';
@@ -55,7 +56,7 @@ function Section({ title, members }: { title: string; members: Member[] }) {
         {members.map((member, index) => (
           <Animated.View
             key={member.id}
-            layout={LinearTransition.springify().damping(18)}
+            layout={LinearTransition.springify().mass(1).stiffness(spring.smooth.stiffness).damping(spring.smooth.damping)}
             entering={FadeIn.delay(Math.min(index, 10) * 30)}
             exiting={FadeOut.duration(120)}
             style={[styles.row, index > 0 && styles.divider]}

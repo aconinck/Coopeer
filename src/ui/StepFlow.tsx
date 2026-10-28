@@ -14,12 +14,12 @@ import Animated, {
   withSequence,
   withSpring,
   withTiming,
-  ZoomIn,
+  FadeIn,
 } from 'react-native-reanimated';
 import { colors, flow, flowColors, space, type } from '../constants/theme';
+import { pressScale, spring, timing } from '../constants/motion';
 
 const isNative = Platform.OS !== 'web';
-const snappy = { damping: 18, stiffness: 260, mass: 0.7 };
 
 // Progress persists across step screens so the bar animates from where it was.
 let lastProgress = 0;
@@ -60,7 +60,7 @@ export function StepScaffold({
   const keyboardUp = useKeyboardVisible();
   const entering = reduceMotion
     ? undefined
-    : (direction === 'forward' ? FadeInRight : FadeInLeft).springify().damping(20).stiffness(180);
+    : (direction === 'forward' ? FadeInRight : FadeInLeft).springify().mass(1).stiffness(spring.smooth.stiffness).damping(spring.smooth.damping);
 
   return (
     <KeyboardAvoidingView style={[styles.root, { paddingTop: insets.top + flow.headerTop }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -116,7 +116,7 @@ export function StepProgress({ value }: { value: number }) {
   const clamped = Math.min(Math.max(value, 0), 1);
   const width = useSharedValue(lastProgress);
   useEffect(() => {
-    width.value = withSpring(clamped, { damping: 20, stiffness: 120 });
+    width.value = withSpring(clamped, spring.smooth);
     lastProgress = clamped;
   }, [clamped, width]);
   const fill = useAnimatedStyle(() => ({ width: `${width.value * 100}%` }));
@@ -144,13 +144,9 @@ export function StepNextButton({
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    active.value = withTiming(enabled || success ? 1 : 0, { duration: 180 });
-    if (enabled && !reduceMotion) scale.value = withSequence(withSpring(1.12, snappy), withSpring(1, snappy));
-  }, [enabled, success, active, scale, reduceMotion]);
-
-  useEffect(() => {
-    if (success && !reduceMotion) scale.value = withSequence(withSpring(1.15, snappy), withSpring(1, snappy));
-  }, [success, scale, reduceMotion]);
+    // Enabling is a calm color change, not a bounce.
+    active.value = reduceMotion ? (enabled || success ? 1 : 0) : withTiming(enabled || success ? 1 : 0, timing.fade);
+  }, [enabled, success, active, reduceMotion]);
 
   const style = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -165,16 +161,15 @@ export function StepNextButton({
       disabled={!enabled || loading || success}
       onPress={onPress}
       onPressIn={() => {
-        scale.value = withSpring(0.92, snappy);
-        if (isNative) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        scale.value = withTiming(pressScale, timing.press);
       }}
       onPressOut={() => {
-        scale.value = withSpring(1, snappy);
+        scale.value = withSpring(1, spring.quick);
       }}
     >
       <Animated.View style={[styles.next, style]}>
         {success ? (
-          <Animated.View key="check" entering={reduceMotion ? undefined : ZoomIn.springify().damping(12)}>
+          <Animated.View key="check" entering={reduceMotion ? undefined : FadeIn.duration(timing.fade.duration)}>
             <Ionicons name="checkmark" size={30} color={colors.white} />
           </Animated.View>
         ) : loading ? (
@@ -253,8 +248,9 @@ function useShake(error: boolean) {
     if (!error) return;
     if (isNative) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     if (reduceMotion) return;
-    const t = (to: number) => withTiming(to, { duration: 55 });
-    x.value = withSequence(t(-12), t(12), t(-9), t(9), t(-4), t(0));
+    // Three small oscillations, ~240ms total.
+    const t = (to: number) => withTiming(to, { duration: 40 });
+    x.value = withSequence(t(-8), t(8), t(-6), t(6), t(-3), t(0));
   }, [error, x, reduceMotion]);
   return useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
 }
@@ -313,7 +309,6 @@ export function CodeField({
         value={value}
         onChangeText={(text) => {
           const next = text.replace(/\D/g, '').slice(0, length);
-          if (isNative && next.length > value.length) Haptics.selectionAsync();
           onChange(next);
         }}
         onFocus={() => setFocused(true)}
@@ -335,15 +330,16 @@ function Digit({ char, gap, color, isNext }: { char?: string; gap: boolean; colo
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    // Typed digits settle in gently (no overshoot).
     if (char && !reduceMotion) {
-      scale.value = 0.6;
-      scale.value = withSpring(1, { damping: 10, stiffness: 320, mass: 0.6 });
+      scale.value = 0.92;
+      scale.value = withSpring(1, spring.quick);
     }
   }, [char, scale, reduceMotion]);
 
   useEffect(() => {
     if (isNext && !reduceMotion) {
-      pulse.value = withRepeat(withSequence(withTiming(0.35, { duration: 520 }), withTiming(1, { duration: 520 })), -1);
+      pulse.value = withRepeat(withSequence(withTiming(0.45, { duration: 800 }), withTiming(1, { duration: 800 })), -1);
     } else {
       pulse.value = withTiming(1, { duration: 120 });
     }

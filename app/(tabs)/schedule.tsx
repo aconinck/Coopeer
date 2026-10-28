@@ -3,7 +3,6 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, space, type } from '../../src/constants/theme';
 import { gameStatus, isToday } from '../../src/state/models';
-import { useSession } from '../../src/state/session';
 import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
 import { PrimaryButton } from '../../src/ui/Buttons';
@@ -14,20 +13,6 @@ import { Screen } from '../../src/ui/Screen';
 /** Figma "Hoje": games from your clubs plus games you said you're in for. */
 export default function ScheduleScreen() {
   const store = useStore();
-  const session = useSession();
-
-  if (!session.isSignedIn) {
-    return (
-      <Screen variant="tab" title="Schedule">
-        <Empty
-          title="Your games live here"
-          text="Sign in with your phone number to keep track of the games you're playing."
-          action="Sign in"
-          onPress={() => router.push('/auth')}
-        />
-      </Screen>
-    );
-  }
 
   const games = store.mySchedule;
   const today = games.filter((g) => isToday(gameStatus(g, store.now)));

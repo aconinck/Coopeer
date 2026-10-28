@@ -59,10 +59,10 @@ export default function Auth() {
             await session.completeProfile(name);
             finish();
           }}
-          onJoin={async () => {
+          onCreate={async () => {
             await session.completeProfile(name);
             finish();
-            router.push('/join?mode=code');
+            router.push('/create/club');
           }}
         />
       );
@@ -251,7 +251,8 @@ function NameStep({
   );
 }
 
-function DoneStep({ name, onExplore, onJoin }: { name: string; onExplore: () => Promise<void>; onJoin: () => Promise<void> }) {
+/** Figma Sign up "Welcome": Explore, or start a new club right away. */
+function DoneStep({ name, onExplore, onCreate }: { name: string; onExplore: () => Promise<void>; onCreate: () => Promise<void> }) {
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
   const first = name.split(' ')[0] || name;
@@ -274,14 +275,14 @@ function DoneStep({ name, onExplore, onJoin }: { name: string; onExplore: () => 
           </Text>
         </HeroItem>
         <HeroItem index={1}>
-          <Text style={[flow.heroBody, styles.center, styles.heroSubtitle]}>Find a game near you tonight, or join a club with its code.</Text>
+          <Text style={[flow.heroBody, styles.center, styles.heroSubtitle]}>Start with a new club or find one near you on Coopeer.</Text>
         </HeroItem>
         <View style={styles.heroActions}>
           <HeroItem index={2}>
             <HeroButton title="Explore" onPress={run(onExplore)} disabled={busy} />
           </HeroItem>
           <HeroItem index={3}>
-            <HeroButton title="Join a club" variant="text" onPress={run(onJoin)} disabled={busy} />
+            <HeroButton title="Create a new club" variant="text" onPress={run(onCreate)} disabled={busy} />
           </HeroItem>
         </View>
       </View>

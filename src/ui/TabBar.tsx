@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { colors, layout, radius, space } from '../constants/theme';
+import { spring } from '../constants/motion';
 import { haptic, type IconName } from './Buttons';
 import { Glass } from './Glass';
 
@@ -15,8 +16,6 @@ const tabs: Record<string, { label: string; icon: IconName; activeIcon: IconName
   schedule: { label: 'Schedule', icon: 'calendar-outline', activeIcon: 'calendar' },
   profile: { label: 'Profile', icon: 'person-circle-outline', activeIcon: 'person-circle' },
 };
-
-const PILL_SPRING = { damping: 18, stiffness: 220, mass: 0.8 } as const;
 
 /** Floating Liquid Glass tab bar (iOS 26 style) with a sliding active pill. */
 export function TabBar({ state, navigation }: BottomTabBarProps) {
@@ -35,8 +34,8 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
       pillW.value = active.width;
       visible.value = 1;
     } else {
-      pillX.value = withSpring(active.x, PILL_SPRING);
-      pillW.value = withSpring(active.width, PILL_SPRING);
+      pillX.value = withSpring(active.x, spring.snappy);
+      pillW.value = withSpring(active.width, spring.snappy);
     }
   }, [active, pillX, pillW, visible, reduceMotion]);
 
@@ -73,29 +72,13 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
               }}
               style={styles.item}
             >
-              <TabIcon focused={focused} icon={focused ? tab.activeIcon : tab.icon} />
+              <Ionicons name={focused ? tab.activeIcon : tab.icon} size={23} color={focused ? colors.brand : colors.label} />
               <Text style={[styles.label, { color: focused ? colors.brand : colors.label }]}>{tab.label}</Text>
             </Pressable>
           );
         })}
       </Glass>
     </View>
-  );
-}
-
-function TabIcon({ focused, icon }: { focused: boolean; icon: IconName }) {
-  const reduceMotion = useReducedMotion();
-  const bounce = useSharedValue(1);
-  useEffect(() => {
-    if (focused && !reduceMotion) {
-      bounce.value = withSequence(withSpring(1.18, { damping: 8, stiffness: 420 }), withSpring(1, { damping: 10, stiffness: 220 }));
-    }
-  }, [focused, bounce, reduceMotion]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: bounce.value }] }));
-  return (
-    <Animated.View style={style}>
-      <Ionicons name={icon} size={23} color={focused ? colors.brand : colors.label} />
-    </Animated.View>
   );
 }
 

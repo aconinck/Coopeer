@@ -3,7 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeOut, useReducedMotion, ZoomIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, useReducedMotion, ZoomIn } from 'react-native-reanimated';
+import { spring } from '../src/constants/motion';
 import { colors, flow } from '../src/constants/theme';
 import { HeroButton, HeroItem, HeroVideo, Logo, heroVideo } from '../src/ui/Hero';
 
@@ -42,8 +43,16 @@ export default function Welcome() {
 
       {splash && (
         <Animated.View style={styles.splash} exiting={FadeOut.duration(260)}>
-          <Animated.View entering={ZoomIn.springify().damping(12)}>
-            <Logo size={72} />
+          <Animated.View
+            entering={ZoomIn.withInitialValues({ transform: [{ scale: 0.96 }] })
+              .springify()
+              .mass(1)
+              .stiffness(spring.smooth.stiffness)
+              .damping(spring.smooth.damping)}
+          >
+            <Animated.View entering={FadeIn.duration(300)}>
+              <Logo size={72} />
+            </Animated.View>
           </Animated.View>
         </Animated.View>
       )}

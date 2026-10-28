@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ME, gameStatus, type Club, type Game, type Payment, type Place, type RSVP } from './models';
+import { ME, gameStatus, type Club, type Game, type NewClub, type NewGame, type Payment, type Place, type RSVP } from './models';
+import { time, weekday } from '../lib/format';
 import * as mock from './mockData';
 
 // In-memory data layer. To use a real backend, replace the internals of this
@@ -19,6 +20,7 @@ interface Store {
   gamesFor: (clubId: string) => Game[];
   nextGameFor: (clubId: string) => Game | undefined;
   isMember: (clubId: string) => boolean;
+  isAdmin: (clubId: string) => boolean;
   myClubs: Club[];
   mySchedule: Game[];
   join: (clubId: string) => void;
@@ -26,6 +28,25 @@ interface Store {
   setRSVP: (gameId: string, rsvp: RSVP) => void;
   findClub: (code: string) => Promise<Club | undefined>;
   cancelPayment: (paymentId: string) => void;
+  /** Creates a club owned by the current user (member + admin) with a fresh 8-digit code. */
+  createClub: (input: NewClub) => Club;
+  /** Creates a club game (plus repeats). Returns the first occurrence. */
+  createGame: (input: NewGame) => Game;
+}
+
+const DAY = 24 * 3600 * 1000;
+
+function occurrences(start: Date, repeat: NewGame['repeat']): number[] {
+  if (repeat === 'weekly') return [0, 7, 14, 21].map((d) => d * DAY);
+  if (repeat === 'weekdays') {
+    const offsets: number[] = [];
+    for (let d = 0; d < 14; d++) {
+      const day = new Date(start.getTime() + d * DAY).getDay();
+      if (day !== 0 && day !== 6) offsets.push(d * DAY);
+    }
+    return offsets;
+  }
+  return [0];
 }
 
 const StoreContext = createContext<Store | null>(null);
@@ -84,6 +105,74 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const createClub = useCallback(
+    (input: NewClub): Club => {
+      const taken = new Set(clubs.map((c) => c.code));
+      let code = '';
+      do code = String(10_000_000 + Math.floor(Math.random() * 90_000_000));
+      while (taken.has(code));
+      const club: Club = {
+        id: `c-${Date.now()}`,
+        name: input.name.trim(),
+        sport: input.sport,
+        homePlaceId: input.homePlaceId,
+        cadence: 'No regular time yet',
+        about: input.about.trim(),
+        links: input.links,
+        members: [ME],
+        memberCount: 1,
+        monthlyPrice: input.monthlyPrice,
+        level: 'All levels',
+        code,
+        isNew: true,
+        photoUri: input.photoUri,
+        ownerId: ME.id,
+        adminIds: [ME.id],
+        payoutLast4: input.payoutLast4,
+      };
+      setClubs((list) => [club, ...list]);
+      setMemberships((current) => new Set(current).add(club.id));
+      return club;
+    },
+    [clubs],
+  );
+
+  const createGame = useCallback(
+    (input: NewGame): Game => {
+      const club = clubs.find((c) => c.id === input.clubId);
+      const sport = club?.sport ?? 'soccer';
+      const invited = (input.inviteeIds === null ? club?.members ?? [] : (club?.members ?? []).filter((m) => input.inviteeIds?.includes(m.id))).filter(
+        (m) => m.id !== ME.id,
+      );
+      const stamp = Date.now();
+      const created: Game[] = occurrences(input.start, input.repeat).map((offset, index) => ({
+        id: `g-${stamp}-${index}`,
+        sport,
+        placeId: input.placeId,
+        clubId: input.clubId,
+        title: input.title.trim(),
+        details: input.details.trim(),
+        start: new Date(input.start.getTime() + offset),
+        end: new Date(input.end.getTime() + offset),
+        capacity: sport === 'soccer' ? 14 : 8,
+        going: [ME],
+        declined: [],
+        noResponse: invited,
+        dropInPrice: 7,
+        level: club?.level ?? 'All levels',
+        myRSVP: 'going',
+        isNew: true,
+      }));
+      setGames((list) => [...list, ...created]);
+      if (input.repeat !== 'never') {
+        const cadence = input.repeat === 'weekly' ? `Every ${weekday(input.start)} · ${time(input.start)}` : `Weekdays · ${time(input.start)}`;
+        setClubs((list) => list.map((c) => (c.id === input.clubId ? { ...c, cadence } : c)));
+      }
+      return created[0];
+    },
+    [clubs],
+  );
+
   const value = useMemo<Store>(() => {
     const active = (g: Game) => gameStatus(g, now) !== 'ended';
     const byStart = (a: Game, b: Game) => a.start.getTime() - b.start.getTime();
@@ -103,6 +192,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       gamesFor,
       nextGameFor: (clubId) => gamesFor(clubId).find((g) => !g.isCanceled),
       isMember: (clubId) => memberships.has(clubId),
+      isAdmin: (clubId) => clubs.find((c) => c.id === clubId)?.adminIds?.includes(ME.id) ?? false,
       myClubs: clubs.filter((c) => memberships.has(c.id)),
       mySchedule: games
         .filter((g) => active(g) && (g.myRSVP === 'going' || (g.clubId !== null && memberships.has(g.clubId))))
@@ -115,8 +205,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return clubs.find((c) => c.code === code);
       },
       cancelPayment: (paymentId) => setPayments((list) => list.filter((p) => p.id !== paymentId)),
+      createClub,
+      createGame,
     };
-  }, [now, clubs, games, payments, memberships, join, leave, setRSVP]);
+  }, [now, clubs, games, payments, memberships, join, leave, setRSVP, createClub, createGame]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

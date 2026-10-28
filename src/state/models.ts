@@ -54,7 +54,43 @@ export interface Club {
   level: SkillLevel;
   code: string;
   isNew?: boolean;
+  /** Local image URI picked by the creator; falls back to the sport logo. */
+  photoUri?: string;
+  ownerId?: string;
+  /** Members who can create games and manage the club. */
+  adminIds?: string[];
+  /** Last 4 digits of the payout account, shown to admins. */
+  payoutLast4?: string;
 }
+
+export type Repeat = 'never' | 'weekly' | 'weekdays';
+
+export interface NewClub {
+  name: string;
+  about: string;
+  links: ClubLink[];
+  sport: SportId;
+  homePlaceId: string;
+  monthlyPrice: number;
+  photoUri?: string;
+  payoutLast4?: string;
+}
+
+export interface NewGame {
+  clubId: string;
+  title: string;
+  details: string;
+  start: Date;
+  end: Date;
+  placeId: string;
+  repeat: Repeat;
+  /** null = all members. */
+  inviteeIds: string[] | null;
+}
+
+/** Coopeer's fee added on top of the club price. */
+export const COOPEER_FEE = 0.03;
+export const memberPrice = (monthlyPrice: number) => Math.round(monthlyPrice * (1 + COOPEER_FEE) * 100) / 100;
 
 export type RSVP = 'going' | 'declined' | 'none';
 export type GameStatus = 'live' | 'soon' | 'today' | 'later' | 'ended';
