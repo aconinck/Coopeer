@@ -95,8 +95,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
       signOut: () => {
         setUser(null);
+        // The root layout's auth guard sends signed-out users back to /welcome.
         AsyncStorage.removeItem(USER_KEY);
-        router.replace('/welcome');
       },
       requireAuth: (action) => {
         if (user) {
