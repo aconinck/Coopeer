@@ -43,7 +43,8 @@
           "cameraPermission": "Coopeer uses the camera to scan club QR codes.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": false

@@ -31,7 +31,7 @@ export default function Auth() {
   const e164 = `+1${digits}`;
 
   const finish = () => {
-    if (from === 'welcome') router.replace('/explore');
+    if (from === 'welcome') router.replace('/map');
     else router.back();
     session.finishAuth();
   };

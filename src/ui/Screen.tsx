@@ -15,7 +15,7 @@ export const useTabBarSpace = () => {
 
 function goBack() {
   if (router.canGoBack()) router.back();
-  else router.replace('/explore');
+  else router.replace('/map');
 }
 
 interface ScreenProps {

@@ -25,21 +25,17 @@ const mockAuth = {
 };
 
 const USER_KEY = 'session.user';
-const GUEST_KEY = 'session.guest';
 const KNOWN_KEY = 'mock.knownUsers';
 
 interface Session {
   isReady: boolean;
   user: User | null;
-  isGuest: boolean;
   isSignedIn: boolean;
-  hasOnboarded: boolean;
   sendCode: (phone: string) => Promise<void>;
   /** Resolves true when the phone is new and we still need a name. */
   verify: (phone: string, code: string) => Promise<boolean>;
   completeProfile: (name: string) => Promise<void>;
   updateName: (name: string) => Promise<void>;
-  continueAsGuest: () => void;
   signOut: () => void;
   /** Runs `action` now if signed in, otherwise opens phone login and runs it afterwards. */
   requireAuth: (action: () => void) => void;
@@ -52,15 +48,13 @@ const SessionContext = createContext<Session | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [isReady, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [isGuest, setGuest] = useState(false);
   const pendingPhone = useRef<string | null>(null);
   const pendingAction = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [storedUser, storedGuest] = await Promise.all([AsyncStorage.getItem(USER_KEY), AsyncStorage.getItem(GUEST_KEY)]);
+      const storedUser = await AsyncStorage.getItem(USER_KEY);
       if (storedUser) setUser(JSON.parse(storedUser) as User);
-      setGuest(storedGuest === 'true');
       setReady(true);
     })();
   }, []);
@@ -75,9 +69,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => ({
       isReady,
       user,
-      isGuest,
       isSignedIn: user !== null,
-      hasOnboarded: user !== null || isGuest,
       sendCode: (phone) => mockAuth.sendCode(phone),
       verify: async (phone, code) => {
         const result = await mockAuth.verify(phone, code);
@@ -101,14 +93,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         await mockAuth.remember(next);
         await signIn(next);
       },
-      continueAsGuest: () => {
-        setGuest(true);
-        AsyncStorage.setItem(GUEST_KEY, 'true');
-      },
       signOut: () => {
         setUser(null);
-        setGuest(false);
-        AsyncStorage.multiRemove([USER_KEY, GUEST_KEY]);
+        AsyncStorage.removeItem(USER_KEY);
+        router.replace('/welcome');
       },
       requireAuth: (action) => {
         if (user) {
@@ -124,7 +112,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         action?.();
       },
     }),
-    [isReady, user, isGuest, signIn],
+    [isReady, user, signIn],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

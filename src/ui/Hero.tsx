@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -12,6 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { colors, flow, flowColors } from '../constants/theme';
 
 const LOGO_PATHS = [
@@ -82,15 +83,65 @@ export function HeroBackground({ image, shadeFrom = 0 }: { image: HeroImage; sha
           }}
         />
       </Animated.View>
-      <Svg style={styles.fill} width="100%" height="100%" preserveAspectRatio="none">
-        <Defs>
-          <LinearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset={shadeFrom} stopColor={flowColors.heroShadeBottom} stopOpacity={shadeFrom > 0 ? 0 : 0.44} />
-            <Stop offset="1" stopColor={flowColors.heroShadeBottom} stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#shade)" />
-      </Svg>
+      <HeroShade shadeFrom={shadeFrom} />
+    </View>
+  );
+}
+
+function HeroShade({ shadeFrom }: { shadeFrom: number }) {
+  return (
+    <Svg style={styles.fill} width="100%" height="100%" preserveAspectRatio="none">
+      <Defs>
+        <LinearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset={shadeFrom} stopColor={flowColors.heroShadeBottom} stopOpacity={shadeFrom > 0 ? 0 : 0.44} />
+          <Stop offset="1" stopColor={flowColors.heroShadeBottom} stopOpacity={1} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill="url(#shade)" />
+    </Svg>
+  );
+}
+
+export const heroVideo = {
+  source: require('../../assets/video/hero.mp4') as VideoSource,
+  poster: require('../../assets/video/hero.jpg') as ImageSourcePropType,
+};
+
+/**
+ * Looping, muted background clip under the Figma shade. The poster frame shows
+ * instantly; the video fades in once it can play. Reduced motion keeps the poster.
+ */
+export function HeroVideo({ source, poster }: { source: VideoSource; poster: ImageSourcePropType }) {
+  const reduceMotion = useReducedMotion();
+  const [ready, setReady] = useState(false);
+  const opacity = useSharedValue(0);
+  const player = useVideoPlayer(source, (p) => {
+    p.loop = true;
+    p.muted = true;
+  });
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const sub = player.addListener('statusChange', ({ status }) => {
+      if (status === 'readyToPlay') setReady(true);
+    });
+    player.play();
+    return () => sub.remove();
+  }, [player, reduceMotion]);
+
+  useEffect(() => {
+    if (ready) opacity.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.quad) });
+  }, [ready, opacity]);
+
+  const videoStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <View style={styles.fill} pointerEvents="none">
+      <Image source={poster} resizeMode="cover" style={styles.fill} />
+      <Animated.View style={[styles.fill, videoStyle]}>
+        <VideoView player={player} style={styles.fill} contentFit="cover" nativeControls={false} allowsPictureInPicture={false} />
+      </Animated.View>
+      <HeroShade shadeFrom={0} />
     </View>
   );
 }

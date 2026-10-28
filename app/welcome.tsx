@@ -5,12 +5,10 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeOut, useReducedMotion, ZoomIn } from 'react-native-reanimated';
 import { colors, flow } from '../src/constants/theme';
-import { useSession } from '../src/state/session';
-import { HeroBackground, HeroButton, HeroItem, Logo, heroImages } from '../src/ui/Hero';
+import { HeroButton, HeroItem, HeroVideo, Logo, heroVideo } from '../src/ui/Hero';
 
-/** Figma Login: splash (logo on white) → hero photo with "Discover a new world!". */
+/** Figma Login: splash (logo on white) → looping hero video with "Discover a new world!" and Get started. */
 export default function Welcome() {
-  const session = useSession();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const [splash, setSplash] = useState(!reduceMotion);
@@ -24,7 +22,7 @@ export default function Welcome() {
   return (
     <View style={styles.root}>
       <StatusBar style={splash ? 'dark' : 'light'} />
-      <HeroBackground image={heroImages.welcome} />
+      <HeroVideo source={heroVideo.source} poster={heroVideo.poster} />
 
       {!splash && (
         <View style={[styles.content, { paddingBottom: Math.max(insets.bottom, 34) + 45 }]}>
@@ -37,16 +35,6 @@ export default function Welcome() {
           <View style={styles.actions}>
             <HeroItem index={2}>
               <HeroButton title="Get started" onPress={() => router.push('/auth?from=welcome')} />
-            </HeroItem>
-            <HeroItem index={3}>
-              <HeroButton
-                title="Look around"
-                variant="text"
-                onPress={() => {
-                  session.continueAsGuest();
-                  router.replace('/explore');
-                }}
-              />
             </HeroItem>
           </View>
         </View>

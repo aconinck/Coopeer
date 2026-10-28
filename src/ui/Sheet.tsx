@@ -58,7 +58,7 @@ interface Chrome {
 const ChromeContext = createContext<Chrome | null>(null);
 
 // Routes where the sheet steps aside (full-screen flows presented above it).
-const HIDDEN_ON = ['/auth', '/join', '/invite', '/welcome', '/personal-info', '/payments', '/how-it-works'];
+const HIDDEN_ON = ['/auth', '/join', '/invite', '/welcome', '/create', '/personal-info', '/payments', '/how-it-works'];
 
 const selection = () => {
   if (Platform.OS !== 'web') Haptics.selectionAsync();

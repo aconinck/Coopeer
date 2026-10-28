@@ -9,8 +9,9 @@ import { haptic, type IconName } from './Buttons';
 import { Glass } from './Glass';
 
 const tabs: Record<string, { label: string; icon: IconName; activeIcon: IconName }> = {
-  explore: { label: 'Explore', icon: 'map-outline', activeIcon: 'map' },
+  map: { label: 'Map', icon: 'map-outline', activeIcon: 'map' },
   clubs: { label: 'Clubs', icon: 'people-outline', activeIcon: 'people' },
+  explore: { label: 'Explore', icon: 'compass-outline', activeIcon: 'compass' },
   schedule: { label: 'Schedule', icon: 'calendar-outline', activeIcon: 'calendar' },
   profile: { label: 'Profile', icon: 'person-circle-outline', activeIcon: 'person-circle' },
 };

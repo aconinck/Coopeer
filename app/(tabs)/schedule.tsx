@@ -40,7 +40,7 @@ export default function ScheduleScreen() {
           title="Nothing scheduled"
           text="Find a game on the map, or join a club to get its games here automatically."
           action="Explore the map"
-          onPress={() => router.navigate('/explore')}
+          onPress={() => router.navigate('/map')}
         />
       )}
       {today.length > 0 && <SectionHeader title="Today" />}

@@ -29,7 +29,7 @@ export default function ClubsScreen() {
           items={[
             { label: 'Scan QR code', icon: 'qr-code-outline', onPress: joinScan },
             { label: 'Enter team code', icon: 'keypad-outline', onPress: joinCode },
-            { label: 'Find clubs on the map', icon: 'map-outline', onPress: () => router.navigate('/explore') },
+            { label: 'Find clubs on the map', icon: 'map-outline', onPress: () => router.navigate('/map') },
           ]}
         />
       }>
