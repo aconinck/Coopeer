@@ -7,15 +7,16 @@ import { colors } from '../constants/theme';
 // - Club:  a recurring group ("every Friday 8 PM"). Join once, get all its games.
 // - Game:  one occurrence at a Place and time. Hosted by a Club, or open (pickup).
 
-export type SportId = 'soccer' | 'pickleball';
+export type SportId = 'soccer' | 'pickleball' | 'trails';
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 export const sports: Record<SportId, { label: string; icon: IconName; color: string; placeNoun: string }> = {
   soccer: { label: 'Soccer', icon: 'soccer', color: colors.soccer, placeNoun: 'field' },
   pickleball: { label: 'Pickleball', icon: 'table-tennis', color: colors.pickleball, placeNoun: 'courts' },
+  trails: { label: 'Trails', icon: 'hiking', color: colors.trails, placeNoun: 'trail' },
 };
 
-export const sportIds: SportId[] = ['soccer', 'pickleball'];
+export const sportIds: SportId[] = ['soccer', 'pickleball', 'trails'];
 
 export interface Member {
   id: string;
@@ -24,13 +25,28 @@ export interface Member {
 
 export const ME: Member = { id: 'me', name: 'You' };
 
+/** What the place physically is. Drives the quiet marker on the map (never an activity). */
+export type PlaceKind = 'park' | 'field' | 'courts' | 'trail' | 'center';
+
+export const placeKinds: Record<PlaceKind, { label: string; icon: IconName }> = {
+  park: { label: 'Park', icon: 'tree' },
+  field: { label: 'Field', icon: 'soccer-field' },
+  courts: { label: 'Courts', icon: 'tennis' },
+  trail: { label: 'Trail', icon: 'hiking' },
+  center: { label: 'Community center', icon: 'home-city-outline' },
+};
+
 export interface Place {
   id: string;
+  kind: PlaceKind;
   name: string;
   address: string;
   latitude: number;
   longitude: number;
+  /** Sports that can be played here. */
   sports: SportId[];
+  /** Photos of the place. Only use images we are licensed to show, and credit them. */
+  photos?: { uri: string; credit?: string }[];
 }
 
 export type SkillLevel = 'Casual' | 'All levels' | 'Competitive';
@@ -54,6 +70,8 @@ export interface Club {
   level: SkillLevel;
   code: string;
   isNew?: boolean;
+  /** Coopeer has confirmed this club is real and well run. */
+  verified?: boolean;
   /** Local image URI picked by the creator; falls back to the sport logo. */
   photoUri?: string;
   ownerId?: string;
@@ -124,11 +142,21 @@ export interface Payment {
   method: string;
 }
 
+/** What the player wants to do first; decides where sign-up lands them. */
+export type Goal = 'play' | 'join' | 'host';
+
 export interface User {
   id: string;
   phone: string;
   name: string;
+  birthYear?: number;
+  /** Favorite sports, picked at sign-up. Filters the map and feed first. */
+  sports?: SportId[];
+  goal?: Goal;
 }
+
+/** Everything sign-up collects after the phone is verified. */
+export type NewProfile = Pick<User, 'name' | 'birthYear' | 'sports' | 'goal'>;
 
 export function gameStatus(game: Game, now = new Date()): GameStatus {
   if (game.end < now) return 'ended';

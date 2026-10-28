@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { BackHandler, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -13,6 +13,7 @@ import Animated, {
   SlideOutRight,
   interpolate,
   runOnJS,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -49,6 +50,8 @@ export const useSheet = () => useContext(StateContext);
 
 interface Chrome {
   pan: ReturnType<typeof Gesture.Pan>;
+  bodyPan: ReturnType<typeof Gesture.Pan>;
+  scrollY: SharedValue<number>;
   canGoBack: boolean;
   back: () => void;
   close: () => void;
@@ -190,35 +193,76 @@ function SheetHost({
     return () => sub.remove();
   }, [isOpen, stack.length, back, close]);
 
-  const pan = useMemo(
-    () =>
-      Gesture.Pan()
-        .activeOffsetY([-6, 6])
-        .onStart(() => {
+  // Close on Escape (web), like any modal surface.
+  useEffect(() => {
+    if (!isOpen || Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, close]);
+
+  const scrollY = useSharedValue(0);
+  const pulling = useSharedValue(0);
+  const pullFrom = useSharedValue(0);
+
+  const pan = useMemo(() => {
+    // Release: project with velocity, then close, collapse to half, or expand to full.
+    const settle = (velocityY: number) => {
+      'worklet';
+      const projected = y.value + velocityY * 0.18;
+      if (projected > half + 90) {
+        runOnJS(beginClose)();
+        y.value = withSpring(closed, { ...SPRING, velocity: velocityY }, (finished) => {
+          if (finished) runOnJS(clear)();
+        });
+        runOnJS(setAtFull)(false);
+        return;
+      }
+      const target = projected < half / 2 ? full : half;
+      y.value = withSpring(target, { ...SPRING, velocity: velocityY });
+      runOnJS(detentHaptic)();
+      runOnJS(setAtFull)(target === full);
+    };
+    const follow = (translationY: number) => {
+      'worklet';
+      const next = start.value + translationY;
+      // Rubber-band above the top snap.
+      y.value = next < full ? full + (next - full) * 0.22 : next;
+    };
+
+    /** Header: always drags the sheet. */
+    const header = Gesture.Pan()
+      .activeOffsetY([-6, 6])
+      .onStart(() => {
+        start.value = y.value;
+      })
+      .onUpdate((e) => follow(e.translationY))
+      .onEnd((e) => settle(e.velocityY));
+
+    /** Body: once the content is scrolled to the top, pulling down drags the sheet (iOS sheet behavior). */
+    const body = Gesture.Pan()
+      .activeOffsetY([-8, 8])
+      .onStart(() => {
+        pulling.value = 0;
+      })
+      .onUpdate((e) => {
+        if (!pulling.value) {
+          if (scrollY.value > 1 || e.translationY <= 0) return;
+          pulling.value = 1;
+          pullFrom.value = e.translationY;
           start.value = y.value;
-        })
-        .onUpdate((e) => {
-          const next = start.value + e.translationY;
-          // Rubber-band above the top snap.
-          y.value = next < full ? full + (next - full) * 0.22 : next;
-        })
-        .onEnd((e) => {
-          const projected = y.value + e.velocityY * 0.18;
-          if (projected > half + 90) {
-            runOnJS(beginClose)();
-            y.value = withSpring(closed, { ...SPRING, velocity: e.velocityY }, (finished) => {
-              if (finished) runOnJS(clear)();
-            });
-            runOnJS(setAtFull)(false);
-            return;
-          }
-          const target = projected < half / 2 ? full : half;
-          y.value = withSpring(target, { ...SPRING, velocity: e.velocityY });
-          runOnJS(detentHaptic)();
-          runOnJS(setAtFull)(target === full);
-        }),
-    [closed, half, clear, beginClose, start, y],
-  );
+        }
+        follow(Math.max(0, e.translationY - pullFrom.value));
+      })
+      .onEnd((e) => {
+        if (pulling.value) settle(e.velocityY);
+        pulling.value = 0;
+      });
+
+    return { header, body };
+  }, [closed, half, clear, beginClose, start, y, scrollY, pulling, pullFrom]);
 
   // The sheet grows/shrinks (height) between full and half, and only slides (translate) below half.
   // Its bottom stays on the screen edge, so the action bar and scroll area are always reachable.
@@ -242,7 +286,9 @@ function SheetHost({
 
   const chrome = useMemo<Chrome>(
     () => ({
-      pan,
+      pan: pan.header,
+      bodyPan: pan.body,
+      scrollY,
       canGoBack: stack.length > 1,
       back,
       close,
@@ -253,7 +299,7 @@ function SheetHost({
       y,
       half,
     }),
-    [pan, stack.length, back, close, snapTo, atFull, y, half],
+    [pan, scrollY, stack.length, back, close, snapTo, atFull, y, half],
   );
 
   const top = stack[stack.length - 1];
@@ -307,7 +353,15 @@ function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
   const chrome = useContext(ChromeContext);
   const insets = useSafeAreaInsets();
   const [footerHeight, setFooterHeight] = useState(0);
-
+  const scrollY = chrome?.scrollY;
+  const onScroll = useAnimatedScrollHandler((e) => {
+    if (scrollY) scrollY.value = e.contentOffset.y;
+  });
+  // The scroll view keeps scrolling; the body pan only takes over when pulled down at the top.
+  const bodyGesture = useMemo(
+    () => (chrome ? Gesture.Simultaneous(Gesture.Native(), chrome.bodyPan) : Gesture.Native()),
+    [chrome],
+  );
 
   if (!chrome) return null;
 
@@ -332,15 +386,19 @@ function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
         </View>
       </GestureDetector>
 
-      <ScrollView
-        style={styles.flex}
-        contentContainerStyle={[styles.body, { paddingBottom: footerHeight + insets.bottom + space.xxl }]}
-        onScrollBeginDrag={chrome.expand}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {children}
-      </ScrollView>
+      <GestureDetector gesture={bodyGesture}>
+        <Animated.ScrollView
+          style={styles.flex}
+          contentContainerStyle={[styles.body, { paddingBottom: footerHeight + insets.bottom + space.xxl }]}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          onScrollBeginDrag={chrome.expand}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {children}
+        </Animated.ScrollView>
+      </GestureDetector>
 
       {footer ? (
         <Animated.View

@@ -8,6 +8,7 @@ import { open } from '../../src/lib/nav';
 import { PrimaryButton, SecondaryButton, TextButton } from '../../src/ui/Buttons';
 import { ClubCard, GamesVsClubsCard } from '../../src/ui/Rows';
 import { MoreMenu, Screen } from '../../src/ui/Screen';
+import { Rail, Section } from '../../src/ui/Layout';
 
 const createClub = () => router.push('/create/club');
 const joinScan = () => router.push('/join?mode=scan');
@@ -18,6 +19,8 @@ export default function ClubsScreen() {
   const store = useStore();
   const session = useSession();
   const clubs = session.isSignedIn ? store.myClubs : [];
+
+  const discover = store.clubs.filter((c) => !store.isMember(c.id)).sort((a, b) => Number(!!b.verified) - Number(!!a.verified));
 
   const rows: (typeof clubs)[] = [];
   for (let i = 0; i < clubs.length; i += 2) rows.push(clubs.slice(i, i + 2));
@@ -36,14 +39,16 @@ export default function ClubsScreen() {
         />
       }>
       {clubs.length > 0 ? (
-        rows.map((row, rowIndex) => (
-          <View key={row.map((c) => c.id).join('-')} style={styles.gridRow}>
-            {row.map((club, col) => (
-              <ClubCard key={club.id} index={rowIndex * 2 + col} club={club} onPress={() => open.clubPage(club.id)} />
-            ))}
-            {row.length === 1 && <View style={styles.flex} />}
-          </View>
-        ))
+        <Section first title="Your clubs" caption={`${clubs.length} ${clubs.length === 1 ? 'club' : 'clubs'} · games land in your schedule`}>
+          {rows.map((row, rowIndex) => (
+            <View key={row.map((c) => c.id).join('-')} style={styles.gridRow}>
+              {row.map((club, col) => (
+                <ClubCard key={club.id} index={rowIndex * 2 + col} club={club} onPress={() => open.clubPage(club.id)} />
+              ))}
+              {row.length === 1 && <View style={styles.flex} />}
+            </View>
+          ))}
+        </Section>
       ) : (
         <>
           <View style={styles.empty}>
@@ -60,6 +65,16 @@ export default function ClubsScreen() {
           </View>
           <GamesVsClubsCard />
         </>
+      )}
+
+      {discover.length > 0 && (
+        <Section first={false} title="Clubs near you" caption="Verified first. Join once, play every week." action={{ label: 'Map', onPress: () => router.navigate('/map') }}>
+          <Rail snap={176}>
+            {discover.map((club) => (
+              <ClubCard key={club.id} club={club} width={176} onPress={() => open.club(club.id)} />
+            ))}
+          </Rail>
+        </Section>
       )}
     </Screen>
   );

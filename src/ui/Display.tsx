@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, type ComponentProps } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   LinearTransition,
@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, radius, space, type } from '../constants/theme';
+import { colors, layout, radius, shadow, space, type } from '../constants/theme';
 import { spring, timing } from '../constants/motion';
 import { gameStatus, initials, sports, spotsLeft, type Club, type Game, type Member, type SportId } from '../state/models';
 import { isTomorrow, time, weekday } from '../lib/format';
@@ -100,6 +100,15 @@ export function ClubLogo({ club, size = 52 }: { club: Club; size?: number }) {
   );
 }
 
+/** Coopeer-confirmed club. A blue seal next to the name, like Apple's verified marks. */
+export function VerifiedBadge({ size = 16 }: { size?: number }) {
+  return (
+    <View accessible accessibilityLabel="Verified club" style={styles.center}>
+      <MaterialCommunityIcons name="check-decagram" size={size} color={colors.verified} />
+    </View>
+  );
+}
+
 export function DateTile({ game, now }: { game: Game; now: Date }) {
   const status = gameStatus(game, now);
   const top =
@@ -160,12 +169,13 @@ export function gameBadge(game: Game, isMember: boolean, now: Date): BadgeKind |
   return isMember ? 'reply' : null;
 }
 
-export function StatusBadge({ kind }: { kind: BadgeKind }) {
+/** `onMedia`: solid white pill for sitting on a photo/cover (no nested pill). */
+export function StatusBadge({ kind, onMedia }: { kind: BadgeKind; onMedia?: boolean }) {
   const mounted = useMounted();
   const { title, tone } = badgeInfo[kind];
   const { color, bg } = tones[tone];
   return (
-    <Animated.View key={kind} entering={mounted ? FadeIn.duration(timing.fade.duration) : undefined} style={[styles.badge, { backgroundColor: bg }]}>
+    <Animated.View key={kind} entering={mounted ? FadeIn.duration(timing.fade.duration) : undefined} style={[styles.badge, { backgroundColor: onMedia ? colors.surface : bg }, onMedia && styles.badgeOnMedia]}>
       {kind === 'live' && <View style={styles.liveDot} />}
       {kind === 'member' && <Ionicons name="checkmark" size={12} color={color} />}
       <Text style={[type.caption, { color, fontWeight: '600' }]}>{title}</Text>
@@ -184,11 +194,62 @@ export function KindTag({ kind }: { kind: 'clubGame' | 'openGame' | 'club' }) {
   );
 }
 
-export function SectionHeader({ title, caption }: { title: string; caption?: string }) {
+/**
+ * Section title (Airbnb pattern): bold title, optional one-line caption, optional "See all" link on the right.
+ * Use one per section; never stack two headers without content between them.
+ */
+export function SectionHeader({ title, caption, action }: { title: string; caption?: string; action?: { label: string; onPress: () => void } }) {
   return (
-    <View style={{ gap: 2, marginTop: space.sm }} accessibilityRole="header">
-      <Text style={type.title3}>{title}</Text>
-      {caption ? <Text style={[type.footnote, { color: colors.label2 }]}>{caption}</Text> : null}
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionText} accessibilityRole="header">
+        <Text style={type.title3}>{title}</Text>
+        {caption ? <Text style={[type.footnote, { color: colors.label2 }]}>{caption}</Text> : null}
+      </View>
+      {action && (
+        <Pressable accessibilityRole="button" onPress={action.onPress} hitSlop={8} style={({ pressed }) => pressed && { opacity: 0.5 }}>
+          <Text style={[type.subhead, styles.sectionAction]}>{action.label}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+/** Strava-style row of big numbers with small labels, separated by hairlines. */
+export function StatRow({ stats }: { stats: { value: string; label: string; tone?: string }[] }) {
+  return (
+    <View style={styles.statRow}>
+      {stats.map((stat, index) => (
+        <View key={stat.label} style={[styles.stat, index > 0 && styles.statDivider]}>
+          <Text style={[styles.statValue, stat.tone ? { color: stat.tone } : null]} numberOfLines={1} adjustsFontSizeToFit>
+            {stat.value}
+          </Text>
+          <Text style={styles.statLabel} numberOfLines={1}>
+            {stat.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function ProgressBar({ value, color = colors.brand, height = 6 }: { value: number; color?: string; height?: number }) {
+  const pct = Math.max(0, Math.min(1, value)) * 100;
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(pct) }}
+      style={[styles.track, { height, borderRadius: height / 2 }]}
+    >
+      <View style={{ width: `${pct}%`, height, borderRadius: height / 2, backgroundColor: color }} />
+    </View>
+  );
+}
+
+/** Rounded-square tile holding an icon. The one way icons sit next to text in rows. */
+export function IconTile({ icon, color = colors.label, background = colors.fill, size = layout.iconTile }: { icon: ComponentProps<typeof Ionicons>['name']; color?: string; background?: string; size?: number }) {
+  return (
+    <View style={[styles.center, { width: size, height: size, borderRadius: size * 0.28, backgroundColor: background }]}>
+      <Ionicons name={icon} size={size * 0.56} color={color} />
     </View>
   );
 }
@@ -201,15 +262,68 @@ export function InfoChip({ text }: { text: string }) {
   );
 }
 
+/** Card surface: white, generous radius, no outline, a whisper of shadow. */
 export const card = {
   backgroundColor: colors.surface,
   borderRadius: radius.card,
-  borderWidth: StyleSheet.hairlineWidth,
-  borderColor: colors.separator,
+  ...shadow.card,
 } as const;
+
+/**
+ * Soft tinted pill: icon + short segments separated by dots ("Soccer • Club game").
+ * The one way to show a category or status at the top of a card.
+ */
+export function Tag({
+  icon,
+  segments,
+  color = colors.label,
+  tint,
+  live,
+  iconColor,
+}: {
+  icon?: ComponentProps<typeof MaterialCommunityIcons>['name'];
+  segments: string[];
+  color?: string;
+  tint?: string;
+  live?: boolean;
+  /** Sport color for the icon when `live` (the text stays red). */
+  iconColor?: string;
+}) {
+  return (
+    <View style={[styles.tag, { backgroundColor: tint ?? `${color}14` }]}>
+      {live && icon ? (
+        <View>
+          <MaterialCommunityIcons name={icon} size={17} color={iconColor ?? color} />
+          <View style={styles.tagLiveBadge} />
+        </View>
+      ) : live ? (
+        <View style={styles.tagLive} />
+      ) : icon ? (
+        <MaterialCommunityIcons name={icon} size={16} color={color} />
+      ) : null}
+      {segments.map((segment, index) => (
+        <View key={segment} style={styles.row}>
+          {index > 0 && <View style={[styles.tagDot, { backgroundColor: `${color}40` }]} />}
+          <Text style={[type.subhead, styles.tagText, { color: index === 0 ? color : colors.label }]} numberOfLines={1}>
+            {segment}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.md, marginTop: space.sm },
+  sectionText: { flex: 1, gap: 2 },
+  sectionAction: { color: colors.label, fontWeight: '600', textDecorationLine: 'underline' },
+  statRow: { flexDirection: 'row', alignItems: 'stretch' },
+  stat: { flex: 1, gap: 1, paddingHorizontal: space.md },
+  statDivider: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.separator },
+  statValue: { fontSize: 20, lineHeight: 25, fontWeight: '700', letterSpacing: -0.3, fontVariant: ['tabular-nums'], color: colors.label },
+  statLabel: { ...type.caption2, color: colors.label2, fontWeight: '600' },
+  track: { width: '100%', backgroundColor: colors.fill, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center' },
   dateTile: {
     width: 82,
@@ -231,5 +345,11 @@ const styles = StyleSheet.create({
   },
   tileTime: { ...type.footnote, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.live },
+  tag: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 12, borderRadius: radius.full, alignSelf: 'flex-start', flexShrink: 1 },
+  tagText: { fontWeight: '600' },
+  tagDot: { width: 5, height: 5, borderRadius: 3, marginRight: 6 },
+  tagLive: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.live },
+  tagLiveBadge: { position: 'absolute', top: -2, right: -3, width: 9, height: 9, borderRadius: 5, backgroundColor: colors.live, borderWidth: 1.5, borderColor: colors.surface },
+  badgeOnMedia: { height: 26, paddingHorizontal: 10 },
   infoChip: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: 10, backgroundColor: colors.fill },
 });

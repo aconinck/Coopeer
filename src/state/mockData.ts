@@ -13,12 +13,15 @@ const crowd = (count: number, offset = 0) =>
   Array.from({ length: count }, (_, i) => people[(i + offset) % people.length]);
 
 export const places: Place[] = [
-  { id: 'p1', name: 'Lawrence Plaza Field', address: '100 NW 1st St, Bentonville, AR', latitude: 36.3729, longitude: -94.2088, sports: ['soccer'] },
-  { id: 'p2', name: 'Memorial Park', address: '1100 NE J St, Bentonville, AR', latitude: 36.37621, longitude: -94.19123, sports: ['soccer', 'pickleball'] },
-  { id: 'p3', name: 'Osage Park Courts', address: 'Osage Park, Bentonville, AR', latitude: 36.3554, longitude: -94.21726, sports: ['pickleball'] },
-  { id: 'p4', name: 'Creekside Park Courts', address: 'Creekside Park, Bentonville, AR', latitude: 36.34012, longitude: -94.23727, sports: ['pickleball'] },
-  { id: 'p5', name: 'Phillips Park', address: '2001 SE J St, Bentonville, AR', latitude: 36.3537, longitude: -94.2042, sports: ['soccer'] },
-  { id: 'p6', name: 'Community Center', address: '1101 SW Citizens Cir, Bentonville, AR', latitude: 36.3631, longitude: -94.229, sports: ['soccer', 'pickleball'] },
+  { id: 'p1', kind: 'field', name: 'Lawrence Plaza Field', address: '100 NW 1st St, Bentonville, AR', latitude: 36.3729, longitude: -94.2088, sports: ['soccer'] },
+  { id: 'p2', kind: 'park', name: 'Memorial Park', address: '1100 NE J St, Bentonville, AR', latitude: 36.37621, longitude: -94.19123, sports: ['soccer', 'pickleball'] },
+  { id: 'p3', kind: 'courts', name: 'Osage Park Courts', address: 'Osage Park, Bentonville, AR', latitude: 36.3554, longitude: -94.21726, sports: ['pickleball'] },
+  { id: 'p4', kind: 'courts', name: 'Creekside Park Courts', address: 'Creekside Park, Bentonville, AR', latitude: 36.34012, longitude: -94.23727, sports: ['pickleball'] },
+  { id: 'p5', kind: 'park', name: 'Phillips Park', address: '2001 SE J St, Bentonville, AR', latitude: 36.3537, longitude: -94.2042, sports: ['soccer'] },
+  { id: 'p6', kind: 'center', name: 'Community Center', address: '1101 SW Citizens Cir, Bentonville, AR', latitude: 36.3631, longitude: -94.229, sports: ['soccer', 'pickleball'] },
+  { id: 'p7', kind: 'trail', name: 'Crystal Bridges Trails', address: '600 Museum Way, Bentonville, AR', latitude: 36.3815, longitude: -94.2024, sports: ['trails'],
+    photos: [{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Crystal_Bridges_Museum_of_American_Art_May_2017_03.jpg/960px-Crystal_Bridges_Museum_of_American_Art_May_2017_03.jpg', credit: 'Photo: Michael Barera · CC BY-SA 4.0' }] },
+  { id: 'p8', kind: 'trail', name: 'Slaughter Pen Trails', address: 'Slaughter Pen Hollow, Bentonville, AR', latitude: 36.3862, longitude: -94.2165, sports: ['trails'] },
 ];
 
 export const clubs: Club[] = [
@@ -26,12 +29,12 @@ export const clubs: Club[] = [
     id: 'c1', name: 'Bentonville Strikers', sport: 'soccer', homePlaceId: 'p1', cadence: 'Every Fri · 8 PM',
     about: 'Casual Friday night soccer. All skill levels welcome — we split teams fairly and grab drinks after.',
     links: [{ title: 'Group chat', url: 'https://chat.whatsapp.com/strikers' }],
-    members: crowd(12), memberCount: 34, monthlyPrice: 29, level: 'Casual', code: '12355654',
+    members: crowd(12), memberCount: 34, monthlyPrice: 29, level: 'Casual', code: '12355654', verified: true,
   },
   {
     id: 'c2', name: 'Sunday League', sport: 'soccer', homePlaceId: 'p2', cadence: 'Every Sun · 10 AM',
     about: '11v11 on full-size fields. Intermediate to competitive. Referee every match.',
-    links: [], members: crowd(10, 3), memberCount: 48, monthlyPrice: 35, level: 'Competitive', code: '22446688',
+    links: [], members: crowd(10, 3), memberCount: 48, monthlyPrice: 35, level: 'Competitive', code: '22446688', verified: true,
   },
   {
     id: 'c3', name: 'Osage Park Picklers', sport: 'pickleball', homePlaceId: 'p3', cadence: 'Every Sat · 9 AM',
@@ -42,7 +45,7 @@ export const clubs: Club[] = [
     id: 'c4', name: 'Dink & Drive', sport: 'pickleball', homePlaceId: 'p2', cadence: 'Tue & Thu · 6 PM',
     about: 'After-work doubles ladder. Rotating partners, ratings 3.0–4.0.',
     links: [{ title: 'Ladder standings', url: 'https://dinkanddrive.club/ladder' }],
-    members: crowd(9, 7), memberCount: 26, monthlyPrice: 24, level: 'All levels', code: '44668800',
+    members: crowd(9, 7), memberCount: 26, monthlyPrice: 24, level: 'All levels', code: '44668800', verified: true,
   },
   {
     id: 'c5', name: 'Phillips Park FC', sport: 'soccer', homePlaceId: 'p5', cadence: 'Every Wed · 7 PM',
@@ -58,6 +61,11 @@ export const clubs: Club[] = [
     id: 'c7', name: 'NWA Futsal', sport: 'soccer', homePlaceId: 'p6', cadence: 'Every Thu · 8 PM',
     about: 'Indoor 5v5 futsal. Fast, technical, fun.', links: [], members: crowd(8, 11),
     memberCount: 20, monthlyPrice: 32, level: 'Competitive', code: '77992244', isNew: true,
+  },
+  {
+    id: 'c8', name: 'Bentonville Trail Crew', sport: 'trails', homePlaceId: 'p7', cadence: 'Every Sat · 7 AM',
+    about: 'Sunrise group hikes and trail runs on the Crystal Bridges and Slaughter Pen loops. All paces, nobody gets left behind.',
+    links: [], members: crowd(9, 4), memberCount: 41, monthlyPrice: 12, level: 'All levels', code: '88003355', verified: true,
   },
 ];
 
@@ -102,6 +110,12 @@ export function makeGames(now: Date): Game[] {
     { ...base, id: 'g10', sport: 'pickleball', placeId: 'p2', clubId: 'c4', title: 'Doubles Ladder',
       details: 'Ladder night.', start: day(2, 18), end: day(2, 20), capacity: 12,
       going: crowd(3, 7), noResponse: crowd(6, 2), dropInPrice: 7, level: 'All levels', isCanceled: true },
+    { ...base, id: 'g11', sport: 'trails', placeId: 'p7', clubId: 'c8', title: 'Sunrise Group Hike',
+      details: '4 mile loop at a conversational pace. Bring water.', start: at(90), end: at(210), capacity: 20,
+      going: crowd(8, 4), dropInPrice: 0, level: 'All levels' },
+    { ...base, id: 'g12', sport: 'trails', placeId: 'p8', clubId: null, title: 'Trail Run · Slaughter Pen',
+      details: 'Easy 5K on the Slaughter Pen loop.', start: day(1, 7), end: day(1, 9), capacity: 12,
+      going: crowd(4, 9), dropInPrice: 0, level: 'Casual' },
   ];
 }
 

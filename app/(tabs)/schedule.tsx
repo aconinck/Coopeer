@@ -5,8 +5,8 @@ import { colors, space, type } from '../../src/constants/theme';
 import { gameStatus, isToday } from '../../src/state/models';
 import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
-import { PrimaryButton } from '../../src/ui/Buttons';
-import { SectionHeader } from '../../src/ui/Display';
+import { IconButton, PrimaryButton } from '../../src/ui/Buttons';
+import { Section } from '../../src/ui/Layout';
 import { GameRow } from '../../src/ui/Rows';
 import { Screen } from '../../src/ui/Screen';
 
@@ -19,7 +19,7 @@ export default function ScheduleScreen() {
   const upcoming = games.filter((g) => gameStatus(g, store.now) === 'later');
 
   return (
-    <Screen variant="tab" title="Schedule">
+    <Screen variant="tab" title="Schedule" trailing={<IconButton icon="add" label="New game" onPress={() => router.push('/create/game')} />}>
       {games.length === 0 && (
         <Empty
           title="Nothing scheduled"
@@ -28,14 +28,20 @@ export default function ScheduleScreen() {
           onPress={() => router.navigate('/map')}
         />
       )}
-      {today.length > 0 && <SectionHeader title="Today" />}
-      {today.map((game, index) => (
-        <GameRow key={game.id} index={index} game={game} onPress={() => open.game(game.id)} />
-      ))}
-      {upcoming.length > 0 && <SectionHeader title="Upcoming" />}
-      {upcoming.map((game, index) => (
-        <GameRow key={game.id} index={today.length + index} game={game} onPress={() => open.game(game.id)} />
-      ))}
+      {today.length > 0 && (
+        <Section first title="Today" caption={`${today.length} ${today.length === 1 ? 'game' : 'games'}`}>
+          {today.map((game, index) => (
+            <GameRow key={game.id} index={index} game={game} onPress={() => open.game(game.id)} />
+          ))}
+        </Section>
+      )}
+      {upcoming.length > 0 && (
+        <Section first={today.length === 0} title="Upcoming" caption="From your clubs and games you're in for.">
+          {upcoming.map((game, index) => (
+            <GameRow key={game.id} index={today.length + index} game={game} onPress={() => open.game(game.id)} />
+          ))}
+        </Section>
+      )}
     </Screen>
   );
 }

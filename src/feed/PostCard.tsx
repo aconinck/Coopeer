@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
@@ -11,7 +11,8 @@ import { haptic, usePressScale } from '../ui/Buttons';
 import { Avatar, ClubLogo, SportIcon, card } from '../ui/Display';
 import { FeedClip } from './FeedClip';
 import { photos } from './media';
-import { timeAgo, type FeedPost, type HighlightPost, type ResultPost } from './posts';
+import { timeAgo, type FeedPost, type HighlightPost, type PhotoPost, type ResultPost } from './posts';
+import { FillImage, MediaFrame } from '../ui/Media';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -19,9 +20,12 @@ export function PostCard({ post, active, liked, onToggleLike }: { post: FeedPost
   const store = useStore();
   const club = store.club(post.clubId);
 
+  const hasMedia = post.kind === 'clip' || post.kind === 'photo';
+
+  // Card anatomy (Strava): header, then media edge to edge, then caption and actions.
   return (
     <View style={styles.card}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${post.author.name}, ${club?.name ?? ''}`} onPress={() => open.club(post.clubId)} style={styles.header}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${post.author.name}, ${club?.name ?? ''}`} onPress={() => open.club(post.clubId)} style={[styles.header, styles.pad]}>
         <Avatar member={post.author} size={36} />
         <View style={styles.flex}>
           <Text style={type.headline} numberOfLines={1}>
@@ -37,23 +41,64 @@ export function PostCard({ post, active, liked, onToggleLike }: { post: FeedPost
         <SportIcon sport={post.sport} size={24} />
       </Pressable>
 
-      {post.kind === 'clip' && (
-        <>
-          <FeedClip clip={post.clip} tag={post.tag} active={active} />
-          <Text style={type.body}>{post.caption}</Text>
-        </>
+      {post.kind === 'clip' && <FeedClip clip={post.clip} tag={post.tag} active={active} aspect={post.aspect} />}
+      {post.kind === 'photo' && <Gallery post={post} />}
+      {!hasMedia && (
+        <View style={styles.pad}>
+          {post.kind === 'result' && <ResultCard post={post} />}
+          {post.kind === 'highlight' && <HighlightCard post={post} />}
+        </View>
       )}
-      {post.kind === 'photo' && (
-        <>
-          <Image source={photos[post.photo]} resizeMode="cover" style={styles.photo} accessibilityIgnoresInvertColors />
-          <Text style={type.body}>{post.caption}</Text>
-        </>
-      )}
-      {post.kind === 'result' && <ResultCard post={post} />}
-      {post.kind === 'highlight' && <HighlightCard post={post} />}
 
-      <Actions post={post} liked={liked} onToggleLike={onToggleLike} />
+      <View style={[styles.pad, styles.bottom]}>
+        {hasMedia && <Text style={type.body}>{post.caption}</Text>}
+        <Actions post={post} liked={liked} onToggleLike={onToggleLike} />
+      </View>
     </View>
+  );
+}
+
+/** Photo layouts: one photo at its aspect, two side by side, three as a big one plus a stacked pair. */
+function Gallery({ post }: { post: PhotoPost }) {
+  const list = post.photos;
+  if (list.length === 1) {
+    return (
+      <MediaFrame aspect={post.aspect ?? 'portrait'}>
+        <FillImage source={photos[list[0]]} label={post.caption} />
+      </MediaFrame>
+    );
+  }
+  if (list.length === 2) {
+    return (
+      <View style={styles.grid}>
+        {list.map((name) => (
+          <MediaFrame key={name} aspect="portrait" style={styles.flex}>
+            <FillImage source={photos[name]} />
+          </MediaFrame>
+        ))}
+      </View>
+    );
+  }
+  return (
+    <MediaFrame aspect="square">
+      <View style={[styles.grid, StyleSheet.absoluteFill]}>
+        <View style={[styles.flex2, styles.cell]}>
+          <FillImage source={photos[list[0]]} />
+        </View>
+        <View style={[styles.flex, styles.stack]}>
+          {list.slice(1, 3).map((name, i) => (
+            <View key={name} style={[styles.flex, styles.cell]}>
+              <FillImage source={photos[name]} />
+              {i === 1 && list.length > 3 && (
+                <View style={styles.more}>
+                  <Text style={[type.title3, { color: colors.white }]}>+{list.length - 3}</Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+      </View>
+    </MediaFrame>
   );
 }
 
@@ -188,9 +233,15 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   secondary: { color: colors.label2 },
-  card: { ...card, padding: space.md, gap: space.md },
+  flex2: { flex: 2 },
+  card: { ...card, overflow: 'hidden', paddingTop: space.md, gap: space.md },
+  pad: { paddingHorizontal: space.md },
+  bottom: { gap: space.md, paddingBottom: space.md },
+  grid: { flexDirection: 'row', gap: 2 },
+  stack: { gap: 2 },
+  cell: { overflow: 'hidden', backgroundColor: colors.fill },
+  more: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  photo: { width: '100%', aspectRatio: 4 / 5, borderRadius: radius.card, backgroundColor: colors.fill },
   board: { borderRadius: radius.card, backgroundColor: colors.bg, padding: space.lg, gap: space.md },
   boardTop: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   status: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.full, backgroundColor: colors.fill },

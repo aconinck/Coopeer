@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Alert, Image, Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,10 +13,11 @@ import { dollars, shareText } from '../../src/lib/format';
 import { COOPEER_FEE, inviteUrl, memberPrice, sportIds, sports, type Club, type ClubLink, type SportId } from '../../src/state/models';
 import { pitchPlace, useStore } from '../../src/state/store';
 import { pitchById } from '../../src/map/pitches';
-import { SportIcon } from '../../src/ui/Display';
+import { PlaceResults } from '../../src/ui/PlaceResults';
 import { HeroButton } from '../../src/ui/Hero';
-import { StepScaffold, UnderlineField } from '../../src/ui/StepFlow';
-import { CheckBadge, ChoiceChip, CodeBoxes, FieldLabel, LightPill, haptics } from '../../src/create/ui';
+import { SportTile, StepScaffold, UnderlineField } from '../../src/ui/StepFlow';
+import { PlacePickerMap } from '../../src/map/PlacePickerMap';
+import { CheckBadge, CodeBoxes, FieldLabel, LightPill, haptics } from '../../src/create/ui';
 
 /** Close the flow; opened from a deep link there is nothing to go back to. */
 const leave = () => (router.canGoBack() ? router.back() : router.replace('/map'));
@@ -131,11 +132,13 @@ export default function CreateClub() {
 
     case 'sport':
       return (
-        <StepScaffold {...common} title="Sport" subtitle="Coopeer starts with soccer and pickleball." canContinue={sport !== null} onNext={() => go(1)}>
-          <View style={styles.chips}>
+        <StepScaffold {...common} title="Sport" subtitle="Soccer, pickleball and trails to start." canContinue={sport !== null} onNext={() => go(1)}>
+          <View style={styles.tiles}>
             {sportIds.map((id) => (
-              <ChoiceChip
+              <SportTile
                 key={id}
+                icon={sports[id].icon}
+                color={sports[id].color}
                 title={sports[id].label}
                 selected={sport === id}
                 onPress={() => {
@@ -234,41 +237,44 @@ function PhotoPicker({ name, uri, onChange }: { name: string; uri?: string; onCh
 }
 
 function PlaceList({ sport, selectedId, onSelect }: { sport: SportId | null; selectedId: string | null; onSelect: (id: string) => void }) {
-  const store = useStore();
-  const places = useMemo(() => store.places.filter((p) => !sport || p.sports.includes(sport)), [store.places, sport]);
+  const [query, setQuery] = useState('');
   return (
     <View style={styles.places}>
-      {places.map((place, index) => {
-        const selected = place.id === selectedId;
-        return (
-          <Animated.View key={place.id} entering={enter(index)}>
-            <Pressable
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              onPress={() => {
-                if (!selected) haptics.selection();
-                onSelect(place.id);
-              }}
-              style={({ pressed }) => [styles.placeRow, selected && styles.placeRowSelected, pressed && { opacity: 0.7 }]}
-            >
-              <View style={styles.placeIcons}>
-                {place.sports.map((s, i) => (
-                  <View key={s} style={{ marginLeft: i === 0 ? 0 : -8 }}>
-                    <SportIcon sport={s} size={30} ring />
-                  </View>
-                ))}
-              </View>
-              <View style={styles.flex}>
-                <Text style={type.headline}>{place.name}</Text>
-                <Text style={[type.footnote, styles.muted]} numberOfLines={1}>
-                  {place.address}
-                </Text>
-              </View>
-              <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selected ? colors.brand : colors.gray3} />
-            </Pressable>
-          </Animated.View>
-        );
-      })}
+      <PlacePickerMap
+        sport={sport}
+        selectedId={selectedId}
+        onSelect={(id) => {
+          haptics.selection();
+          onSelect(id);
+        }}
+      />
+      <View style={styles.placeSearch}>
+        <Ionicons name="search" size={18} color={colors.label2} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search a park, field, trail or address"
+          placeholderTextColor={colors.label2}
+          autoCorrect={false}
+          returnKeyType="search"
+          style={[type.body, styles.placeSearchInput]}
+        />
+        {query ? (
+          <Pressable accessibilityLabel="Clear search" onPress={() => setQuery('')} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={colors.label2} />
+          </Pressable>
+        ) : null}
+      </View>
+      <PlaceResults
+        query={query}
+        sport={sport}
+        selectedId={selectedId}
+        onSelect={(id) => {
+          haptics.selection();
+          setQuery('');
+          onSelect(id);
+        }}
+      />
     </View>
   );
 }
@@ -364,7 +370,7 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center' },
   fields: { gap: 26 },
   field: { gap: space.sm },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  tiles: { flexDirection: 'row', gap: space.sm },
   photoArea: { height: 380, alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
   ring: { position: 'absolute', borderWidth: 1, borderColor: colors.brandSoft },
   ringFilled: { backgroundColor: colors.brandSoft, opacity: 0.45 },
@@ -406,7 +412,17 @@ const styles = StyleSheet.create({
     borderColor: colors.separator,
   },
   placeRowSelected: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
-  placeIcons: { flexDirection: 'row' },
+  placeSearch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: radius.full,
+    backgroundColor: colors.fill,
+    marginBottom: space.xs,
+  },
+  placeSearchInput: { flex: 1, color: colors.label, paddingVertical: 0, outlineStyle: 'none' } as never,
   priceArea: { alignItems: 'center', gap: space.xs, marginTop: space.lg },
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   priceText: { color: colors.brand },

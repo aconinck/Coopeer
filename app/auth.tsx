@@ -2,19 +2,21 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { router, useLocalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, flow, flowColors, space, type } from '../src/constants/theme';
+import { colors, space, type } from '../src/constants/theme';
 import { formatUSPhone } from '../src/lib/format';
 import { useSession } from '../src/state/session';
+import { requestTour } from '../src/tour/Tour';
 import { TextButton } from '../src/ui/Buttons';
-import { CodeField, StepScaffold, UnderlineField } from '../src/ui/StepFlow';
-import { HeroBackground, HeroButton, HeroItem, heroImages } from '../src/ui/Hero';
+import { CodeField, OptionCard, SportTile, StepScaffold, UnderlineField } from '../src/ui/StepFlow';
+import { sportIds, sports, type Goal, type SportId } from '../src/state/models';
 
-type Step = 'phone' | 'code' | 'name' | 'done';
+type Step = 'phone' | 'code' | 'name' | 'age' | 'sports' | 'goal';
 type Direction = 'forward' | 'back';
 
-/** Phone-only login: number → SMS code → (new people only) name. No passwords. */
+/**
+ * Phone-only login: number → SMS code. New players then set up a quick profile —
+ * name → age → favorite sports → what they want to do first — and land right in that flow.
+ */
 export default function Auth() {
   const { from } = useLocalSearchParams<{ from?: string }>();
   const session = useSession();
@@ -26,6 +28,9 @@ export default function Auth() {
   };
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
+  const [birthYear, setBirthYear] = useState('');
+  const [favorites, setFavorites] = useState<SportId[]>([]);
+  const [goal, setGoal] = useState<Goal | null>(null);
 
   const digits = phone.replace(/\D/g, '');
   const e164 = `+1${digits}`;
@@ -50,19 +55,27 @@ export default function Auth() {
         />
       );
     case 'name':
-      return <NameStep name={name} setName={setName} direction={direction} onBack={() => go('code', 'back')} onDone={() => go('done')} />;
-    case 'done':
+      return <NameStep name={name} setName={setName} direction={direction} onBack={() => go('code', 'back')} onDone={() => go('age')} />;
+    case 'age':
+      return <AgeStep birthYear={birthYear} setBirthYear={setBirthYear} direction={direction} onBack={() => go('name', 'back')} onDone={() => go('sports')} />;
+    case 'sports':
+      return <SportsStep selected={favorites} setSelected={setFavorites} direction={direction} onBack={() => go('age', 'back')} onDone={() => go('goal')} />;
+    case 'goal':
       return (
-        <DoneStep
-          name={name.trim()}
-          onExplore={async () => {
-            await session.completeProfile(name);
-            finish();
-          }}
-          onCreate={async () => {
-            await session.completeProfile(name);
-            finish();
-            router.push('/create/club');
+        <GoalStep
+          goal={goal}
+          setGoal={setGoal}
+          direction={direction}
+          onBack={() => go('sports', 'back')}
+          onDone={async () => {
+            const chosen = goal ?? 'play';
+            await session.completeProfile({ name, birthYear: Number(birthYear) || undefined, sports: favorites, goal: chosen });
+            await requestTour();
+            session.finishAuth();
+            // The goal is the last step: land them straight in what they picked.
+            if (chosen === 'join') router.replace('/clubs');
+            else router.replace(favorites[0] ? `/map?sport=${favorites[0]}` : '/map');
+            if (chosen === 'host') router.push(favorites[0] ? `/create/game?sport=${favorites[0]}` : '/create/game');
           }}
         />
       );
@@ -102,7 +115,7 @@ function PhoneStep({
     <StepScaffold
       title="Phone number"
       subtitle="We'll text you a code. No password, ever."
-      progress={0.33}
+      progress={0.14}
       canContinue={digits.length === 10}
       loading={sending}
       onNext={send}
@@ -176,7 +189,7 @@ function CodeStep({
     <StepScaffold
       title="Confirmation"
       subtitle={`Enter the 6-digit code we sent to +1 ${displayPhone}.`}
-      progress={0.66}
+      progress={0.28}
       canContinue={code.length === 6}
       loading={verifying}
       success={success}
@@ -231,7 +244,7 @@ function NameStep({
     <StepScaffold
       title="Full name"
       subtitle="So your teammates know who's coming."
-      progress={0.9}
+      progress={0.43}
       canContinue={valid}
       onNext={onDone}
       onBack={onBack}
@@ -251,51 +264,130 @@ function NameStep({
   );
 }
 
-/** Figma Sign up "Welcome": Explore, or start a new club right away. */
-function DoneStep({ name, onExplore, onCreate }: { name: string; onExplore: () => Promise<void>; onCreate: () => Promise<void> }) {
-  const insets = useSafeAreaInsets();
-  const [busy, setBusy] = useState(false);
-  const first = name.split(' ')[0] || name;
+const THIS_YEAR = new Date().getFullYear();
+const MIN_AGE = 13;
 
-  const run = (action: () => Promise<void>) => async () => {
-    if (busy) return;
-    setBusy(true);
-    await action();
-  };
-
+function AgeStep({
+  birthYear,
+  setBirthYear,
+  direction,
+  onBack,
+  onDone,
+}: {
+  birthYear: string;
+  setBirthYear: (v: string) => void;
+  direction: Direction;
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  const year = Number(birthYear);
+  const age = birthYear.length === 4 ? THIS_YEAR - year : null;
+  const valid = age !== null && age >= MIN_AGE && age <= 100;
+  const tooYoung = age !== null && age < MIN_AGE;
   return (
-    <View style={styles.hero}>
-      <StatusBar style="light" />
-      <HeroBackground image={heroImages.done} shadeFrom={0.26} />
-      <View style={[styles.heroContent, { paddingBottom: Math.max(insets.bottom, 34) + 33 }]}>
-        <HeroItem index={0}>
-          <Text style={[flow.heroTitle, styles.center, { color: colors.white }]}>
-            Welcome{'\n'}
-            {first}!
-          </Text>
-        </HeroItem>
-        <HeroItem index={1}>
-          <Text style={[flow.heroBody, styles.center, styles.heroSubtitle]}>Start with a new club or find one near you on Coopeer.</Text>
-        </HeroItem>
-        <View style={styles.heroActions}>
-          <HeroItem index={2}>
-            <HeroButton title="Explore" onPress={run(onExplore)} disabled={busy} />
-          </HeroItem>
-          <HeroItem index={3}>
-            <HeroButton title="Create a new club" variant="text" onPress={run(onCreate)} disabled={busy} />
-          </HeroItem>
-        </View>
+    <StepScaffold
+      title="Birth year"
+      subtitle="Helps us match you with the right level and age groups. Never shown publicly."
+      progress={0.57}
+      canContinue={valid}
+      onNext={onDone}
+      onBack={onBack}
+      direction={direction}
+    >
+      <UnderlineField
+        placeholder="1996"
+        value={birthYear}
+        onChangeText={(text) => setBirthYear(text.replace(/\D/g, '').slice(0, 4))}
+        keyboardType="number-pad"
+        autoComplete="birthdate-year"
+        error={tooYoung || (age !== null && age > 100)}
+        onSubmitEditing={() => valid && onDone()}
+      />
+      {valid && <Text style={[type.subhead, styles.muted]}>You're {age}.</Text>}
+      {tooYoung && <Text style={[type.footnote, styles.error]}>You need to be at least {MIN_AGE} to use Coopeer.</Text>}
+    </StepScaffold>
+  );
+}
+
+function SportsStep({
+  selected,
+  setSelected,
+  direction,
+  onBack,
+  onDone,
+}: {
+  selected: SportId[];
+  setSelected: (v: SportId[]) => void;
+  direction: Direction;
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  const toggle = (id: SportId) => setSelected(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
+  return (
+    <StepScaffold
+      title="Your sports"
+      subtitle="Tap all you play. We'll show these first."
+      progress={0.71}
+      canContinue={selected.length > 0}
+      onNext={onDone}
+      onBack={onBack}
+      direction={direction}
+    >
+      <View style={styles.tiles}>
+        {sportIds.map((id) => (
+          <SportTile key={id} icon={sports[id].icon} color={sports[id].color} title={sports[id].label} selected={selected.includes(id)} onPress={() => toggle(id)} />
+        ))}
       </View>
-    </View>
+    </StepScaffold>
+  );
+}
+
+const goals: { id: Goal; icon: 'map-search-outline' | 'account-group-outline' | 'flag-plus-outline'; title: string; detail: string }[] = [
+  { id: 'play', icon: 'map-search-outline', title: 'Find a game', detail: 'See what is happening near you today.' },
+  { id: 'join', icon: 'account-group-outline', title: 'Join a club', detail: 'Play with the same group every week.' },
+  { id: 'host', icon: 'flag-plus-outline', title: 'Start a game', detail: 'Pick a place and time. Players near you join.' },
+];
+
+function GoalStep({
+  goal,
+  setGoal,
+  direction,
+  onBack,
+  onDone,
+}: {
+  goal: Goal | null;
+  setGoal: (v: Goal) => void;
+  direction: Direction;
+  onBack: () => void;
+  onDone: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <StepScaffold
+      title="What's first?"
+      subtitle="We'll take you straight there. You can do all of it later."
+      progress={1}
+      canContinue={goal !== null && !busy}
+      onNext={() => {
+        if (busy) return;
+        setBusy(true);
+        onDone().catch(() => setBusy(false));
+      }}
+      onBack={onBack}
+      direction={direction}
+    >
+      <View style={styles.options}>
+        {goals.map((g) => (
+          <OptionCard key={g.id} icon={g.icon} title={g.title} detail={g.detail} selected={goal === g.id} onPress={() => setGoal(g.id)} />
+        ))}
+      </View>
+    </StepScaffold>
   );
 }
 
 const styles = StyleSheet.create({
   error: { color: colors.live },
   muted: { color: colors.label3 },
-  hero: { flex: 1, backgroundColor: colors.black },
-  heroContent: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: flow.heroGutter },
-  center: { textAlign: 'center', alignSelf: 'center', maxWidth: 304 },
-  heroSubtitle: { color: flowColors.heroMuted, marginTop: space.sm },
-  heroActions: { marginTop: 64, gap: flow.ctaGap },
+  options: { gap: space.md },
+  tiles: { flexDirection: 'row', gap: space.sm },
 });

@@ -1,22 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { Image, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, LinearTransition, useReducedMotion } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
-import { enter, exit, spring } from '../constants/motion';
+import { enter, exit } from '../constants/motion';
 import { DetailLayout, useDetailNav } from '../ui/DetailLayout';
 import { ME, gameStatus, inviteUrl, isToday, type Club } from '../state/models';
 import { useSession } from '../state/session';
 import { useStore } from '../state/store';
 import { confirmDestructive, dollars, shareText } from '../lib/format';
 import { ActionBar, PrimaryButton, SecondaryButton, TextButton, haptic } from '../ui/Buttons';
-import { Avatar, ClubLogo, KindTag, SectionHeader, card } from '../ui/Display';
+import { Avatar, ClubLogo, KindTag, SectionHeader, VerifiedBadge, card } from '../ui/Display';
 import { GameRow, LinkRow } from '../ui/Rows';
 import { MoreMenu, type MenuItem } from '../ui/Screen';
+import { Segmented, type SegmentOption } from '../ui/Segmented';
 
 type Tab = 'Games' | 'About' | 'Members';
-const tabs: Tab[] = ['Games', 'About', 'Members'];
+const tabs: SegmentOption<Tab>[] = [
+  { value: 'Games', label: 'Games' },
+  { value: 'About', label: 'About' },
+  { value: 'Members', label: 'Members' },
+];
 
 /** Figma club page: Games / About / Members. Non-members see "Join club" in the action bar. */
 export function ClubDetail({ id }: { id: string }) {
@@ -96,7 +101,10 @@ export function ClubDetail({ id }: { id: string }) {
         {club.photoUri ? <Image source={{ uri: club.photoUri }} style={styles.photo} accessibilityIgnoresInvertColors /> : <ClubLogo club={club} size={72} />}
         <View style={styles.headerText}>
           <KindTag kind="club" />
-          <Text style={type.title2}>{club.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={[type.title2, styles.nameText]}>{club.name}</Text>
+            {club.verified && <VerifiedBadge size={20} />}
+          </View>
           <Text style={[type.subhead, styles.secondary]}>{club.cadence}</Text>
           {isMember && (
             <Animated.View entering={mounted.current && !reduceMotion ? FadeIn.duration(260) : undefined} style={styles.memberRow}>
@@ -107,7 +115,7 @@ export function ClubDetail({ id }: { id: string }) {
         </View>
       </View>
 
-      <Segmented value={tab} onChange={setTab} />
+      <Segmented options={tabs} value={tab} onChange={setTab} />
 
       <Animated.View key={tab} entering={FadeIn.duration(220)} exiting={FadeOut.duration(100)} style={styles.tabBody}>
         {tab === 'Games' && <GamesTab club={club} />}
@@ -115,43 +123,6 @@ export function ClubDetail({ id }: { id: string }) {
         {tab === 'Members' && <MembersTab club={club} />}
       </Animated.View>
     </DetailLayout>
-  );
-}
-
-function Segmented({ value, onChange }: { value: Tab; onChange: (tab: Tab) => void }) {
-  const [width, setWidth] = useState(0);
-  const index = tabs.indexOf(value);
-  const segment = (width - 6) / tabs.length;
-  const x = useSharedValue(0);
-  const ready = width > 0;
-
-  useEffect(() => {
-    if (ready) x.value = withSpring(index * segment, spring.snappy);
-  }, [index, segment, ready, x]);
-
-  const pillStyle = useAnimatedStyle(() => ({ width: segment, opacity: ready ? 1 : 0, transform: [{ translateX: x.value }] }));
-
-  return (
-    <View style={styles.segmented} accessibilityRole="tablist" onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-      <Animated.View pointerEvents="none" style={[styles.segmentPill, pillStyle]} />
-      {tabs.map((tab) => {
-        const selected = tab === value;
-        return (
-          <Pressable
-            key={tab}
-            accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            onPress={() => {
-              if (!selected) haptic.selection();
-              onChange(tab);
-            }}
-            style={styles.segment}
-          >
-            <Text style={[type.subhead, { fontWeight: selected ? '600' : '500' }]}>{tab}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
   );
 }
 
@@ -291,23 +262,10 @@ const styles = StyleSheet.create({
   secondary: { color: colors.label2 },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
   headerText: { flex: 1, gap: 3 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  nameText: { flexShrink: 1 },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  segmented: { flexDirection: 'row', backgroundColor: colors.fill, borderRadius: radius.full, padding: 3 },
-  segment: { flex: 1, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full },
   tabBody: { gap: space.md },
-  segmentPill: {
-    position: 'absolute',
-    left: 3,
-    top: 3,
-    height: 34,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.xl },
   emptyAction: { flexDirection: 'row', width: 200, marginTop: space.sm },
   newGame: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.xs },

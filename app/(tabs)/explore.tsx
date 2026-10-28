@@ -14,6 +14,10 @@ import { useTabBarSpace } from '../../src/ui/Screen';
 
 const VIEWABILITY = { itemVisiblePercentThreshold: 60 };
 
+/** Rows of the feed list: title, the sticky sport chips, then posts. Only the chips stick. */
+type Row = { kind: 'title'; id: 'title' } | { kind: 'chips'; id: 'chips' } | { kind: 'post'; id: string; post: FeedPost };
+const STICKY = [1];
+
 /** Explore: what other players in town are posting — clips, results, highlights, photos. */
 export default function ExploreFeed() {
   const insets = useSafeAreaInsets();
@@ -31,20 +35,32 @@ export default function ExploreFeed() {
     }, []),
   );
 
-  const data = useMemo(() => posts.filter((p) => !sport || p.sport === sport), [sport]);
+  const data = useMemo<Row[]>(
+    () => [
+      { kind: 'title', id: 'title' },
+      { kind: 'chips', id: 'chips' },
+      ...posts.filter((p) => !sport || p.sport === sport).map((post) => ({ kind: 'post' as const, id: post.id, post })),
+    ],
+    [sport],
+  );
 
   // Play the first clip that is at least 60% visible; everything else stays paused.
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<FeedPost>[] }) => {
-    const clip = viewableItems.find((v) => v.isViewable && v.item?.kind === 'clip');
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<Row>[] }) => {
+    const clip = viewableItems.find((v) => v.isViewable && v.item?.kind === 'post' && v.item.post.kind === 'clip');
     setVisibleClipId(clip?.item?.id ?? null);
   }).current;
 
-  const header = (
+  const title = (
     <View style={styles.header}>
       <Text style={type.largeTitle} accessibilityRole="header">
         Explore
       </Text>
       <Text style={[type.subhead, styles.subtitle]}>Clips, results and highlights from players in Bentonville.</Text>
+    </View>
+  );
+
+  const chips = (
+    <View style={styles.sticky}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         <Chip title="All" selected={!sport} onPress={() => setSport(null)} />
         {sportIds.map((id) => (
@@ -54,7 +70,7 @@ export default function ExploreFeed() {
             color={sports[id].color}
             selected={sport === id}
             onPress={() => setSport(sport === id ? null : id)}
-            icon={<MaterialCommunityIcons name={sports[id].icon} size={16} color={sport === id ? colors.white : sports[id].color} />}
+            icon={<MaterialCommunityIcons name={sports[id].icon} size={16} color={sport === id ? colors.white : colors.label2} />}
           />
         ))}
       </ScrollView>
@@ -66,38 +82,39 @@ export default function ExploreFeed() {
       <FlatList
         data={data}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={header}
-        renderItem={({ item, index }) => (
-          <Animated.View entering={enter(index)}>
-            <PostCard
-              post={item}
-              active={focused && item.id === visibleClipId}
-              liked={!!liked[item.id]}
-              onToggleLike={() => setLiked((current) => ({ ...current, [item.id]: !current[item.id] }))}
-            />
-          </Animated.View>
-        )}
-        ItemSeparatorComponent={Separator}
+        stickyHeaderIndices={STICKY}
+        renderItem={({ item, index }) =>
+          item.kind === 'title' ? (
+            title
+          ) : item.kind === 'chips' ? (
+            chips
+          ) : (
+            <Animated.View entering={enter(index - 2)} style={styles.post}>
+              <PostCard
+                post={item.post}
+                active={focused && item.id === visibleClipId}
+                liked={!!liked[item.id]}
+                onToggleLike={() => setLiked((current) => ({ ...current, [item.id]: !current[item.id] }))}
+              />
+            </Animated.View>
+          )
+        }
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={VIEWABILITY}
-        contentContainerStyle={[styles.list, { paddingTop: insets.top, paddingBottom: tabBarSpace + space.lg }]}
+        style={{ marginTop: insets.top }}
+        contentContainerStyle={[styles.list, { paddingBottom: tabBarSpace + space.lg }]}
         showsVerticalScrollIndicator={false}
       />
-      <View pointerEvents="none" style={[styles.statusBar, { height: insets.top }]} />
     </View>
   );
-}
-
-function Separator() {
-  return <View style={styles.separator} />;
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   list: { paddingHorizontal: space.lg },
-  header: { paddingTop: space.sm, paddingBottom: space.sm, gap: space.xs },
+  header: { paddingTop: space.sm, gap: space.xs },
+  sticky: { marginHorizontal: -space.lg, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.xs, marginBottom: space.sm, backgroundColor: colors.bg },
   subtitle: { color: colors.label2 },
   chips: { gap: space.sm, paddingVertical: space.md },
-  separator: { height: space.lg },
-  statusBar: { position: 'absolute', left: 0, right: 0, top: 0, backgroundColor: colors.bg },
+  post: { marginBottom: space.lg },
 });

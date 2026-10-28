@@ -11,7 +11,10 @@ import { pitchPlace, useStore } from '../../src/state/store';
 import { pitchById } from '../../src/map/pitches';
 import { Avatar } from '../../src/ui/Display';
 import { HeroButton } from '../../src/ui/Hero';
+import { PlaceResults } from '../../src/ui/PlaceResults';
+import { PlacePickerMap } from '../../src/map/PlacePickerMap';
 import { ChoiceChip, FieldLabel, OptionRow, OptionSheet, haptics } from '../../src/create/ui';
+import { SportTile } from '../../src/ui/StepFlow';
 
 /** Close the flow; opened from a deep link there is nothing to go back to. */
 const leave = () => (router.canGoBack() ? router.back() : router.replace('/map'));
@@ -33,7 +36,7 @@ const label = (minutes: number) => time(at(startOfDay(new Date()), minutes));
 
 /** Figma "Criando Partida" (Evento): schedule an open game, or a game for a club you run. */
 export default function CreateGame() {
-  const { club: clubParam, pitch: pitchParam } = useLocalSearchParams<{ club?: string; pitch?: string }>();
+  const { club: clubParam, pitch: pitchParam, sport: sportParam } = useLocalSearchParams<{ club?: string; pitch?: string; sport?: string }>();
   const store = useStore();
   const insets = useSafeAreaInsets();
   const pitch = pitchParam ? pitchById(pitchParam) : undefined;
@@ -43,7 +46,7 @@ export default function CreateGame() {
 
   const [host, setHost] = useState<string>(initialClub?.id ?? OPEN);
   const club = host === OPEN ? undefined : store.club(host);
-  const [openSport, setOpenSport] = useState<SportId>(pitch?.sport ?? 'soccer');
+  const [openSport, setOpenSport] = useState<SportId>(pitch?.sport ?? (sportIds.find((id) => id === sportParam) ?? 'soccer'));
   const sport: SportId = pitch?.sport ?? club?.sport ?? openSport;
 
   const [title, setTitle] = useState('');
@@ -120,9 +123,9 @@ export default function CreateGame() {
         {!pitch && !club && (
           <View style={styles.field}>
             <FieldLabel>Sport</FieldLabel>
-            <View style={styles.chips}>
+            <View style={styles.tiles}>
               {sportIds.map((id) => (
-                <ChoiceChip key={id} title={sports[id].label} selected={openSport === id} onPress={() => setOpenSport(id)} />
+                <SportTile key={id} icon={sports[id].icon} color={sports[id].color} title={sports[id].label} selected={openSport === id} onPress={() => setOpenSport(id)} />
               ))}
             </View>
           </View>
@@ -363,26 +366,30 @@ function PlaceSheet({
   onClose: () => void;
   onSelect: (id: string) => void;
 }) {
-  const store = useStore();
   const [query, setQuery] = useState('');
-  const q = query.trim().toLowerCase();
-  const places = store.places.filter((p) => p.sports.includes(sport) && (!q || `${p.name} ${p.address}`.toLowerCase().includes(q)));
   return (
-    <OptionSheet visible={visible} onClose={onClose} header={<SearchField value={query} onChange={setQuery} placeholder="Search places" />}>
-      {places.map((p) => (
-        <OptionRow
-          key={p.id}
-          title={p.name}
-          detail={p.address}
-          selected={p.id === selectedId}
-          onPress={() => {
-            haptics.selection();
-            onSelect(p.id);
-            onClose();
-          }}
-        />
-      ))}
-      {places.length === 0 && <Text style={[type.subhead, styles.muted, styles.emptyText]}>No places match “{query}”.</Text>}
+    <OptionSheet visible={visible} onClose={onClose} header={<SearchField value={query} onChange={setQuery} placeholder="Search a park, field, trail or address" />}>
+      <PlacePickerMap
+        style={styles.pickerMap}
+        sport={sport}
+        selectedId={selectedId}
+        onSelect={(id) => {
+          haptics.selection();
+          onSelect(id);
+          onClose();
+        }}
+      />
+      <PlaceResults
+        query={query}
+        sport={sport}
+        selectedId={selectedId}
+        onSelect={(id) => {
+          haptics.selection();
+          setQuery('');
+          onSelect(id);
+          onClose();
+        }}
+      />
     </OptionSheet>
   );
 }
@@ -497,6 +504,8 @@ const styles = StyleSheet.create({
   underline: { height: 1, backgroundColor: colors.separator },
   underlineFocused: { height: 2, backgroundColor: colors.brand },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  tiles: { flexDirection: 'row', gap: space.sm },
+  pickerMap: { marginBottom: space.md },
   whenRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   chip: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: 10, borderWidth: 1, borderColor: colors.separator },
   repeat: { height: 36, borderRadius: radius.tile, backgroundColor: colors.fill, alignItems: 'center', justifyContent: 'center' },

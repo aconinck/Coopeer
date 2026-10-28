@@ -46,6 +46,12 @@
       ],
       "expo-video",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Coopeer uses your location to show games and clubs near you."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Coopeer uses your photos to set your club picture.",

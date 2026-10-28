@@ -3,7 +3,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
-  ZoomIn,
   interpolate,
   Extrapolation,
   runOnJS,
@@ -18,13 +17,21 @@ import { colors, mapColors } from '../constants/theme';
 import { spring } from '../constants/motion';
 import type { Place } from '../state/models';
 import { PlacePin, type PlaceSummary } from './PlacePin';
-import { BENTONVILLE_CENTER, DEFAULT_SPAN, RENDER, RENDER_HEIGHT, RENDER_WIDTH, project } from './projection';
-import { parks, pitches, streetLabels, streets, water, WORLD, type Pitch } from './mapData';
+import { BENTONVILLE_CENTER, DEFAULT_SPAN, MAP_BOUNDS, RENDER, RENDER_HEIGHT, RENDER_WIDTH, project } from './projection';
+import { parks, pitches, WORLD, type Pitch } from './mapData';
+import { TileLayer } from './TileLayer';
+import { UserDot } from './UserDot';
 
 export interface StreetMapHandle {
   /** Glide the camera so a point sits centered in the visible band [top, bottom] of the screen. */
   focus: (point: { latitude: number; longitude: number }, visibleTop: number, visibleBottom: number) => void;
   recenter: () => void;
+  /** Glide to the player's position (keeps the current zoom unless zoomed far out). */
+  locate: (point: { latitude: number; longitude: number }, visibleTop: number, visibleBottom: number) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  /** Zoom out (never in past the default view) so every point sits inside the visible band [top, bottom]. */
+  fit: (points: { latitude: number; longitude: number }[], visibleTop: number, visibleBottom: number) => void;
 }
 
 interface StreetMapProps {
@@ -35,6 +42,12 @@ interface StreetMapProps {
   /** Tapping an illustrated soccer field or pickleball court. */
   onPitchPress?: (pitch: Pitch) => void;
   selectedPitchId?: string | null;
+  /** The player's current position (blue dot). */
+  userLocation?: { latitude: number; longitude: number } | null;
+  /** Fires when the player moves the camera by hand (pan, pinch, double tap). */
+  onUserMove?: () => void;
+  /** Where the OSM/CARTO credit sits (below any overlay on top of the map). */
+  attributionTop?: number;
 }
 
 const CAMERA_SPRING = spring.camera;
@@ -45,13 +58,13 @@ const CAMERA_SPRING = spring.camera;
  * fade in as you zoom. Soccer fields and pickleball courts are drawn as small illustrations.
  */
 export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function StreetMap(
-  { summaries, selectedId, onSelect, onBackgroundPress, onPitchPress, selectedPitchId = null },
+  { summaries, selectedId, onSelect, onBackgroundPress, onPitchPress, selectedPitchId = null, userLocation = null, onUserMove, attributionTop = 4 },
   ref,
 ) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   const baseScale = size.width > 0 ? size.width / DEFAULT_SPAN : 0.7;
-  const minScale = baseScale * 0.55;
-  const maxScale = baseScale * 4;
+  const minScale = baseScale * 0.1;
+  const maxScale = baseScale * 5;
 
   const scale = useSharedValue(0.7);
   const tx = useSharedValue(0);
@@ -83,7 +96,37 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
       centerOn(project(point.latitude, point.longitude), target, (visibleTop + visibleBottom) / 2, true);
     },
     recenter: () => centerOn(BENTONVILLE_CENTER, baseScale, size.height * 0.42, true),
+    locate: (point, visibleTop, visibleBottom) => {
+      const target = Math.min(Math.max(scale.value, baseScale), maxScale);
+      centerOn(project(point.latitude, point.longitude), target, (visibleTop + visibleBottom) / 2, true);
+    },
+    fit: (points, visibleTop, visibleBottom) => {
+      if (points.length === 0 || size.width === 0) return;
+      const rendered = points.map((p) => project(p.latitude, p.longitude));
+      const xs = rendered.map((p) => p.x);
+      const ys = rendered.map((p) => p.y);
+      const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
+      const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
+      const pad = 56;
+      const fitX = (size.width - pad * 2) / Math.max(maxX - minX, 1);
+      const fitY = (visibleBottom - visibleTop - pad * 2) / Math.max(maxY - minY, 1);
+      const target = Math.min(Math.max(Math.min(fitX, fitY, baseScale), minScale), maxScale);
+      centerOn({ x: (minX + maxX) / 2, y: (minY + maxY) / 2 }, target, (visibleTop + visibleBottom) / 2, true);
+    },
+    zoomIn: () => zoomBy(1.7),
+    zoomOut: () => zoomBy(1 / 1.7),
   }));
+
+  // Zoom about the middle of the visible map band (above the drawer).
+  const zoomBy = (factor: number) => {
+    const next = Math.min(Math.max(scale.value * factor, minScale), maxScale);
+    const ratio = next / scale.value;
+    const cx = size.width / 2;
+    const cy = size.height * 0.42;
+    tx.value = withSpring(cx - (cx - tx.value) * ratio, CAMERA_SPRING);
+    ty.value = withSpring(cy - (cy - ty.value) * ratio, CAMERA_SPRING);
+    scale.value = withSpring(next, CAMERA_SPRING);
+  };
 
   const onLayout = (width: number, height: number) => {
     const first = size.width === 0;
@@ -99,9 +142,12 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
 
   const { width, height } = size;
 
+  const movedByUser = () => onUserMove?.();
+
   const pan = Gesture.Pan()
     .averageTouches(true)
     .onStart(() => {
+      runOnJS(movedByUser)();
       startX.value = tx.value;
       startY.value = ty.value;
     })
@@ -116,17 +162,18 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
       tx.value = withDecay({
         velocity: e.velocityX,
         deceleration: 0.996,
-        clamp: [width - RENDER_WIDTH * s - slackX, slackX],
+        clamp: [width - MAP_BOUNDS.right * s - slackX, -MAP_BOUNDS.left * s + slackX],
       });
       ty.value = withDecay({
         velocity: e.velocityY,
         deceleration: 0.996,
-        clamp: [height - RENDER_HEIGHT * s - slackY, slackY],
+        clamp: [height - MAP_BOUNDS.bottom * s - slackY, -MAP_BOUNDS.top * s + slackY],
       });
     });
 
   const pinch = Gesture.Pinch()
     .onStart((e) => {
+      runOnJS(movedByUser)();
       startScale.value = scale.value;
       startX.value = tx.value;
       startY.value = ty.value;
@@ -155,6 +202,7 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd((e) => {
+      runOnJS(movedByUser)();
       const next = Math.min(scale.value * 1.7, maxScale);
       const ratio = next / scale.value;
       tx.value = withSpring(e.x - (e.x - tx.value) * ratio, CAMERA_SPRING);
@@ -191,11 +239,6 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
 
-  // Residential streets: faint when zoomed out, full when zoomed in (Apple Maps hierarchy).
-  const minorStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scale.value, [baseScale * 0.8, baseScale * 1.2], [0.3, 1], Extrapolation.CLAMP),
-  }));
-
   return (
     <View
       style={[StyleSheet.absoluteFill, styles.ground]}
@@ -204,20 +247,14 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
       <GestureDetector gesture={gesture}>
         <View collapsable={false} style={StyleSheet.absoluteFill}>
           <Animated.View style={[styles.layer, layerStyle]}>
-            <GroundLayer />
-            <Animated.View style={[StyleSheet.absoluteFill, minorStyle]}>
-              <MinorStreets />
-            </Animated.View>
+            <TileLayer scale={scale} tx={tx} ty={ty} width={width} height={height} />
+            <ParkLayer />
             <View style={StyleSheet.absoluteFill}>
-              <MainLayer selectedPitchId={selectedPitchId} />
+              <PitchLayer selectedPitchId={selectedPitchId} />
             </View>
           </Animated.View>
         </View>
       </GestureDetector>
-
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        {width > 0 && streetLabels.map((label, index) => <StreetLabel key={index} label={label} scale={scale} tx={tx} ty={ty} baseScale={baseScale} />)}
-      </View>
 
       <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
         {width > 0 &&
@@ -236,37 +273,31 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
             />
           ))}
       </View>
-      <Text style={styles.attribution}>© OpenStreetMap contributors</Text>
+
+      {width > 0 && userLocation && (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <UserMarker point={userLocation} scale={scale} tx={tx} ty={ty} />
+        </View>
+      )}
+      <Text style={[styles.attribution, { top: attributionTop }]}>© OpenStreetMap contributors © CARTO</Text>
     </View>
   );
 });
 
 const VIEWBOX = `0 0 ${WORLD.width} ${WORLD.height}`;
-const ROAD = { strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' } as const;
 
-const GroundLayer = memo(function GroundLayer() {
+/** Park footprints from OpenStreetMap, a soft tint over the tiles so the main parks read at a glance. */
+const ParkLayer = memo(function ParkLayer() {
   return (
-    <Svg style={StyleSheet.absoluteFill} width={RENDER_WIDTH} height={RENDER_HEIGHT} viewBox={VIEWBOX}>
-      <Path d={parks} fill={mapColors.park} />
-      <Path d={water} fill={mapColors.water} />
+    <Svg style={StyleSheet.absoluteFill} width={RENDER_WIDTH} height={RENDER_HEIGHT} viewBox={VIEWBOX} pointerEvents="none">
+      <Path d={parks} fill={mapColors.park} fillOpacity={0.7} />
     </Svg>
   );
 });
 
-const MinorStreets = memo(function MinorStreets() {
+const PitchLayer = memo(function PitchLayer({ selectedPitchId }: { selectedPitchId: string | null }) {
   return (
     <Svg width={RENDER_WIDTH} height={RENDER_HEIGHT} viewBox={VIEWBOX}>
-      <Path d={streets.minor} stroke={mapColors.street} strokeWidth={8} {...ROAD} />
-    </Svg>
-  );
-});
-
-const MainLayer = memo(function MainLayer({ selectedPitchId }: { selectedPitchId: string | null }) {
-  return (
-    <Svg width={RENDER_WIDTH} height={RENDER_HEIGHT} viewBox={VIEWBOX}>
-      <Path d={streets.mid} stroke={mapColors.street} strokeWidth={14} {...ROAD} />
-      <Path d={streets.major} stroke={mapColors.majorCasing} strokeWidth={27} {...ROAD} />
-      <Path d={streets.major} stroke={mapColors.street} strokeWidth={20} {...ROAD} />
       {pitches.map((pitch) => (
         <PitchShape key={pitch.id} pitch={pitch} selected={pitch.id === selectedPitchId} />
       ))}
@@ -302,35 +333,24 @@ function PitchShape({ pitch, selected }: { pitch: Pitch; selected: boolean }) {
   );
 }
 
-/** Street names only appear once you are zoomed in enough to read them comfortably. */
-function StreetLabel({
-  label,
+function UserMarker({
+  point,
   scale,
   tx,
   ty,
-  baseScale,
 }: {
-  label: (typeof streetLabels)[number];
+  point: { latitude: number; longitude: number };
   scale: SharedValue<number>;
   tx: SharedValue<number>;
   ty: SharedValue<number>;
-  baseScale: number;
 }) {
-  const [name, x, y, angle, major] = label;
-  const rx = x * RENDER;
-  const ry = y * RENDER;
-  const from = baseScale * (major ? 1.25 : 1.5);
+  const p = project(point.latitude, point.longitude);
   const style = useAnimatedStyle(() => ({
-    opacity: interpolate(scale.value, [from, from * 1.15], [0, 1], Extrapolation.CLAMP),
-    transform: [{ translateX: rx * scale.value + tx.value }, { translateY: ry * scale.value + ty.value }, { rotate: `${angle}deg` }],
+    transform: [{ translateX: p.x * scale.value + tx.value - 9 }, { translateY: p.y * scale.value + ty.value - 9 }],
   }));
   return (
     <Animated.View style={[styles.anchor, style]}>
-      <View style={styles.labelBox}>
-        <Text numberOfLines={1} style={[styles.streetLabel, major && styles.streetLabelMajor]}>
-          {name}
-        </Text>
-      </View>
+      <UserDot />
     </Animated.View>
   );
 }
@@ -379,31 +399,22 @@ function Marker({
   return (
     <Animated.View pointerEvents="box-none" style={[styles.anchor, { zIndex: selected ? 3 : summary.live ? 2 : 1 }, position]}>
       <View pointerEvents="box-none" style={styles.pinBox}>
-        <Animated.View
-          entering={ZoomIn.withInitialValues({ transform: [{ scale: 0.9 }] })
-            .springify()
-            .mass(1)
-            .stiffness(spring.smooth.stiffness)
-            .damping(spring.smooth.damping)
-            .delay(120 + Math.min(index, 8) * 40)}
-        >
-          <Animated.View entering={FadeIn.duration(260).delay(120 + Math.min(index, 8) * 40)}>
-            <Animated.View style={pinStyle}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={summary.place.name}
-                onPress={onPress}
-                onPressIn={() => {
-                  pressed.value = 1;
-                }}
-                onPressOut={() => {
-                  pressed.value = 0;
-                }}
-                hitSlop={8}
-              >
-                <PlacePin summary={summary} />
-              </Pressable>
-            </Animated.View>
+        <Animated.View entering={FadeIn.duration(260).delay(120 + Math.min(index, 8) * 40)}>
+          <Animated.View style={pinStyle}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={summary.place.name}
+              onPress={onPress}
+              onPressIn={() => {
+                pressed.value = 1;
+              }}
+              onPressOut={() => {
+                pressed.value = 0;
+              }}
+              hitSlop={8}
+            >
+              <PlacePin summary={summary} selected={selected} />
+            </Pressable>
           </Animated.View>
         </Animated.View>
       </View>
@@ -417,7 +428,6 @@ function Marker({
 }
 
 const PIN_BOX = 240;
-const LABEL_BOX = 220;
 
 const styles = StyleSheet.create({
   ground: { backgroundColor: mapColors.ground, overflow: 'hidden' },
@@ -446,19 +456,9 @@ const styles = StyleSheet.create({
     textShadowColor: mapColors.street,
     textShadowRadius: 4,
   },
-  labelBox: { position: 'absolute', left: -LABEL_BOX / 2, top: -8, width: LABEL_BOX, height: 16, justifyContent: 'center' },
-  streetLabel: {
-    textAlign: 'center',
-    fontSize: 10,
-    fontWeight: '600',
-    color: mapColors.label,
-    textShadowColor: mapColors.labelHalo,
-    textShadowRadius: 3,
-  },
-  streetLabelMajor: { fontSize: 11 },
   attribution: {
     position: 'absolute',
-    right: 8,
+    left: 20,
     top: 4,
     fontSize: 9,
     color: mapColors.pinName,

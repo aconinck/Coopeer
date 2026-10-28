@@ -1,11 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ME, gameStatus, type Club, type Game, type NewClub, type NewGame, type Payment, type Place, type RSVP } from './models';
 import { time, weekday } from '../lib/format';
 import { pitchById, pitchTitle, placeForPitch as nearestPlace, type Pitch } from '../map/pitches';
 import * as mock from './mockData';
+import * as api from './api';
+import { hasBackend } from '../lib/supabase';
+import { useSession } from './session';
 
-// In-memory data layer. To use a real backend, replace the internals of this
-// provider; screens only use the values and actions returned by useStore().
+// Data layer. With Supabase configured (src/lib/supabase.ts) it loads everything for the signed-in
+// user, applies every change optimistically, writes it to the database and refreshes on realtime
+// events. Without keys it runs on the in-memory demo data. Screens only use useStore().
 
 interface Store {
   now: Date;
@@ -35,6 +39,8 @@ interface Store {
   createGame: (input: NewGame) => Game;
   /** The place a map field/court belongs to; creates (and stores) one if none is nearby. */
   placeForPitch: (pitchId: string) => Place | undefined;
+  /** Saves a searched place (or adds a sport to a known one) and returns it. */
+  addPlace: (place: Place) => Place;
 }
 
 /** Existing place near the pitch, or the place that would be created for it (not stored). */
@@ -42,6 +48,7 @@ export function pitchPlace(pitch: Pitch, places: Place[]): Place {
   return (
     nearestPlace(pitch, places) ?? {
       id: `pitch-${pitch.id}`,
+      kind: pitch.sport === 'soccer' ? 'field' : 'courts',
       name: pitch.park ? `${pitch.park} ${pitch.sport === 'soccer' ? 'Field' : 'Courts'}` : pitchTitle(pitch),
       address: pitch.park ?? 'Bentonville, AR',
       latitude: pitch.latitude,
@@ -52,6 +59,9 @@ export function pitchPlace(pitch: Pitch, places: Place[]): Place {
 }
 
 const DAY = 24 * 3600 * 1000;
+
+/** Unique enough for client-made ids (also used as the database primary key). */
+const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 function occurrences(start: Date, repeat: NewGame['repeat']): number[] {
   if (repeat === 'weekly') return [0, 7, 14, 21].map((d) => d * DAY);
@@ -70,11 +80,51 @@ const StoreContext = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => new Date());
-  const [places, setPlaces] = useState<Place[]>(mock.places);
-  const [clubs, setClubs] = useState(mock.clubs);
-  const [games, setGames] = useState(() => mock.makeGames(new Date()));
-  const [memberships, setMemberships] = useState<Set<string>>(() => new Set(['c1', 'c4']));
+  const session = useSession();
+  const uid = hasBackend ? (session.user?.id ?? null) : null;
+  const [places, setPlaces] = useState<Place[]>(hasBackend ? [] : mock.places);
+  const [clubs, setClubs] = useState<Club[]>(hasBackend ? [] : mock.clubs);
+  const [games, setGames] = useState<Game[]>(() => (hasBackend ? [] : mock.makeGames(new Date())));
+  const [memberships, setMemberships] = useState<Set<string>>(() => new Set(hasBackend ? [] : ['c1', 'c4']));
   const [payments, setPayments] = useState(mock.payments);
+  // Writes run one after another so a new place lands before the game that uses it.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+
+  const refresh = useCallback(async () => {
+    if (!uid) return null;
+    try {
+      const data = await api.fetchAll(uid);
+      setPlaces(data.places);
+      setClubs(data.clubs);
+      setGames(data.games);
+      setMemberships(data.memberships);
+      return data;
+    } catch (error) {
+      console.warn('Could not load data', error);
+      return null;
+    }
+  }, [uid]);
+
+  // Load on sign-in, then stay live: any change by anyone triggers a refresh.
+  useEffect(() => {
+    if (!uid) return;
+    refresh();
+    return api.subscribe(refresh);
+  }, [uid, refresh]);
+
+  /** Fire a write; the UI already shows the change. On failure, reload the truth from the server. */
+  const sync = useCallback(
+    (write: (id: string) => Promise<void>) => {
+      if (!uid) return;
+      queue.current = queue.current.then(() =>
+        write(uid).catch((error) => {
+          console.warn('Could not save', error);
+          refresh();
+        }),
+      );
+    },
+    [uid, refresh],
+  );
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30_000);
@@ -85,11 +135,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (clubId: string) => {
       if (memberships.has(clubId)) return;
       setMemberships(new Set(memberships).add(clubId));
+      sync((id) => api.joinClub(id, clubId));
       setClubs((list) =>
         list.map((c) => (c.id === clubId ? { ...c, memberCount: c.memberCount + 1, members: [ME, ...c.members] } : c)),
       );
     },
-    [memberships],
+    [memberships, sync],
   );
 
   const leave = useCallback(
@@ -98,16 +149,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const next = new Set(memberships);
       next.delete(clubId);
       setMemberships(next);
+      sync((id) => api.leaveClub(id, clubId));
       setClubs((list) =>
         list.map((c) =>
           c.id === clubId ? { ...c, memberCount: c.memberCount - 1, members: c.members.filter((m) => m.id !== ME.id) } : c,
         ),
       );
     },
-    [memberships],
+    [memberships, sync],
   );
 
   const setRSVP = useCallback((gameId: string, rsvp: RSVP) => {
+    sync((id) => api.setRSVP(id, gameId, rsvp));
     setGames((list) =>
       list.map((g) => {
         if (g.id !== gameId) return g;
@@ -121,7 +174,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
       }),
     );
-  }, []);
+  }, [sync]);
 
   const createClub = useCallback(
     (input: NewClub): Club => {
@@ -130,7 +183,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       do code = String(10_000_000 + Math.floor(Math.random() * 90_000_000));
       while (taken.has(code));
       const club: Club = {
-        id: `c-${Date.now()}`,
+        id: newId('c'),
         name: input.name.trim(),
         sport: input.sport,
         homePlaceId: input.homePlaceId,
@@ -150,9 +203,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       };
       setClubs((list) => [club, ...list]);
       setMemberships((current) => new Set(current).add(club.id));
+      sync((id) => api.createClub(id, club));
       return club;
     },
-    [clubs],
+    [clubs, sync],
   );
 
   const createGame = useCallback(
@@ -161,9 +215,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const sport = club?.sport ?? input.sport;
       const roster = club?.members ?? [];
       const invited = (input.inviteeIds === null ? roster : roster.filter((m) => input.inviteeIds?.includes(m.id))).filter((m) => m.id !== ME.id);
-      const stamp = Date.now();
+      const stamp = newId('g');
       const created: Game[] = occurrences(input.start, input.repeat).map((offset, index) => ({
-        id: `g-${stamp}-${index}`,
+        id: `${stamp}-${index}`,
         sport,
         placeId: input.placeId,
         clubId: input.clubId,
@@ -171,7 +225,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         details: input.details.trim(),
         start: new Date(input.start.getTime() + offset),
         end: new Date(input.end.getTime() + offset),
-        capacity: sport === 'soccer' ? 14 : 8,
+        capacity: sport === 'soccer' ? 14 : sport === 'trails' ? 12 : 8,
         going: [ME],
         declined: [],
         noResponse: invited,
@@ -181,13 +235,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         isNew: true,
       }));
       setGames((list) => [...list, ...created]);
+      // Create the game first, then the club cadence (it depends on nothing else).
+      sync((id) => api.createGames(id, created, invited.map((m) => m.id)));
       if (club && input.repeat !== 'never') {
         const cadence = input.repeat === 'weekly' ? `Every ${weekday(input.start)} · ${time(input.start)}` : `Weekdays · ${time(input.start)}`;
         setClubs((list) => list.map((c) => (c.id === club.id ? { ...c, cadence } : c)));
+        sync(() => api.setClubCadence(club.id, cadence));
       }
       return created[0];
     },
-    [clubs],
+    [clubs, sync],
   );
 
   const placeForPitch = useCallback(
@@ -195,10 +252,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const pitch = pitchById(pitchId);
       if (!pitch) return undefined;
       const place = pitchPlace(pitch, places);
-      if (!places.some((p) => p.id === place.id)) setPlaces((list) => (list.some((p) => p.id === place.id) ? list : [...list, place]));
+      if (!places.some((p) => p.id === place.id)) {
+        setPlaces((list) => (list.some((p) => p.id === place.id) ? list : [...list, place]));
+        sync((id) => api.savePlace(id, place, true));
+      }
       return place;
     },
-    [places],
+    [places, sync],
+  );
+
+  const addPlace = useCallback(
+    (place: Place): Place => {
+      const existing = places.find((p) => p.id === place.id);
+      const merged = existing ? { ...existing, sports: Array.from(new Set([...existing.sports, ...place.sports])) } : place;
+      setPlaces((list) => (list.some((p) => p.id === place.id) ? list.map((p) => (p.id === place.id ? merged : p)) : [...list, merged]));
+      sync((id) => api.savePlace(id, merged, !existing));
+      return merged;
+    },
+    [places, sync],
   );
 
   const value = useMemo<Store>(() => {
@@ -229,6 +300,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       leave,
       setRSVP,
       findClub: async (code) => {
+        if (uid) return (await refresh())?.clubs.find((c) => c.code === code) ?? clubs.find((c) => c.code === code);
         await new Promise((resolve) => setTimeout(resolve, 600));
         return clubs.find((c) => c.code === code);
       },
@@ -236,8 +308,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       createClub,
       createGame,
       placeForPitch,
+      addPlace,
     };
-  }, [now, places, clubs, games, payments, memberships, join, leave, setRSVP, createClub, createGame, placeForPitch]);
+  }, [now, places, clubs, games, payments, memberships, join, leave, setRSVP, createClub, createGame, placeForPitch, addPlace, uid, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

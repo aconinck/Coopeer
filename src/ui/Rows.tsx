@@ -3,12 +3,13 @@ import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } fro
 import Animated, { useReducedMotion } from 'react-native-reanimated';
 import { enter } from '../constants/motion';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, space, type } from '../constants/theme';
-import { gameStatus, spotsLeft, type Club, type Game } from '../state/models';
+import { colors, radius, space, type } from '../constants/theme';
+import { gameStatus, spotsLeft, sports, type Club, type Game } from '../state/models';
 import { useStore } from '../state/store';
-import { time, weekday } from '../lib/format';
-import { TextButton, usePressScale } from './Buttons';
-import { AvatarStack, ClubLogo, DateTile, KindTag, StatusBadge, card, gameBadge } from './Display';
+import { useSession } from '../state/session';
+import { isTomorrow, time, weekday } from '../lib/format';
+import { TextButton, haptic, usePressScale } from './Buttons';
+import { AvatarStack, ClubLogo, KindTag, StatusBadge, Tag, VerifiedBadge, card } from './Display';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -18,19 +19,21 @@ function PressCard({
   onPress,
   style,
   grow,
+  width,
   children,
 }: {
   index?: number;
   onPress: () => void;
   style: StyleProp<ViewStyle>;
   grow?: boolean;
+  width?: number;
   children: ReactNode;
 }) {
   const reduceMotion = useReducedMotion();
   const press = usePressScale(0.98, 0.9);
   const entering = index === undefined || reduceMotion ? undefined : enter(index);
   return (
-    <Animated.View entering={entering} style={grow && styles.grow}>
+    <Animated.View entering={entering} style={[grow && styles.grow, width !== undefined && { width }]}>
       <AnimatedPressable
         accessibilityRole="button"
         onPress={onPress}
@@ -44,36 +47,80 @@ function PressCard({
   );
 }
 
-/** The one way a game is shown in any list. */
+/**
+ * The one way a game is shown in any list. Calm, airy card: a soft tinted tag (sport • kind) with
+ * who's going on the right, a big title, one quiet meta line (time • place), then spots and the
+ * main action as a pill — tap "I'm in" without opening the game.
+ */
 export function GameRow({ game, showPlace = true, onPress, index }: { game: Game; showPlace?: boolean; onPress: () => void; index?: number }) {
   const store = useStore();
+  const session = useSession();
   const club = game.clubId ? store.club(game.clubId) : undefined;
   const place = store.place(game.placeId);
-  const badge = gameBadge(game, club ? store.isMember(club.id) : false, store.now);
-  const isLive = gameStatus(game, store.now) === 'live';
+  const status = gameStatus(game, store.now);
+  const isLive = status === 'live';
   const left = spotsLeft(game);
-  const host = club?.name ?? 'Open to everyone';
+  const sport = sports[game.sport];
+  const day = isLive ? 'Started' : status === 'soon' || status === 'today' ? 'Today' : isTomorrow(game.start, store.now) ? 'Tomorrow' : weekday(game.start);
+  const going = game.myRSVP === 'going';
+  const ended = status === 'ended' || game.isCanceled;
+  const tone = isLive ? colors.live : sport.color;
+
+  const imIn = () =>
+    session.requireAuth(() => {
+      haptic.success();
+      store.setRSVP(game.id, 'going');
+    });
 
   return (
-    <PressCard index={index} onPress={onPress} style={[styles.card, isLive && styles.liveCard]}>
-      <DateTile game={game} now={store.now} />
-      <View style={styles.body}>
-        <View style={styles.topLine}>
-          <KindTag kind={club ? 'clubGame' : 'openGame'} />
-          {badge && <StatusBadge kind={badge} />}
-        </View>
-        <Text style={[type.headline, game.isCanceled && styles.strike]} numberOfLines={1}>
+    <PressCard index={index} onPress={onPress} style={styles.gameCard}>
+      <View style={styles.gameTop}>
+        <Tag
+          live={isLive}
+          icon={sport.icon}
+          iconColor={sport.color}
+          color={tone}
+          segments={[isLive ? 'Live' : sport.label, club ? 'Club game' : 'Open game']}
+        />
+        <AvatarStack members={game.going} total={game.going.length} size={32} limit={3} />
+      </View>
+
+      <View style={styles.gameText}>
+        <Text style={[styles.gameTitle, game.isCanceled && styles.strike]} numberOfLines={2}>
           {game.title}
         </Text>
-        <Text style={[type.subhead, { color: colors.label2 }]} numberOfLines={1}>
-          {showPlace && place ? `${place.name} · ${host}` : host}
-        </Text>
-        <View style={styles.topLine}>
-          <Text style={[type.footnote, { color: colors.label2 }]}>
-            {left === 0 ? `${game.going.length} going · full` : `${game.going.length} going · ${left} spots left`}
+        <View style={styles.metaLine}>
+          <Text style={[type.subhead, styles.meta]} numberOfLines={1}>
+            {day} · {time(game.start)} – {time(game.end)}
           </Text>
-          <AvatarStack members={game.going} size={20} limit={3} />
         </View>
+        <Text style={[type.subhead, styles.meta]} numberOfLines={1}>
+          {showPlace && place ? place.name : club?.name ?? 'Open to everyone'}
+          {showPlace && place && club ? ` · ${club.name}` : ''}
+        </Text>
+      </View>
+
+      <View style={styles.gameBottom}>
+        <View style={styles.spots}>
+          <Text style={styles.spotsValue}>{left === 0 ? 'Full' : left}</Text>
+          <Text style={[type.footnote, styles.meta]}>{left === 0 ? `${game.going.length} going` : left === 1 ? 'spot left' : 'spots left'}</Text>
+        </View>
+        {ended ? (
+          <StatusBadge kind={game.isCanceled ? 'canceled' : 'full'} />
+        ) : going ? (
+          <View style={[styles.cta, styles.ctaDone]}>
+            <Ionicons name="checkmark" size={16} color={colors.going} />
+            <Text style={[styles.ctaText, { color: colors.going }]}>You're in</Text>
+          </View>
+        ) : left === 0 ? (
+          <View style={[styles.cta, styles.ctaMuted]}>
+            <Text style={[styles.ctaText, { color: colors.label2 }]}>Full</Text>
+          </View>
+        ) : (
+          <Pressable accessibilityRole="button" accessibilityLabel={`I'm in for ${game.title}`} onPress={imIn} hitSlop={6} style={({ pressed }) => [styles.cta, { backgroundColor: isLive ? colors.live : colors.brand }, pressed && styles.ctaPressed]}>
+            <Text style={[styles.ctaText, { color: colors.white }]}>{isLive ? 'Join now' : "I'm in"}</Text>
+          </Pressable>
+        )}
       </View>
     </PressCard>
   );
@@ -91,9 +138,12 @@ export function ClubRow({ club, onPress, index }: { club: Club; onPress: () => v
           <KindTag kind="club" />
           {isMember ? <StatusBadge kind="member" /> : club.isNew ? <StatusBadge kind="new" /> : null}
         </View>
-        <Text style={type.headline} numberOfLines={1}>
-          {club.name}
-        </Text>
+        <View style={styles.nameLine}>
+          <Text style={[type.headline, styles.shrink]} numberOfLines={1}>
+            {club.name}
+          </Text>
+          {club.verified && <VerifiedBadge />}
+        </View>
         <Text style={[type.subhead, { color: colors.label2 }]}>{club.cadence}</Text>
         <View style={styles.topLine}>
           <Text style={[type.footnote, { color: colors.label2 }]}>
@@ -106,35 +156,43 @@ export function ClubRow({ club, onPress, index }: { club: Club; onPress: () => v
   );
 }
 
-/** Figma "Seus Clubes" grid card. */
-export function ClubCard({ club, onPress, index }: { club: Club; onPress: () => void; index?: number }) {
+/**
+ * Club card for grids and rails, same family as GameRow: logo + verified seal, a big name,
+ * the weekly rhythm as a soft tag, and members with the next game at the bottom.
+ */
+export function ClubCard({ club, onPress, index, width }: { club: Club; onPress: () => void; index?: number; width?: number }) {
   const store = useStore();
   const next = store.nextGameFor(club.id);
   const status = next ? gameStatus(next, store.now) : null;
+  const sport = sports[club.sport];
   const nextText = !next
-    ? 'Nothing scheduled'
+    ? 'No games yet'
     : status === 'live'
       ? 'Live now'
       : status === 'soon' || status === 'today'
-        ? `Today · ${time(next.start)}`
-        : `${weekday(next.start)} · ${time(next.start)}`;
+        ? `Today ${time(next.start)}`
+        : `${weekday(next.start)} ${time(next.start)}`;
 
   return (
-    <PressCard index={index} onPress={onPress} grow style={[styles.gridCard, club.isNew && styles.newCard]}>
-      <View style={styles.topLine}>
-        <ClubLogo club={club} size={40} />
-        {club.isNew && <StatusBadge kind="new" />}
+    <PressCard index={index} onPress={onPress} grow={width === undefined} width={width} style={[styles.clubCard, width === undefined && styles.grow]}>
+      <View style={styles.clubTop}>
+        <ClubLogo club={club} size={44} />
+        {club.isNew ? <StatusBadge kind="new" /> : club.verified ? <VerifiedBadge size={20} /> : null}
       </View>
-      <Text style={[type.headline, { minHeight: 44 }]} numberOfLines={2}>
-        {club.name}
-      </Text>
-      <View>
-        <Text style={[type.caption, { color: colors.label2 }]}>Next game</Text>
-        <Text style={[type.subhead, { fontWeight: '500', color: status === 'live' ? colors.live : colors.label }]} numberOfLines={1}>
+      <View style={styles.clubText}>
+        <Text style={styles.clubName} numberOfLines={2}>
+          {club.name}
+        </Text>
+        <Text style={[type.footnote, styles.meta]} numberOfLines={1}>
+          {sport.label} · {club.memberCount} members
+        </Text>
+      </View>
+      <View style={[styles.nextPill, { backgroundColor: status === 'live' ? 'rgba(255,59,48,0.10)' : colors.surface2 }]}>
+        <View style={[styles.nextDot, { backgroundColor: status === 'live' ? colors.live : next ? colors.going : colors.label3 }]} />
+        <Text style={[type.footnote, { fontWeight: '600', color: status === 'live' ? colors.live : colors.label }]} numberOfLines={1}>
           {nextText}
         </Text>
       </View>
-      <AvatarStack members={club.members} total={club.memberCount} size={22} limit={3} />
     </PressCard>
   );
 }
@@ -188,9 +246,28 @@ function Explainer({ icon, title, text }: { icon: 'calendar' | 'people'; title: 
 
 const styles = StyleSheet.create({
   card: { ...card, flexDirection: 'row', gap: space.md, padding: space.md },
-  liveCard: { borderColor: 'rgba(255,59,48,0.45)', borderWidth: 1 },
-  newCard: { borderColor: 'rgba(255,97,0,0.45)', borderWidth: 1 },
-  gridCard: { ...card, flex: 1, padding: space.md, gap: space.sm },
+  gameCard: { ...card, padding: space.lg, gap: space.lg },
+  gameTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
+  gameText: { gap: 2 },
+  gameTitle: { fontSize: 22, lineHeight: 27, fontWeight: '600', letterSpacing: -0.4, color: colors.label, marginBottom: 4 },
+  metaLine: { flexDirection: 'row', alignItems: 'center' },
+  meta: { color: colors.label2 },
+  gameBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  spots: { gap: 0 },
+  spotsValue: { fontSize: 26, lineHeight: 30, fontWeight: '600', letterSpacing: -0.5, color: colors.label, fontVariant: ['tabular-nums'] },
+  cta: { height: 44, paddingHorizontal: 22, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
+  ctaText: { fontSize: 16, fontWeight: '600' },
+  ctaDone: { backgroundColor: 'rgba(48,179,90,0.12)' },
+  ctaMuted: { backgroundColor: colors.fill },
+  ctaPressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
+  clubCard: { ...card, padding: space.lg, gap: space.md },
+  clubTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  clubText: { gap: 2, minHeight: 64 },
+  clubName: { fontSize: 18, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3, color: colors.label },
+  nextPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', height: 30, paddingHorizontal: 12, borderRadius: radius.full, maxWidth: '100%' },
+  nextDot: { width: 7, height: 7, borderRadius: 4 },
+  nameLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
+  shrink: { flexShrink: 1 },
   body: { flex: 1, gap: 3 },
   topLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   strike: { textDecorationLine: 'line-through' },

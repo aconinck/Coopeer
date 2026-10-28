@@ -25,4 +25,9 @@ export const clips: Record<ClipName, { video: VideoSource; poster: ImageSourcePr
 export const photos: Record<PhotoName, ImageSourcePropType> = {
   soccer: require('../../assets/images/hero-soccer.jpg') as ImageSourcePropType,
   ride: require('../../assets/images/hero-welcome.jpg') as ImageSourcePropType,
+  goal: require('../../assets/video/goal.jpg') as ImageSourcePropType,
+  match: require('../../assets/video/match.jpg') as ImageSourcePropType,
+  passing: require('../../assets/video/passing.jpg') as ImageSourcePropType,
+  penalty: require('../../assets/video/penalty.jpg') as ImageSourcePropType,
+  night: require('../../assets/video/hero.jpg') as ImageSourcePropType,
 };

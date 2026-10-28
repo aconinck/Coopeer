@@ -187,12 +187,15 @@ export function Chip({
   color = colors.brand,
   selected,
   onPress,
+  elevated,
 }: {
   title: string;
   icon?: ReactNode;
   color?: string;
   selected: boolean;
   onPress: () => void;
+  /** Opaque white pill for sitting on top of the map. */
+  elevated?: boolean;
 }) {
   const press = usePressScale();
   const reduceMotion = useReducedMotion();
@@ -218,7 +221,7 @@ export function Chip({
       }}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
-      style={[styles.chip, press.style]}
+      style={[styles.chip, elevated && styles.chipElevated, press.style]}
     >
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.chipFill, { backgroundColor: color }, fillStyle]} />
       {icon ?? null}
@@ -270,5 +273,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.fill,
     overflow: 'hidden',
   },
+  chipElevated: { height: 38, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator },
   chipFill: { borderRadius: radius.full },
 });

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
+import { useCallback, useEffect, useId, useState, type ReactNode } from 'react';
+import { Image, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -90,15 +90,17 @@ export function HeroBackground({ image, shadeFrom = 0 }: { image: HeroImage; sha
 }
 
 function HeroShade({ shadeFrom }: { shadeFrom: number }) {
+  // Unique per instance: hero screens stay mounted under each other, and a shared SVG id resolves to the hidden one.
+  const id = `shade${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
     <Svg style={styles.fill} width="100%" height="100%" preserveAspectRatio="none">
       <Defs>
-        <LinearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+        <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
           <Stop offset={shadeFrom} stopColor={flowColors.heroShadeBottom} stopOpacity={shadeFrom > 0 ? 0 : 0.44} />
           <Stop offset="1" stopColor={flowColors.heroShadeBottom} stopOpacity={1} />
         </LinearGradient>
       </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" fill="url(#shade)" />
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
     </Svg>
   );
 }
@@ -108,11 +110,28 @@ export const heroVideo = {
   poster: require('../../assets/video/hero.jpg') as ImageSourcePropType,
 };
 
+// Sign-up "Welcome": a pickup match, shown in black and white (Mixkit free license).
+export const doneVideo = {
+  source: require('../../assets/video/match.mp4') as VideoSource,
+  poster: require('../../assets/video/match.jpg') as ImageSourcePropType,
+};
+
 /**
  * Looping, muted background clip under the Figma shade. The poster frame shows
  * instantly; the video fades in once it can play. Reduced motion keeps the poster.
+ * `mono` renders it black and white (a saturation blend, so any licensed color clip works).
  */
-export function HeroVideo({ source, poster }: { source: VideoSource; poster: ImageSourcePropType }) {
+export function HeroVideo({
+  source,
+  poster,
+  mono,
+  shadeFrom = 0,
+}: {
+  source: VideoSource;
+  poster: ImageSourcePropType;
+  mono?: boolean;
+  shadeFrom?: number;
+}) {
   const reduceMotion = useReducedMotion();
   const [ready, setReady] = useState(false);
   const opacity = useSharedValue(0);
@@ -145,11 +164,14 @@ export function HeroVideo({ source, poster }: { source: VideoSource; poster: Ima
 
   return (
     <View style={styles.fill} pointerEvents="none">
-      <Image source={poster} resizeMode="cover" style={styles.fill} />
-      <Animated.View style={[styles.fill, videoStyle]}>
-        <VideoView player={player} style={styles.fill} contentFit="cover" nativeControls={false} allowsPictureInPicture={false} />
-      </Animated.View>
-      <HeroShade shadeFrom={0} />
+      <View style={[styles.fill, styles.isolate]}>
+        <Image source={poster} resizeMode="cover" style={styles.fill} />
+        <Animated.View style={[styles.fill, videoStyle]}>
+          <VideoView player={player} style={styles.fill} contentFit="cover" nativeControls={false} allowsPictureInPicture={false} />
+        </Animated.View>
+        {mono && <View style={[styles.fill, styles.mono]} />}
+      </View>
+      <HeroShade shadeFrom={shadeFrom} />
     </View>
   );
 }
@@ -200,7 +222,10 @@ export function HeroButton({
 }
 
 const styles = StyleSheet.create({
-  fill: { ...StyleSheet.absoluteFillObject },
+  // Explicit 100% size: on web <video>/<img> ignore left/right/bottom and would keep their intrinsic size.
+  fill: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  isolate: { isolation: 'isolate', overflow: 'hidden' },
+  mono: { backgroundColor: colors.black, mixBlendMode: 'saturation' },
   cta: {
     width: flow.ctaWidth,
     maxWidth: '100%',

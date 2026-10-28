@@ -1,9 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import type { User } from './models';
+import type { NewProfile, User } from './models';
+import { hasBackend, supabase } from '../lib/supabase';
+import * as api from './api';
 
-// Phone-only login. Swap `mockAuth` for Firebase Phone Auth or Twilio Verify.
+// Phone-only login. With Supabase keys set it uses Supabase phone auth (SMS via Twilio);
+// without them it falls back to `mockAuth` so the app still runs on demo data.
 const mockAuth = {
   async sendCode(_phone: string) {
     await new Promise((resolve) => setTimeout(resolve, 700));
@@ -34,7 +37,7 @@ interface Session {
   sendCode: (phone: string) => Promise<void>;
   /** Resolves true when the phone is new and we still need a name. */
   verify: (phone: string, code: string) => Promise<boolean>;
-  completeProfile: (name: string) => Promise<void>;
+  completeProfile: (profile: NewProfile) => Promise<void>;
   updateName: (name: string) => Promise<void>;
   signOut: () => void;
   /** Runs `action` now if signed in, otherwise opens phone login and runs it afterwards. */
@@ -50,8 +53,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const pendingPhone = useRef<string | null>(null);
   const pendingAction = useRef<(() => void) | null>(null);
+  const pendingUid = useRef<string | null>(null);
 
   useEffect(() => {
+    if (supabase) {
+      const client = supabase;
+      (async () => {
+        try {
+          const { data } = await client.auth.getSession();
+          const authUser = data.session?.user;
+          // A session without a profile means sign-up was not finished: treat as signed out.
+          if (authUser) setUser(await api.loadProfile(authUser.id, authUser.phone ?? ''));
+        } catch (error) {
+          console.warn('Could not restore session', error);
+        }
+        setReady(true);
+      })();
+      const { data } = client.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT') setUser(null);
+      });
+      return () => data.subscription.unsubscribe();
+    }
     (async () => {
       const storedUser = await AsyncStorage.getItem(USER_KEY);
       if (storedUser) setUser(JSON.parse(storedUser) as User);
@@ -62,7 +84,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (next: User) => {
     setUser(next);
     pendingPhone.current = null;
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(next));
+    pendingUid.current = null;
+    if (!hasBackend) await AsyncStorage.setItem(USER_KEY, JSON.stringify(next));
   }, []);
 
   const value = useMemo<Session>(
@@ -70,8 +93,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isReady,
       user,
       isSignedIn: user !== null,
-      sendCode: (phone) => mockAuth.sendCode(phone),
+      sendCode: async (phone) => {
+        if (!supabase) return mockAuth.sendCode(phone);
+        const { error } = await supabase.auth.signInWithOtp({ phone });
+        if (error) throw new Error(error.message);
+      },
       verify: async (phone, code) => {
+        if (supabase) {
+          const { data, error } = await supabase.auth.verifyOtp({ phone, token: code, type: 'sms' });
+          if (error || !data.user) throw new Error("That code didn't work. Check the text and try again.");
+          const existing = await api.loadProfile(data.user.id, phone);
+          if (existing) {
+            await signIn(existing);
+            return false;
+          }
+          pendingPhone.current = phone;
+          pendingUid.current = data.user.id;
+          return true;
+        }
         const result = await mockAuth.verify(phone, code);
         if ('existing' in result) {
           await signIn(result.existing);
@@ -80,23 +119,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         pendingPhone.current = phone;
         return true;
       },
-      completeProfile: async (name) => {
+      completeProfile: async (profile) => {
         const phone = pendingPhone.current;
         if (!phone) return;
-        const next = { id: phone, phone, name: name.trim() };
-        await mockAuth.remember(next);
+        const uid = pendingUid.current;
+        const next: User = { id: uid ?? phone, phone, ...profile, name: profile.name.trim() };
+        if (uid) await api.saveProfile(uid, phone, { ...profile, name: next.name });
+        else await mockAuth.remember(next);
         await signIn(next);
       },
       updateName: async (name) => {
         if (!user) return;
         const next = { ...user, name: name.trim() };
-        await mockAuth.remember(next);
+        if (hasBackend) await api.updateProfileName(user.id, next.name);
+        else await mockAuth.remember(next);
         await signIn(next);
       },
       signOut: () => {
         setUser(null);
         // The root layout's auth guard sends signed-out users back to /welcome.
-        AsyncStorage.removeItem(USER_KEY);
+        if (supabase) supabase.auth.signOut();
+        else AsyncStorage.removeItem(USER_KEY);
       },
       requireAuth: (action) => {
         if (user) {

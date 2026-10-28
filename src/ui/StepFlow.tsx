@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeInLeft,
@@ -390,4 +390,114 @@ const styles = StyleSheet.create({
   digit: { textAlign: 'center', minWidth: 24 },
   digitGap: { marginLeft: 14 },
   hiddenInput: { position: 'absolute', opacity: 0, width: '100%', height: '100%' },
+});
+
+/**
+ * Big selectable card for step flows (sports, goals). Icon tile, title, one line of detail,
+ * and a check when selected. Works as single or multi select — the caller owns the state.
+ */
+export function OptionCard({
+  icon,
+  color = colors.brand,
+  title,
+  detail,
+  selected,
+  onPress,
+  multi,
+}: {
+  icon: ComponentProps<typeof MaterialCommunityIcons>['name'];
+  color?: string;
+  title: string;
+  detail?: string;
+  selected: boolean;
+  onPress: () => void;
+  multi?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole={multi ? 'checkbox' : 'radio'}
+      accessibilityState={multi ? { checked: selected } : { selected }}
+      onPress={() => {
+        if (Platform.OS !== 'web') Haptics.selectionAsync();
+        onPress();
+      }}
+      style={({ pressed }) => [optionStyles.card, selected && { borderColor: color, backgroundColor: `${color}0F` }, pressed && { opacity: 0.85 }]}
+    >
+      <View style={[optionStyles.icon, { backgroundColor: selected ? color : `${color}1A` }]}>
+        <MaterialCommunityIcons name={icon} size={24} color={selected ? colors.white : color} />
+      </View>
+      <View style={optionStyles.text}>
+        <Text style={type.headline}>{title}</Text>
+        {detail ? <Text style={[type.footnote, { color: colors.label2 }]}>{detail}</Text> : null}
+      </View>
+      <View style={[optionStyles.check, selected ? { backgroundColor: color, borderColor: color } : null, !multi && { borderRadius: 12 }]}>
+        {selected && <Ionicons name="checkmark" size={15} color={colors.white} />}
+      </View>
+    </Pressable>
+  );
+}
+
+/** Quick multi-select tile (sports): tap to fill with the sport color. No checkbox. */
+export function SportTile({
+  icon,
+  color,
+  title,
+  selected,
+  onPress,
+}: {
+  icon: ComponentProps<typeof MaterialCommunityIcons>['name'];
+  color: string;
+  title: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityLabel={title}
+      accessibilityState={{ checked: selected }}
+      onPress={() => {
+        if (Platform.OS !== 'web') Haptics.selectionAsync();
+        onPress();
+      }}
+      style={({ pressed }) => [tileStyles.tile, selected && { backgroundColor: color, borderColor: color }, pressed && { transform: [{ scale: 0.97 }] }]}
+    >
+      <View style={[tileStyles.icon, { backgroundColor: selected ? 'rgba(255,255,255,0.22)' : `${color}1A` }]}>
+        <MaterialCommunityIcons name={icon} size={30} color={selected ? colors.white : color} />
+      </View>
+      <Text numberOfLines={1} style={[type.headline, { color: selected ? colors.white : colors.label }]}>
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
+const tileStyles = StyleSheet.create({
+  tile: {
+    flex: 1,
+    aspectRatio: 0.82,
+    justifyContent: 'space-between',
+    padding: space.md,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: colors.separator,
+    backgroundColor: colors.surface,
+  },
+  icon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+});
+
+const optionStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    padding: space.lg,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: colors.separator,
+    backgroundColor: colors.surface,
+  },
+  icon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  text: { flex: 1, gap: 2 },
+  check: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: colors.gray3, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,10 +1,11 @@
+import type { MediaAspect } from '../constants/theme';
 import type { Member, SportId } from '../state/models';
 
 // Mock Explore feed for Bentonville. Authors are the same people as in mockData
 // (ids m0–m15), clubs/games/places reference the store ids.
 
 export type ClipName = 'penalty' | 'goal' | 'passing' | 'match';
-export type PhotoName = 'soccer' | 'ride';
+export type PhotoName = 'soccer' | 'ride' | 'goal' | 'match' | 'passing' | 'penalty' | 'night';
 
 interface PostBase {
   id: string;
@@ -21,6 +22,8 @@ export interface ClipPost extends PostBase {
   clip: ClipName;
   caption: string;
   tag: string;
+  /** Frame size in the feed; the clip always fills it. */
+  aspect: MediaAspect;
   gameId?: string;
 }
 
@@ -47,7 +50,9 @@ export interface HighlightPost extends PostBase {
 
 export interface PhotoPost extends PostBase {
   kind: 'photo';
-  photo: PhotoName;
+  /** 1 photo uses `aspect`; 2 sit side by side; 3+ become a big one plus a stacked pair. */
+  photos: PhotoName[];
+  aspect?: MediaAspect;
   caption: string;
 }
 
@@ -62,7 +67,7 @@ export const posts: FeedPost[] = [
   },
   {
     kind: 'clip', id: 'f2', author: m(1, 'Jordan Lee'), clubId: 'c1', sport: 'soccer', minutesAgo: 24, likes: 128, comments: 17,
-    clip: 'goal', tag: "GOAL · 12'", caption: 'Bottom corner. Keeper had no chance 🎯', gameId: 'g1',
+    clip: 'goal', aspect: 'portrait', tag: "GOAL · 12'", caption: 'Bottom corner. Keeper had no chance 🎯', gameId: 'g1',
   },
   {
     kind: 'highlight', id: 'f3', author: m(5, 'Morgan Diaz'), clubId: 'c4', sport: 'pickleball', minutesAgo: 75, likes: 64, comments: 6,
@@ -70,7 +75,7 @@ export const posts: FeedPost[] = [
   },
   {
     kind: 'clip', id: 'f4', author: m(3, 'Casey Wong'), clubId: 'c2', sport: 'soccer', minutesAgo: 140, likes: 92, comments: 11,
-    clip: 'penalty', tag: 'PENALTY', caption: 'Ice cold from the spot to win it in extra time.',
+    clip: 'penalty', aspect: 'square', tag: 'PENALTY', caption: 'Ice cold from the spot to win it in extra time.',
   },
   {
     kind: 'result', id: 'f5', author: m(7, 'Jamie Patel'), clubId: 'c3', sport: 'pickleball', minutesAgo: 210, likes: 37, comments: 4,
@@ -78,7 +83,7 @@ export const posts: FeedPost[] = [
   },
   {
     kind: 'clip', id: 'f6', author: m(10, 'Quinn Foster'), clubId: 'c5', sport: 'soccer', minutesAgo: 320, likes: 55, comments: 3,
-    clip: 'passing', tag: 'TEAM PLAY', caption: 'Twelve passes before the shot. Midweek 7v7 is getting slick.',
+    clip: 'passing', aspect: 'landscape', tag: 'TEAM PLAY', caption: 'Twelve passes before the shot. Midweek 7v7 is getting slick.',
   },
   {
     kind: 'highlight', id: 'f7', author: m(1, 'Jordan Lee'), clubId: 'c1', sport: 'soccer', minutesAgo: 600, likes: 210, comments: 28,
@@ -86,15 +91,23 @@ export const posts: FeedPost[] = [
   },
   {
     kind: 'photo', id: 'f8', author: m(11, 'Parker Hughes'), clubId: 'c7', sport: 'soccer', minutesAgo: 900, likes: 73, comments: 5,
-    photo: 'soccer', caption: 'Futsal night was electric. Same time Thursday?',
+    photos: ['night', 'match', 'goal'], caption: 'Futsal night was electric. Same time Thursday?',
   },
   {
     kind: 'result', id: 'f9', author: m(4, 'Taylor Brooks'), clubId: 'c2', sport: 'soccer', minutesAgo: 1440, likes: 48, comments: 7,
     placeId: 'p2', home: 'Sunday League Blue', away: 'Sunday League Red', score: [0, 0], status: 'final', mvp: m(12, 'Reese Morgan'),
   },
   {
+    kind: 'photo', id: 'f13', author: m(2, 'Sam Torres'), clubId: 'c5', sport: 'soccer', minutesAgo: 1200, likes: 88, comments: 6,
+    photos: ['soccer'], aspect: 'landscape', caption: 'Golden hour at Phillips Park. Best pitch in town.',
+  },
+  {
+    kind: 'photo', id: 'f14', author: m(3, 'Casey Wong'), clubId: 'c2', sport: 'soccer', minutesAgo: 2100, likes: 42, comments: 3,
+    photos: ['passing', 'penalty'], caption: 'Before and after. Sunday League round 5 in two shots.',
+  },
+  {
     kind: 'clip', id: 'f10', author: m(12, 'Reese Morgan'), clubId: 'c7', sport: 'soccer', minutesAgo: 1900, likes: 66, comments: 8,
-    clip: 'match', tag: 'NIGHT GAME', caption: 'Under the lights at the Community Center.', gameId: 'g8',
+    clip: 'match', aspect: 'tall', tag: 'NIGHT GAME', caption: 'Under the lights at the Community Center.', gameId: 'g8',
   },
   {
     kind: 'highlight', id: 'f11', author: m(6, 'Riley Chen'), clubId: 'c6', sport: 'pickleball', minutesAgo: 2600, likes: 29, comments: 2,
@@ -102,7 +115,7 @@ export const posts: FeedPost[] = [
   },
   {
     kind: 'photo', id: 'f12', author: m(9, 'Avery Kim'), clubId: 'c1', sport: 'soccer', minutesAgo: 3400, likes: 51, comments: 4,
-    photo: 'ride', caption: 'Rode to Friday Night Soccer. Worth it.',
+    photos: ['ride'], aspect: 'portrait', caption: 'Rode to Friday Night Soccer. Worth it.',
   },
 ];
 

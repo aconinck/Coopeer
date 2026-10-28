@@ -6,8 +6,10 @@ export const colors = {
   brand: '#FF6100',
   brandSoft: 'rgba(255,97,0,0.12)',
 
-  bg: '#F2F2F7',
+  bg: '#F3F2EE',
   surface: '#FFFFFF',
+  /** Nested surface inside a card (card-in-card), warm and quieter than bg. */
+  surface2: '#F7F6F3',
   label: '#000000',
   label2: 'rgba(60,60,67,0.62)',
   label3: 'rgba(60,60,67,0.32)',
@@ -25,6 +27,14 @@ export const colors = {
 
   soccer: '#30B35A',
   pickleball: '#5B5BD6',
+  trails: '#1F9D8B',
+  verified: '#0A84FF',
+
+  // Achievement tiers
+  gold: '#E5A50A',
+  silver: '#8E9AAF',
+  bronze: '#B87333',
+  locked: '#D1D1D6',
   live: '#FF3B30',
   going: '#30B35A',
   orange: '#FF9500',
@@ -75,7 +85,7 @@ export const space = {
 
 export const radius = {
   tile: 14,
-  card: 22,
+  card: 26,
   sheet: 32,
   full: 999,
 } as const;
@@ -84,7 +94,25 @@ export const layout = {
   tabBarHeight: 62,
   control: 50,
   iconButton: 44,
+  /** Horizontal page margin. Every screen, rail and section lines up to it. */
+  gutter: 16,
+  /** Gap between sections on a screen (bigger than gaps inside a section). */
+  sectionGap: 28,
+  /** Rounded-square icon tile used in list rows and stats. */
+  iconTile: 32,
 } as const;
+
+/**
+ * Media sizes. Every image and video uses one of these and always fills its frame
+ * (cover) on a neutral backdrop: never letterboxing, never black bars.
+ */
+export const media = {
+  landscape: 16 / 9,
+  square: 1,
+  portrait: 4 / 5,
+  tall: 3 / 4,
+} as const;
+export type MediaAspect = keyof typeof media;
 
 export const shadow = {
   glass: {
@@ -93,6 +121,14 @@ export const shadow = {
     shadowOpacity: 0.12,
     shadowRadius: 24,
     elevation: 8,
+  },
+  /** Cards: barely-there lift, no outline. */
+  card: {
+    shadowColor: '#1C1A16',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 1,
   },
   soft: {
     shadowColor: '#000',

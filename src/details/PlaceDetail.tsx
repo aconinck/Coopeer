@@ -1,11 +1,18 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, space, type } from '../constants/theme';
+import { colors, radius, space, type } from '../constants/theme';
 import { DetailLayout, useDetailNav } from '../ui/DetailLayout';
 import { useStore } from '../state/store';
 import { openDirections } from '../lib/format';
 import { ActionBar, PrimaryButton } from '../ui/Buttons';
 import { SectionHeader, SportIcon } from '../ui/Display';
 import { ClubRow, GameRow } from '../ui/Rows';
+import { PlaceHero } from '../ui/PlaceHero';
+import { placeKinds, sports, type SportId } from '../state/models';
+
+const listSports = (ids: SportId[]) => {
+  const names = ids.map((id) => sports[id].label.toLowerCase());
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+};
 
 /** A map pin's sheet: games happening here (one-time) and clubs that play here (recurring). */
 export function PlaceDetail({ id }: { id: string }) {
@@ -33,19 +40,28 @@ export function PlaceDetail({ id }: { id: string }) {
         </ActionBar>
       }
     >
-      <View style={styles.header}>
-        <View style={styles.icons}>
-          {place.sports.map((sport, index) => (
-            <View key={sport} style={{ marginLeft: index === 0 ? 0 : -10 }}>
-              <SportIcon sport={sport} size={44} ring />
-            </View>
-          ))}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={type.title2}>{place.name}</Text>
-          <Text style={[type.subhead, { color: colors.label2 }]}>{place.address}</Text>
-        </View>
+      <PlaceHero place={place} />
+
+      <View style={styles.titleBlock}>
+        <Text style={type.title2}>{place.name}</Text>
+        <Text style={[type.subhead, { color: colors.label2 }]}>
+          {placeKinds[place.kind].label} · {place.address}
+        </Text>
       </View>
+
+      {place.sports.length > 0 && (
+        <>
+          <SectionHeader title="Sports here" caption={`Available here: ${listSports(place.sports)}.`} />
+          <View style={styles.sportRow}>
+            {place.sports.map((sport) => (
+              <View key={sport} style={styles.sportPill}>
+                <SportIcon sport={sport} size={26} />
+                <Text style={[type.subhead, { fontWeight: '600' }]}>{sports[sport].label}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
 
       <SectionHeader title="Games here" caption="One-time. Tap one, say you're in, show up." />
       {games.length === 0 && <Text style={[type.subhead, { color: colors.label2 }]}>No games scheduled here yet.</Text>}
@@ -62,6 +78,7 @@ export function PlaceDetail({ id }: { id: string }) {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  icons: { flexDirection: 'row' },
+  titleBlock: { gap: 2 },
+  sportRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  sportPill: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 6, paddingLeft: 6, paddingRight: space.md, borderRadius: radius.full, backgroundColor: colors.fill },
 });
