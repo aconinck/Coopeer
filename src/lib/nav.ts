@@ -1,13 +1,14 @@
 import { router } from 'expo-router';
+import { sheetController } from '../ui/sheetController';
 
-// Places and clubs open as pages; games always open as a sheet.
+// Anything tapped on the map or in a list opens in the bottom sheet.
+// "Your Clubs" opens a club as a full page (Figma club page).
 export const open = {
-  place: (id: string) => router.push(`/place/${id}`),
-  game: (id: string) => router.push(`/game/${id}`),
-  club: (id: string) => router.push(`/club/${id}`),
-  /** From inside a sheet: close sheets first so the club page isn't trapped under them. */
-  clubFromSheet: (id: string) => {
-    if (router.canDismiss()) router.dismissAll();
+  place: (id: string) => sheetController.open({ kind: 'place', id }),
+  game: (id: string) => sheetController.open({ kind: 'game', id }),
+  club: (id: string) => sheetController.open({ kind: 'club', id }),
+  clubPage: (id: string) => {
+    sheetController.close();
     router.push(`/club/${id}`);
   },
 };

@@ -16,7 +16,6 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.coopeer.mobile",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Coopeer shows games and clubs near you.",
         "NSCameraUsageDescription": "Coopeer uses the camera to scan club QR codes."
       }
     },
@@ -27,8 +26,6 @@
       },
       "package": "app.coopeer.mobile",
       "permissions": [
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.CAMERA"
       ]
     },
@@ -40,12 +37,6 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "Coopeer shows games and clubs near you."
-        }
-      ],
       [
         "expo-camera",
         {

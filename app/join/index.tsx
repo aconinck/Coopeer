@@ -4,14 +4,16 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, space, type } from '../../src/constants/theme';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, useReducedMotion, ZoomIn } from 'react-native-reanimated';
+import { colors, flow, flowColors, radius, space, type } from '../../src/constants/theme';
 import { TEAM_CODE_LENGTH, dollars, extractTeamCode } from '../../src/lib/format';
 import { sports, type Club } from '../../src/state/models';
 import { useSession } from '../../src/state/session';
 import { useStore } from '../../src/state/store';
 import { ActionBar, IconButton, PrimaryButton, SecondaryButton, TextButton } from '../../src/ui/Buttons';
-import { AvatarStack, ClubLogo } from '../../src/ui/Display';
+import { AvatarStack } from '../../src/ui/Display';
+import { HeroButton } from '../../src/ui/Hero';
 import { Glass } from '../../src/ui/Glass';
 import { CodeField, StepScaffold } from '../../src/ui/StepFlow';
 
@@ -28,6 +30,8 @@ export default function Join() {
   const [lookingUp, setLookingUp] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [foundId, setFoundId] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const lookUp = async (value: string) => {
     if (lookingUp || value.length !== TEAM_CODE_LENGTH) return;
@@ -35,10 +39,14 @@ export default function Join() {
     const club = await store.findClub(value);
     setLookingUp(false);
     if (club) {
-      setFoundId(club.id);
+      // Arrow morphs into a check, then the club sheet springs up.
+      setSuccess(true);
+      setTimeout(() => {
+        setFoundId(club.id);
+        setSuccess(false);
+      }, reduceMotion ? 0 : 420);
     } else {
       setNotFound(true);
-      haptic(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -69,6 +77,7 @@ export default function Join() {
           progress={0.5}
           canContinue={code.length === TEAM_CODE_LENGTH}
           loading={lookingUp}
+          success={success}
           onNext={() => lookUp(code)}
           onBack={() => router.back()}
           backIcon="close"
@@ -85,9 +94,9 @@ export default function Join() {
             error={notFound}
           />
           {notFound ? (
-            <Text style={[type.footnote, { color: colors.live, fontWeight: '500' }]}>
-              Wrong code — no club found. Check the digits and try again.
-            </Text>
+            <Animated.Text entering={FadeIn.duration(200)} style={[type.subhead, styles.wrong]}>
+              Wrong code — no club found
+            </Animated.Text>
           ) : null}
           <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
             <TextButton title="Scan QR code instead" onPress={() => setMode('scan')} />
@@ -181,52 +190,70 @@ function ScanStep({ onCode, onTypeInstead }: { onCode: (code: string) => void; o
   );
 }
 
-/** Figma "_join/found": the club behind the code, with Join. */
+/** Figma "_join/found": the club behind the code, with Join / Cancel. */
 function FoundPanel({ club, onCancel }: { club: Club; onCancel: () => void }) {
   const insets = useSafeAreaInsets();
   const store = useStore();
   const session = useSession();
+  const reduceMotion = useReducedMotion();
   const isMember = store.isMember(club.id);
-  const place = store.place(club.homePlaceId);
   const wasMember = useRef(isMember);
+  const info = sports[club.sport];
 
   useEffect(() => {
     if (isMember && !wasMember.current) haptic(Haptics.NotificationFeedbackType.Success);
     wasMember.current = isMember;
   }, [isMember]);
 
+  const pop = reduceMotion ? undefined : ZoomIn.springify().damping(11).stiffness(220);
+
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]} onPress={onCancel} accessibilityLabel="Dismiss" />
-      <Glass radius={radius.sheet} style={[styles.panel, { paddingBottom: Math.max(insets.bottom, space.md) }]}>
-        <View style={styles.grabber} />
-        <View style={styles.panelBody}>
-          <ClubLogo club={club} size={88} />
-          <Text style={[type.title2, { textAlign: 'center' }]}>{club.name}</Text>
-          <Text style={[type.subhead, { color: colors.label2 }]}>
-            {sports[club.sport].label} · {club.cadence}
-          </Text>
-          <AvatarStack members={club.members} total={club.memberCount} size={30} limit={5} />
-          {place ? (
-            <View style={styles.placeRow}>
-              <Ionicons name="location" size={14} color={colors.label2} />
-              <Text style={[type.footnote, { color: colors.label2 }]}>{place.name}</Text>
+      <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(180)} style={StyleSheet.absoluteFill}>
+        <Pressable style={[StyleSheet.absoluteFill, styles.backdrop]} onPress={onCancel} accessibilityLabel="Dismiss" />
+      </Animated.View>
+      <Animated.View
+        entering={reduceMotion ? FadeIn : SlideInDown.springify().damping(20).stiffness(170)}
+        exiting={reduceMotion ? FadeOut : SlideOutDown.duration(220)}
+        style={styles.panelWrap}
+      >
+        <Glass radius={radius.sheet} style={[styles.panel, { paddingBottom: Math.max(insets.bottom, space.md) + space.sm }]}>
+          <View style={styles.grabber} />
+          <View style={styles.panelBody}>
+            <Animated.View entering={pop} style={[styles.logo, { backgroundColor: info.color }]}>
+              <MaterialCommunityIcons name={info.icon} size={60} color={colors.white} />
+              {isMember ? (
+                <Animated.View entering={pop} style={styles.memberCheck}>
+                  <Ionicons name="checkmark" size={22} color={colors.white} />
+                </Animated.View>
+              ) : null}
+            </Animated.View>
+            <View style={styles.nameBlock}>
+              <Text style={styles.name}>{club.name}</Text>
+              <Animated.View key={isMember ? 'member' : 'guest'} entering={reduceMotion ? undefined : FadeIn.duration(260)}>
+                <AvatarStack members={club.members} total={club.memberCount} size={24} limit={4} />
+              </Animated.View>
+              <Text style={[type.footnote, { color: colors.label2, textAlign: 'center' }]}>
+                {isMember
+                  ? "You're in! Its games are now on your schedule."
+                  : `${info.label} · ${club.cadence} · ${dollars(club.monthlyPrice)}/mo`}
+              </Text>
             </View>
-          ) : null}
-        </View>
-        <ActionBar
-          caption={isMember ? "You're in! Its games are now on your schedule." : `${dollars(club.monthlyPrice)}/month · cancel anytime`}
-        >
-          {isMember ? (
-            <PrimaryButton title="Done" icon="checkmark" onPress={() => router.back()} />
-          ) : (
-            <>
-              <SecondaryButton title="Cancel" onPress={onCancel} />
-              <PrimaryButton title="Join" onPress={() => session.requireAuth(() => store.join(club.id))} />
-            </>
-          )}
-        </ActionBar>
-      </Glass>
+          </View>
+          <View style={styles.panelActions}>
+            {isMember ? (
+              <Animated.View key="done" entering={pop}>
+                <HeroButton title="Done" onPress={() => router.back()} />
+              </Animated.View>
+            ) : (
+              <>
+                <HeroButton title="Join" onPress={() => session.requireAuth(() => store.join(club.id))} />
+                <HeroButton title="Cancel" variant="text" onPress={onCancel} />
+              </>
+            )}
+          </View>
+        </Glass>
+      </Animated.View>
     </View>
   );
 }
@@ -255,8 +282,33 @@ const styles = StyleSheet.create({
     gap: space.md,
     paddingHorizontal: space.xl,
   },
-  panel: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: space.md, paddingTop: space.sm, gap: space.lg },
-  grabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: radius.full, backgroundColor: colors.label3 },
-  panelBody: { alignItems: 'center', gap: space.sm, paddingTop: space.md },
-  placeRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  wrong: { color: colors.live, fontWeight: '700', textAlign: 'center', marginTop: space.xs },
+  backdrop: { backgroundColor: flowColors.backdrop },
+  panelWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  panel: { paddingHorizontal: space.lg, paddingTop: space.md, gap: 24, alignItems: 'center', backgroundColor: colors.surface, overflow: 'hidden' },
+  grabber: { width: flow.grabberWidth, height: flow.grabberHeight, borderRadius: radius.full, backgroundColor: flowColors.grabber },
+  panelBody: { alignItems: 'center', gap: 14, marginTop: 4 },
+  logo: {
+    width: flow.sheetLogo,
+    height: flow.sheetLogo,
+    borderRadius: flow.sheetLogoRadius,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberCheck: {
+    position: 'absolute',
+    right: -8,
+    bottom: -8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.going,
+    borderWidth: 3,
+    borderColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nameBlock: { alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg },
+  name: { ...type.title3, fontWeight: '700', fontSize: 20, letterSpacing: -0.44, textAlign: 'center' },
+  panelActions: { alignSelf: 'stretch', alignItems: 'center', gap: space.sm },
 });

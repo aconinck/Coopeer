@@ -1,48 +1,73 @@
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, space, type } from '../src/constants/theme';
+import Animated, { FadeOut, useReducedMotion, ZoomIn } from 'react-native-reanimated';
+import { colors, flow } from '../src/constants/theme';
 import { useSession } from '../src/state/session';
-import { ActionBar, PrimaryButton, SecondaryButton } from '../src/ui/Buttons';
-import { HeroBackground, Logo } from '../src/ui/Hero';
+import { HeroBackground, HeroButton, HeroItem, Logo, heroImages } from '../src/ui/Hero';
 
+/** Figma Login: splash (logo on white) → hero photo with "Discover a new world!". */
 export default function Welcome() {
   const session = useSession();
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
+  const [splash, setSplash] = useState(!reduceMotion);
+
+  useEffect(() => {
+    if (!splash) return;
+    const timer = setTimeout(() => setSplash(false), 900);
+    return () => clearTimeout(timer);
+  }, [splash]);
 
   return (
     <View style={styles.root}>
-      <StatusBar style="light" />
-      <HeroBackground />
-      <View style={[styles.content, { paddingTop: insets.top + space.xl }]}>
-        <Logo size={88} />
-        <View style={{ flex: 1 }} />
-        <Text style={[type.hero, styles.white]}>Discover a{'\n'}new world!</Text>
-        <Text style={[type.title3, styles.subtitle]}>
-          Don&apos;t play alone. Find a game nearby tonight, or a club that plays every week.
-        </Text>
-      </View>
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space.md) }]}>
-        <ActionBar>
-          <SecondaryButton
-            title="Look around"
-            onPress={() => {
-              session.continueAsGuest();
-              router.replace('/explore');
-            }}
-          />
-          <PrimaryButton title="Get started" onPress={() => router.push('/auth?from=welcome')} />
-        </ActionBar>
-      </View>
+      <StatusBar style={splash ? 'dark' : 'light'} />
+      <HeroBackground image={heroImages.welcome} />
+
+      {!splash && (
+        <View style={[styles.content, { paddingBottom: Math.max(insets.bottom, 34) + 45 }]}>
+          <HeroItem index={0}>
+            <Text style={[flow.heroTitle, styles.title]}>Discover a{'\n'}new world!</Text>
+          </HeroItem>
+          <HeroItem index={1}>
+            <Text style={[flow.heroBody, styles.body]}>Don&apos;t be alone! Find a group to enjoy your favorite sport!</Text>
+          </HeroItem>
+          <View style={styles.actions}>
+            <HeroItem index={2}>
+              <HeroButton title="Get started" onPress={() => router.push('/auth?from=welcome')} />
+            </HeroItem>
+            <HeroItem index={3}>
+              <HeroButton
+                title="Look around"
+                variant="text"
+                onPress={() => {
+                  session.continueAsGuest();
+                  router.replace('/explore');
+                }}
+              />
+            </HeroItem>
+          </View>
+        </View>
+      )}
+
+      {splash && (
+        <Animated.View style={styles.splash} exiting={FadeOut.duration(260)}>
+          <Animated.View entering={ZoomIn.springify().damping(12)}>
+            <Logo size={72} />
+          </Animated.View>
+        </Animated.View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.heroDark },
-  content: { flex: 1, paddingHorizontal: space.xl, gap: space.md, paddingBottom: space.xl },
-  white: { color: colors.white },
-  subtitle: { color: colors.white, opacity: 0.8, fontWeight: '400' },
-  footer: { paddingHorizontal: space.md },
+  root: { flex: 1, backgroundColor: colors.black },
+  content: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: flow.heroGutter },
+  title: { color: colors.white, maxWidth: 260 },
+  body: { color: colors.white, maxWidth: 230, marginTop: 12 },
+  actions: { marginTop: 44 },
+  splash: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
 });

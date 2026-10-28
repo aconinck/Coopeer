@@ -1,5 +1,14 @@
-import { useEffect, useRef } from 'react';
-import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  cancelAnimation,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { colors, radius, shadow, type } from '../constants/theme';
 import { gameStatus, type Club, type Game, type Place, type SportId } from '../state/models';
 import { time } from '../lib/format';
@@ -37,43 +46,31 @@ export function pinLabel(summary: PlaceSummary) {
 }
 
 /**
- * Map pin = a place. Shows its sports plus the most useful fact:
- * LIVE now, the time of today's next game, or how many clubs play there.
+ * Map pin = a place: its sport icons plus the single most useful fact —
+ * LIVE now, today's next game time, or how many clubs play there.
+ * The tail tip is the bottom edge, so callers anchor it at the coordinate.
  */
-export function PlacePin({ summary, selected }: { summary: PlaceSummary; selected?: boolean }) {
+export function PlacePin({ summary }: { summary: PlaceSummary }) {
   const isLive = !!summary.live;
   const label = pinLabel(summary);
-  const pulse = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReducedMotion();
+  const pulse = useSharedValue(0);
 
   useEffect(() => {
-    if (!isLive) return;
-    const loop = Animated.loop(
-      Animated.timing(pulse, { toValue: 1, duration: 1600, useNativeDriver: Platform.OS !== 'web' }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [isLive, pulse]);
+    if (!isLive || reduceMotion) return;
+    pulse.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.out(Easing.quad) }), -1, false);
+    return () => cancelAnimation(pulse);
+  }, [isLive, reduceMotion, pulse]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: 0.55 * (1 - pulse.value),
+    transform: [{ scale: 1 + pulse.value * 0.6 }],
+  }));
 
   return (
-    <View
-      style={[styles.root, selected && styles.selected]}
-      accessibilityRole="button"
-      accessibilityLabel={[summary.place.name, label].filter(Boolean).join(', ')}
-    >
+    <View style={styles.root}>
       <View>
-        {isLive && (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              styles.pulse,
-              {
-                opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
-                transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }],
-              },
-            ]}
-          />
-        )}
+        {isLive && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.pulse, pulseStyle]} />}
         <View style={[styles.bubble, { backgroundColor: isLive ? colors.live : colors.surface }]}>
           <View style={styles.icons}>
             {summary.sports.map((sport, index) => (
@@ -90,16 +87,12 @@ export function PlacePin({ summary, selected }: { summary: PlaceSummary; selecte
         </View>
       </View>
       <View style={[styles.tail, { borderTopColor: isLive ? colors.live : colors.surface }]} />
-      <Text style={styles.name} numberOfLines={1}>
-        {summary.place.name}
-      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { alignItems: 'center' },
-  selected: { transform: [{ scale: 1.15 }] },
   pulse: { borderRadius: radius.full, backgroundColor: colors.live },
   bubble: {
     flexDirection: 'row',
@@ -119,14 +112,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 7,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-  },
-  name: {
-    marginTop: 2,
-    maxWidth: 140,
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.label,
-    textShadowColor: colors.white,
-    textShadowRadius: 3,
   },
 });

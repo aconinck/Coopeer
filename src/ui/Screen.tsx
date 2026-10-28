@@ -1,10 +1,11 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, layout, radius, space, type } from '../constants/theme';
-import { IconButton, type IconName } from './Buttons';
+import { IconButton, haptic, type IconName } from './Buttons';
 import { Glass } from './Glass';
 
 export const useTabBarSpace = () => {
@@ -90,6 +91,8 @@ export function MoreMenu({ items, icon = 'ellipsis-horizontal', label = 'More' }
   const [open, setOpen] = useState(false);
   const pending = useRef<(() => void) | null>(null);
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(0);
 
   // Run the chosen action only after the menu has fully closed, so it can
   // present a new screen (iOS refuses to present while a modal is dismissing).
@@ -98,30 +101,54 @@ export function MoreMenu({ items, icon = 'ellipsis-horizontal', label = 'More' }
     pending.current = null;
     action?.();
   };
-  const choose = (action: () => void) => {
-    pending.current = action;
-    setOpen(false);
-    if (Platform.OS !== 'ios') setTimeout(runPending, 320);
+  // Web restores focus to the trigger when the modal unmounts; wait so the next screen keeps focus.
+  const afterClose = () => {
+    if (Platform.OS !== 'ios') setTimeout(runPending, Platform.OS === 'web' ? 250 : 0);
   };
+  const show = () => {
+    haptic.light();
+    setOpen(true);
+    progress.value = 0;
+    progress.value = reduceMotion ? 1 : withSpring(1, { damping: 18, stiffness: 260 });
+  };
+  const hide = (then?: () => void) => {
+    pending.current = then ?? null;
+    progress.value = withTiming(0, { duration: 140 }, (finished) => {
+      if (!finished) return;
+      runOnJS(setOpen)(false);
+      runOnJS(afterClose)();
+    });
+  };
+
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(progress.value * 1.5, 1),
+    transform: [{ scale: 0.85 + progress.value * 0.15 }],
+  }));
 
   return (
     <>
-      <IconButton icon={icon} label={label} onPress={() => setOpen(true)} />
-      <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)} onDismiss={runPending}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} accessibilityLabel="Close menu" />
-        <Glass radius={radius.card} style={[styles.menu, { top: insets.top + 56 }]}>
-          {items.map((item, index) => (
-            <Pressable
-              key={item.label}
-              accessibilityRole="menuitem"
-              onPress={() => choose(item.onPress)}
-              style={({ pressed }) => [styles.menuItem, index > 0 && styles.menuDivider, pressed && { backgroundColor: colors.fill }]}
-            >
-              <Text style={[type.body, { color: item.destructive ? colors.live : colors.label, flex: 1 }]}>{item.label}</Text>
-              <Ionicons name={item.icon} size={18} color={item.destructive ? colors.live : colors.label} />
-            </Pressable>
-          ))}
-        </Glass>
+      <IconButton icon={icon} label={label} onPress={show} />
+      <Modal transparent visible={open} animationType="none" onRequestClose={() => hide()} onDismiss={runPending}>
+        <Animated.View style={[StyleSheet.absoluteFill, styles.menuScrim, backdropStyle]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => hide()} accessibilityLabel="Close menu" />
+        </Animated.View>
+        <Animated.View style={[styles.menu, { top: insets.top + 56 }, cardStyle]}>
+          <Glass radius={radius.card} style={styles.menuCard}>
+            {items.map((item, index) => (
+              <Animated.View key={item.label} entering={reduceMotion ? undefined : FadeInDown.delay(40 + index * 40).springify().damping(18)}>
+                <Pressable
+                  accessibilityRole="menuitem"
+                  onPress={() => hide(item.onPress)}
+                  style={({ pressed }) => [styles.menuItem, index > 0 && styles.menuDivider, pressed && { backgroundColor: colors.fill }]}
+                >
+                  <Text style={[type.body, { color: item.destructive ? colors.live : colors.label, flex: 1 }]}>{item.label}</Text>
+                  <Ionicons name={item.icon} size={18} color={item.destructive ? colors.live : colors.label} />
+                </Pressable>
+              </Animated.View>
+            ))}
+          </Glass>
+        </Animated.View>
       </Modal>
     </>
   );
@@ -149,7 +176,9 @@ const styles = StyleSheet.create({
   trailing: { minWidth: layout.iconButton, alignItems: 'flex-end' },
   content: { padding: space.lg, gap: space.md },
   footer: { position: 'absolute', left: space.md, right: space.md },
-  menu: { position: 'absolute', right: space.lg, minWidth: 240, paddingVertical: space.xs },
+  menu: { position: 'absolute', right: space.lg, minWidth: 240, transformOrigin: 'right top' },
+  menuCard: { paddingVertical: space.xs },
+  menuScrim: { backgroundColor: 'rgba(0,0,0,0.08)' },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 13 },
   menuDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
 });

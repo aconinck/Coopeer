@@ -37,7 +37,7 @@ export default function ClubsScreen() {
         rows.map((row) => (
           <View key={row.map((c) => c.id).join('-')} style={styles.gridRow}>
             {row.map((club) => (
-              <ClubCard key={club.id} club={club} onPress={() => open.club(club.id)} />
+              <ClubCard key={club.id} club={club} onPress={() => open.clubPage(club.id)} />
             ))}
             {row.length === 1 && <View style={styles.flex} />}
           </View>

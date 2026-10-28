@@ -102,3 +102,51 @@ export const shadow = {
     elevation: 2,
   },
 } as const;
+
+// Step flows (login, sign up, team code) and hero screens — measured from the
+// Figma frames (390×844): Login 953:839, Sign up 953:840, Join a team 953:841.
+export const flowColors = {
+  track: '#D9D9D9',
+  grabber: '#B0B0B0',
+  heroMuted: '#D9D9D9',
+  heroShadeTop: 'rgba(0,0,0,0.44)',
+  heroShadeBottom: '#000000',
+  backdrop: 'rgba(12,12,12,0.2)',
+  spinnerTrack: 'rgba(255,255,255,0.35)',
+} as const;
+
+export const flow = {
+  gutterLeft: 35,
+  gutterRight: 43,
+  headerTop: 10,
+  headerHeight: 32,
+  backLeft: 29,
+  titleGap: 16,
+  fieldGap: 64,
+  title: t(36, 44, '700', -0.3),
+  input: t(24, 32, '600', 0),
+  code: t(40, 48, '800', 1),
+  nextSize: 64,
+  nextRight: 29,
+  nextKeyboardGap: 63,
+  progressHeight: 3,
+  heroGutter: 37,
+  heroTitle: t(36, 44, '700', -0.3),
+  heroBody: t(20, 27, '400', 0),
+  heroCta: t(18, 24, '700', 0),
+  ctaHeight: 64,
+  ctaWidth: 316,
+  ctaGap: 16,
+  sheetLogo: 121,
+  sheetLogoRadius: 20,
+  grabberWidth: 129,
+  grabberHeight: 6,
+} as const;
+
+// Stylized street map: grayscale, streets only.
+export const mapColors = {
+  ground: '#E7E7EA',
+  street: '#FFFFFF',
+  majorCasing: '#D2D2D7',
+  pinName: '#3A3A3C',
+} as const;

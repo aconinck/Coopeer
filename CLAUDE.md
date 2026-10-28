@@ -9,7 +9,10 @@ or join a club (monthly). Login is phone number + SMS code only, asked only when
 ## Tech stack
 
 - Expo SDK 55 + Expo Router (file-based routes in `app/`), React Native, TypeScript strict
-- `react-native-maps` on iOS/Android, Leaflet + OpenStreetMap on web (`src/map/PlaceMap.web.tsx`)
+- Custom SVG street map (`src/map/StreetMap.tsx`): grayscale, streets only, thick simplified shapes,
+  identical on iOS/Android/web. Street data is baked from OpenStreetMap into `src/map/streetData.ts`
+  (Bentonville bbox); pan/pinch/double-tap via gesture-handler + Reanimated.
+- `react-native-reanimated` 4 for all motion; `expo-haptics` for feedback (never on web)
 - `expo-glass-effect` (real iOS 26 Liquid Glass) with an `expo-blur` fallback — always via `src/ui/Glass.tsx`
 - `expo-camera` (QR scanning), `react-native-qrcode-svg` (invite QR), `expo-haptics`, AsyncStorage
 - Runs in Expo Go (no custom native code). Web build deploys to Vercel from the branch.
@@ -28,13 +31,24 @@ Visual language that teaches the difference — keep it consistent:
 - Use `GameRow`, `ClubRow`, `ClubCard` from `src/ui/Rows.tsx`; never hand-roll another list item for these.
 
 Map pins show the place's sport icons plus one fact: **LIVE**, today's next game time, or "N clubs".
+Place names fade in as you zoom; the selected pin lifts and the others dim.
+
+## Bottom sheet
+
+Everything tapped on the map or in a list (place, game, club, who's going) opens in the **global
+bottom sheet** (`src/ui/Sheet.tsx`, mounted once in `app/_layout.tsx`). It snaps to half/full by drag
+velocity, rubber-bands at the top, keeps the ActionBar pinned to the visible bottom, and navigates
+inside itself (slide in/out) with a back button. Detail content lives in `src/details/*` and renders
+through `DetailLayout` + `useDetailNav()`, so the same component works in the sheet or as a page.
+Open it with `open.place/game/club(id)` from `src/lib/nav.ts`; "Your Clubs" uses `open.clubPage(id)`.
 
 ## Action placement rules (every screen)
 
 1. A screen's main action lives in the bottom **ActionBar**: `[SecondaryButton] [PrimaryButton]`, optional caption.
+   Exception, matching the Figma: hero screens and the "club found" sheet use a full-width pill with a text button below.
 2. Step-by-step flows (login, team code) use `StepScaffold`: back/close + progress bar, big title, round **NextButton** bottom-right.
 3. The top-right header holds at most **one** control: `MoreMenu` ("…", or `icon="add"` for "+").
-4. Places and clubs open as pages; **games always open as a sheet** (`open.game`). From inside a sheet use `open.clubFromSheet`.
+4. Details open in the bottom sheet (`open.*`); inside a detail use `useDetailNav()` so navigation stays in the sheet.
 5. Destructive actions always confirm (`confirmDestructive`).
 6. Login only when acting: wrap actions in `session.requireAuth(() => ...)`.
 
@@ -47,10 +61,7 @@ app/
   welcome.tsx            Hero (Figma Login)
   auth.tsx               Phone → code → name → welcome (one route, internal steps)
   (tabs)/                explore (map), clubs, schedule, profile — custom glass TabBar
-  place/[id].tsx         Place sheet: games here + clubs that play here
-  game/[id].tsx          Game sheet (Figma "Evento"): Decline / I'm in
-  club/[id].tsx          Club page: Games / About / Members
-  attendees/[id].tsx     Who's going
+  place|game|club|attendees/[id].tsx   Thin route wrappers (deep links, Clubs tab page) around src/details/*
   join/index.tsx         Scan QR or type 8-digit code → "club found" panel
   join/[code].tsx        Deep link coopeer://join/<code>
   invite/[id].tsx        Club QR + code + share
@@ -63,8 +74,9 @@ src/
   state/session.tsx      Phone-OTP session — swap mockAuth for Firebase/Twilio
   lib/format.ts          Time, phone, team-code parsing, share, directions, confirm
   lib/nav.ts             open.place / open.game / open.club
-  map/                   PlacePin, PlaceMap (native), PlaceMap.web (Leaflet)
-  ui/                    Glass, Buttons, Display, Rows, Screen, StepFlow, TabBar, Hero
+  details/               PlaceDetail, GameDetail (Figma "Evento"), ClubDetail (Games/About/Members), AttendeesDetail
+  map/                   StreetMap, PlacePin, projection, streetData (generated)
+  ui/                    Glass, Buttons, Display, Rows, Screen, StepFlow, TabBar, Hero, Sheet, DetailLayout
 ```
 
 ## Figma
@@ -75,9 +87,16 @@ Clubs `953:843`, Event `953:844`. Follow their structure (underline inputs, prog
 round next button, found-club sheet, Games/About/Members tabs, Decline / I'm in) with the
 Liquid Glass styling from `src/ui`.
 
+## Motion
+
+Motion should feel physical and quick: springs (not linear timing) for anything the finger moves,
+stagger list entrances by ~45ms, confirm success with a morph + haptic, shake + error haptic on
+wrong input. Always honor `useReducedMotion()`. Never put `entering`/`exiting`/`layout` on the same
+`Animated.View` that has an animated transform/opacity — wrap it.
+
 ## Code rules
 
-1. Colors, type, spacing, radii only from `src/constants/theme.ts`.
+1. Colors, type, spacing, radii only from `src/constants/theme.ts` (`flow` tokens hold the Figma step-flow measurements).
 2. TypeScript strict, no `any`. `StyleSheet.create`; inline styles only for dynamic values.
 3. Build screens from `src/ui` components; add to the kit instead of duplicating patterns in a screen.
 4. English UI strings only (US-first).

@@ -1,44 +1,74 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Location from 'expo-location';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  FadeInDown,
+  FadeOut,
+  LinearTransition,
+  runOnJS,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../../src/constants/theme';
 import { gameStatus, isToday, sportIds, sports, type Place, type SportId } from '../../src/state/models';
 import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
-import { PlaceMap, type PlaceMapHandle } from '../../src/map/PlaceMap';
+import { StreetMap, type StreetMapHandle } from '../../src/map/StreetMap';
 import { summarize } from '../../src/map/PlacePin';
 import { Chip, IconButton } from '../../src/ui/Buttons';
 import { SectionHeader } from '../../src/ui/Display';
 import { Glass } from '../../src/ui/Glass';
 import { ClubRow, GameRow, GamesVsClubsCard } from '../../src/ui/Rows';
 import { useTabBarSpace } from '../../src/ui/Screen';
+import { SHEET_HALF, useSheet } from '../../src/ui/Sheet';
+import { sheetController } from '../../src/ui/sheetController';
 
 const EXPLAINER_KEY = 'explore.explainerDismissed';
+const DRAWER_SPRING = { damping: 20, stiffness: 220 } as const;
 
 export default function Explore() {
   const store = useStore();
+  const sheet = useSheet();
   const insets = useSafeAreaInsets();
   const tabBarSpace = useTabBarSpace();
   const { height } = useWindowDimensions();
-  const map = useRef<PlaceMapHandle>(null);
+  const map = useRef<StreetMapHandle>(null);
 
   const [sport, setSport] = useState<SportId | null>(null);
   const [liveOnly, setLiveOnly] = useState(false);
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [explainerDismissed, setExplainerDismissed] = useState(true);
 
   useEffect(() => {
     AsyncStorage.getItem(EXPLAINER_KEY).then((value) => setExplainerDismissed(value === 'true'));
-    if (Platform.OS !== 'web') Location.requestForegroundPermissionsAsync().catch(() => undefined);
   }, []);
 
-  useFocusEffect(useCallback(() => setSelectedId(null), []));
+  // Whatever the sheet shows, highlight its place on the map and glide the camera to it.
+  const root = sheet.isOpen ? sheet.root : null;
+  const selectedPlaceId =
+    root?.kind === 'place'
+      ? root.id
+      : root?.kind === 'game'
+        ? store.game(root.id)?.placeId ?? null
+        : root?.kind === 'club'
+          ? store.club(root.id)?.homePlaceId ?? null
+          : null;
+
+  useEffect(() => {
+    const place = selectedPlaceId ? store.place(selectedPlaceId) : undefined;
+    if (place) map.current?.focus(place, insets.top + 56, height * (1 - SHEET_HALF));
+    // Only when the selection changes, not on every store tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlaceId]);
 
   const matches = useCallback(
     (...texts: (string | undefined)[]) => {
@@ -80,133 +110,181 @@ export default function Explore() {
     .join(' · ');
 
   const selectPlace = (place: Place) => {
-    setSelectedId(place.id);
-    map.current?.focus(place);
+    setExpanded(false);
     open.place(place.id);
   };
 
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 10 && Math.abs(g.dy) > Math.abs(g.dx),
-        onPanResponderRelease: (_, g) => {
-          if (g.dy < -30) setExpanded(true);
-          if (g.dy > 30) setExpanded(false);
-        },
-      }),
-    [],
-  );
+  // The drawer steps aside (slides down) while the detail sheet is up.
+  const drawerStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(sheet.isOpen ? 0 : 1, { duration: 180 }),
+    transform: [{ translateY: withSpring(sheet.isOpen ? 260 : 0, DRAWER_SPRING) }],
+  }));
+
+  const drawerPan = Gesture.Pan()
+    .activeOffsetY([-8, 8])
+    .onEnd((e) => {
+      if (e.translationY < -24 || e.velocityY < -400) runOnJS(setExpanded)(true);
+      else if (e.translationY > 24 || e.velocityY > 400) runOnJS(setExpanded)(false);
+    });
+
+  let row = 0;
+  const enter = () => FadeInDown.delay(60 + row++ * 45).springify().damping(18);
 
   return (
     <View style={styles.root}>
-      <PlaceMap ref={map} summaries={summaries} selectedId={selectedId} onSelect={selectPlace} bottomInset={tabBarSpace + 150} />
+      <StreetMap
+        ref={map}
+        summaries={summaries}
+        selectedId={selectedPlaceId}
+        onSelect={selectPlace}
+        onBackgroundPress={() => {
+          if (sheet.isOpen) sheetController.close();
+          else setExpanded(false);
+        }}
+      />
 
       <View style={[styles.topBar, { top: insets.top + space.sm }]} pointerEvents="box-none">
-        {totalLive > 0 ? (
-          <Pressable accessibilityRole="button" onPress={() => setLiveOnly((v) => !v)}>
-            <Glass radius={radius.full} style={styles.livePill} tint={liveOnly ? colors.live : undefined}>
-              <View style={[styles.liveDot, liveOnly && { backgroundColor: colors.white }]} />
-              <Text style={[type.subhead, { fontWeight: '600', color: liveOnly ? colors.white : colors.label }]}>
-                {totalLive} live now
-              </Text>
-            </Glass>
-          </Pressable>
-        ) : (
-          <View />
-        )}
+        {totalLive > 0 ? <LivePill count={totalLive} active={liveOnly} onPress={() => setLiveOnly((v) => !v)} /> : <View />}
         <IconButton icon="navigate" label="Recenter map" tint={colors.brand} onPress={() => map.current?.recenter()} />
       </View>
 
-      <View style={[styles.drawerWrap, { bottom: tabBarSpace }]}>
-        <Glass radius={radius.sheet} style={styles.drawer}>
-          <View {...pan.panHandlers}>
-            <Pressable accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse list' : 'Expand list'} onPress={() => setExpanded((v) => !v)} style={styles.grabberArea}>
-              <View style={styles.grabber} />
-            </Pressable>
-
-            <View style={styles.search}>
-              <Ionicons name="search" size={18} color={colors.label2} />
-              <TextInput
-                value={query}
-                onChangeText={setQuery}
-                onFocus={() => setExpanded(true)}
-                placeholder="Search places, clubs, games"
-                placeholderTextColor={colors.label2}
-                returnKeyType="search"
-                style={[type.body, styles.searchInput]}
-              />
-              {query ? (
-                <Pressable accessibilityLabel="Clear search" onPress={() => setQuery('')} hitSlop={8}>
-                  <Ionicons name="close-circle" size={18} color={colors.label2} />
+      <Animated.View pointerEvents={sheet.isOpen ? 'none' : 'box-none'} style={[styles.drawerWrap, { bottom: tabBarSpace }, drawerStyle]}>
+        <Animated.View layout={LinearTransition.springify().damping(20)}>
+          <Glass radius={radius.sheet} style={styles.drawer}>
+            <GestureDetector gesture={drawerPan}>
+              <View collapsable={false}>
+                <Pressable accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse list' : 'Expand list'} onPress={() => setExpanded((v) => !v)} style={styles.grabberArea}>
+                  <View style={styles.grabber} />
                 </Pressable>
-              ) : null}
-            </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
-              <Chip
-                title="All"
-                selected={!sport && !liveOnly}
-                onPress={() => {
-                  setSport(null);
-                  setLiveOnly(false);
-                }}
-              />
-              {sportIds.map((id) => (
-                <Chip
-                  key={id}
-                  title={sports[id].label}
-                  color={sports[id].color}
-                  selected={sport === id}
-                  onPress={() => setSport(sport === id ? null : id)}
-                  icon={<MaterialCommunityIcons name={sports[id].icon} size={16} color={sport === id ? colors.white : sports[id].color} />}
-                />
-              ))}
-              <Chip
-                title="Live now"
-                color={colors.live}
-                selected={liveOnly}
-                onPress={() => setLiveOnly((v) => !v)}
-                icon={<View style={[styles.liveDot, liveOnly && { backgroundColor: colors.white }]} />}
-              />
-            </ScrollView>
-
-            {!expanded && <Text style={[type.footnote, styles.summary]}>{summaryLine}</Text>}
-          </View>
-
-          {expanded && (
-            <ScrollView style={{ maxHeight: height * 0.48 }} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-              {!explainerDismissed && (
-                <GamesVsClubsCard
-                  onDismiss={() => {
-                    setExplainerDismissed(true);
-                    AsyncStorage.setItem(EXPLAINER_KEY, 'true');
-                  }}
-                />
-              )}
-              {liveGames.length > 0 && <SectionHeader title="Happening now" caption="Live games you can still jump into." />}
-              {liveGames.map((game) => (
-                <GameRow key={game.id} game={game} onPress={() => open.game(game.id)} />
-              ))}
-              {laterGames.length > 0 && <SectionHeader title="Later today" caption="One-time games. Show up and play." />}
-              {laterGames.map((game) => (
-                <GameRow key={game.id} game={game} onPress={() => open.game(game.id)} />
-              ))}
-              {clubs.length > 0 && <SectionHeader title="Clubs nearby" caption="Groups that play every week." />}
-              {clubs.map((club) => (
-                <ClubRow key={club.id} club={club} onPress={() => open.club(club.id)} />
-              ))}
-              {games.length === 0 && clubs.length === 0 && (
-                <View style={styles.empty}>
-                  <Ionicons name="football-outline" size={32} color={colors.label3} />
-                  <Text style={type.headline}>Nothing here yet</Text>
-                  <Text style={[type.subhead, { color: colors.label2 }]}>Try another sport or clear your search.</Text>
+                <View style={styles.search}>
+                  <Ionicons name="search" size={18} color={colors.label2} />
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    onFocus={() => setExpanded(true)}
+                    placeholder="Search places, clubs, games"
+                    placeholderTextColor={colors.label2}
+                    returnKeyType="search"
+                    style={[type.body, styles.searchInput]}
+                  />
+                  {query ? (
+                    <Pressable accessibilityLabel="Clear search" onPress={() => setQuery('')} hitSlop={8}>
+                      <Ionicons name="close-circle" size={18} color={colors.label2} />
+                    </Pressable>
+                  ) : null}
                 </View>
-              )}
-            </ScrollView>
-          )}
-        </Glass>
-      </View>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
+                  <Chip
+                    title="All"
+                    selected={!sport && !liveOnly}
+                    onPress={() => {
+                      setSport(null);
+                      setLiveOnly(false);
+                    }}
+                  />
+                  {sportIds.map((id) => (
+                    <Chip
+                      key={id}
+                      title={sports[id].label}
+                      color={sports[id].color}
+                      selected={sport === id}
+                      onPress={() => setSport(sport === id ? null : id)}
+                      icon={<MaterialCommunityIcons name={sports[id].icon} size={16} color={sport === id ? colors.white : sports[id].color} />}
+                    />
+                  ))}
+                  <Chip
+                    title="Live now"
+                    color={colors.live}
+                    selected={liveOnly}
+                    onPress={() => setLiveOnly((v) => !v)}
+                    icon={<View style={[styles.liveDot, liveOnly && { backgroundColor: colors.white }]} />}
+                  />
+                </ScrollView>
+
+                {!expanded && (
+                  <Animated.Text entering={FadeInDown.duration(220)} exiting={FadeOut.duration(120)} style={[type.footnote, styles.summary]}>
+                    {summaryLine}
+                  </Animated.Text>
+                )}
+              </View>
+            </GestureDetector>
+
+            {expanded && (
+              <ScrollView style={{ maxHeight: height * 0.46 }} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {!explainerDismissed && (
+                  <Animated.View entering={enter()} exiting={FadeOut.duration(160)}>
+                    <GamesVsClubsCard
+                      onDismiss={() => {
+                        setExplainerDismissed(true);
+                        AsyncStorage.setItem(EXPLAINER_KEY, 'true');
+                      }}
+                    />
+                  </Animated.View>
+                )}
+                {liveGames.length > 0 && (
+                  <Animated.View entering={enter()}>
+                    <SectionHeader title="Happening now" caption="Live games you can still jump into." />
+                  </Animated.View>
+                )}
+                {liveGames.map((game) => (
+                  <Animated.View key={game.id} entering={enter()}>
+                    <GameRow game={game} onPress={() => open.game(game.id)} />
+                  </Animated.View>
+                ))}
+                {laterGames.length > 0 && (
+                  <Animated.View entering={enter()}>
+                    <SectionHeader title="Later today" caption="One-time games. Show up and play." />
+                  </Animated.View>
+                )}
+                {laterGames.map((game) => (
+                  <Animated.View key={game.id} entering={enter()}>
+                    <GameRow game={game} onPress={() => open.game(game.id)} />
+                  </Animated.View>
+                ))}
+                {clubs.length > 0 && (
+                  <Animated.View entering={enter()}>
+                    <SectionHeader title="Clubs nearby" caption="Groups that play every week." />
+                  </Animated.View>
+                )}
+                {clubs.map((club) => (
+                  <Animated.View key={club.id} entering={enter()}>
+                    <ClubRow club={club} onPress={() => open.club(club.id)} />
+                  </Animated.View>
+                ))}
+                {games.length === 0 && clubs.length === 0 && (
+                  <View style={styles.empty}>
+                    <Ionicons name="football-outline" size={32} color={colors.label3} />
+                    <Text style={type.headline}>Nothing here yet</Text>
+                    <Text style={[type.subhead, { color: colors.label2 }]}>Try another sport or clear your search.</Text>
+                  </View>
+                )}
+              </ScrollView>
+            )}
+          </Glass>
+        </Animated.View>
+      </Animated.View>
     </View>
+  );
+}
+
+function LivePill({ count, active, onPress }: { count: number; active: boolean; onPress: () => void }) {
+  const reduceMotion = useReducedMotion();
+  const beat = useSharedValue(1);
+  useEffect(() => {
+    if (reduceMotion) return;
+    beat.value = withRepeat(withSequence(withTiming(1.5, { duration: 500 }), withTiming(1, { duration: 700 })), -1);
+  }, [beat, reduceMotion]);
+  const dotStyle = useAnimatedStyle(() => ({ transform: [{ scale: beat.value }] }));
+
+  return (
+    <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress}>
+      <Glass radius={radius.full} style={styles.livePill} tint={active ? colors.live : undefined}>
+        <Animated.View style={[styles.liveDot, active && { backgroundColor: colors.white }, dotStyle]} />
+        <Text style={[type.subhead, { fontWeight: '600', color: active ? colors.white : colors.label }]}>{count} live now</Text>
+      </Glass>
+    </Pressable>
   );
 }
 
