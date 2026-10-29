@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
+import Animated, { useReducedMotion } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, space, type } from '../../src/constants/theme';
@@ -9,38 +8,29 @@ import { useSession } from '../../src/state/session';
 import { useStore } from '../../src/state/store';
 import { confirmDestructive } from '../../src/lib/format';
 import { open } from '../../src/lib/nav';
-import { sports, type SportId } from '../../src/state/models';
-import { achievements, homeTown, levelName, memberSince, skillTrees, sportProgress, totals } from '../../src/state/profile';
-import { AchievementBadge } from '../../src/profile/AchievementBadge';
-import { SkillTree } from '../../src/profile/SkillTree';
-import { SPORT_CARD_WIDTH, SportLevelCard } from '../../src/profile/SportLevelCard';
+import { formatHours } from '../../src/state/profile';
+import { AchievementsSection, SportsSection } from '../../src/profile/PlayerSections';
+import { usePlayer } from '../../src/profile/usePlayer';
 import { Avatar, StatRow, card } from '../../src/ui/Display';
 import { Rail, Section } from '../../src/ui/Layout';
 import { ListGroup, ListRow } from '../../src/ui/ListGroup';
 import { ClubCard } from '../../src/ui/Rows';
 import { Screen } from '../../src/ui/Screen';
 
-const BADGES_PREVIEW = 6;
-const COLUMNS = 3;
+const HOME_TOWN = 'Bentonville, AR';
 
 /**
- * Profile (Airbnb / AllTrails / Uber patterns): identity card, your sports with levels,
- * a skill tree per sport, achievements, your clubs, then account settings.
+ * Profile (Airbnb / AllTrails / Uber patterns): identity card with four numbers, your sports,
+ * achievements, your clubs, then account settings. Every number is derived from games you played.
  */
 export default function ProfileScreen() {
   const store = useStore();
   const session = useSession();
   const user = session.user;
   const reduceMotion = useReducedMotion();
-  const [sport, setSport] = useState<SportId>(sportProgress[0].sport);
-  const [allBadges, setAllBadges] = useState(false);
-
-  const earned = achievements.filter((a) => a.earned).length;
-  const badges = allBadges ? achievements : [...achievements].sort((a, b) => Number(b.earned) - Number(a.earned)).slice(0, BADGES_PREVIEW);
-  const badgeRows: (typeof badges)[] = [];
-  for (let i = 0; i < badges.length; i += COLUMNS) badgeRows.push(badges.slice(i, i + COLUMNS));
-  const current = sportProgress.find((p) => p.sport === sport) ?? sportProgress[0];
+  const player = usePlayer(user?.id ?? 'me');
   const stagger = (index: number) => (reduceMotion ? undefined : enter(index));
+  const { stats } = player;
 
   return (
     <Screen variant="tab" title="Profile">
@@ -59,58 +49,34 @@ export default function ProfileScreen() {
               </Text>
               <View style={styles.metaRow}>
                 <Ionicons name="location-sharp" size={13} color={colors.label2} />
-                <Text style={[type.subhead, styles.muted]}>{homeTown}</Text>
+                <Text style={[type.subhead, styles.muted]}>{HOME_TOWN}</Text>
               </View>
-              <Text style={[type.footnote, styles.muted]}>On Coopeer since {memberSince}</Text>
+              {player.since && <Text style={[type.footnote, styles.muted]}>On Coopeer since {player.since}</Text>}
             </View>
           </View>
           <View style={styles.divider} />
           <View style={styles.statsBleed}>
-            <StatRow stats={[...totals, { value: `${store.myClubs.length}`, label: 'Clubs' }]} />
+            <StatRow
+              stats={[
+                { value: `${stats.games}`, label: 'Games' },
+                { value: formatHours(stats.hours), label: 'Hours' },
+                { value: `${stats.places}`, label: 'Places' },
+                { value: `${store.myClubs.length}`, label: 'Clubs' },
+              ]}
+            />
           </View>
         </View>
       </Animated.View>
 
       <Animated.View entering={stagger(1)}>
-        <Section title="Your sports" caption="Tap a sport to see its skill tree.">
-          <Rail snap={SPORT_CARD_WIDTH}>
-            {sportProgress.map((progress) => (
-              <SportLevelCard key={progress.sport} progress={progress} selected={progress.sport === sport} onPress={() => setSport(progress.sport)} />
-            ))}
-          </Rail>
-        </Section>
+        <SportsSection stats={stats} favorites={player.favorites} caption="Games and hours, counted from every game you play." />
       </Animated.View>
 
       <Animated.View entering={stagger(2)}>
-        <Section title={`${sports[sport].label} skill tree`} caption={`Level ${current.level} · ${levelName(current.level)} · ${Math.round(current.toNext * 100)}% to level ${current.level + 1}`}>
-          <Animated.View key={sport} entering={reduceMotion ? undefined : FadeIn.duration(220)}>
-            <SkillTree sport={sport} tiers={skillTrees[sport]} />
-          </Animated.View>
-        </Section>
+        <AchievementsSection stats={stats} />
       </Animated.View>
 
       <Animated.View entering={stagger(3)}>
-        <Section
-          title="Achievements"
-          caption={`${earned} of ${achievements.length} earned`}
-          action={achievements.length > BADGES_PREVIEW ? { label: allBadges ? 'Show less' : 'See all', onPress: () => setAllBadges((v) => !v) } : undefined}
-        >
-          <View style={styles.badges}>
-            {badgeRows.map((row) => (
-              <View key={row.map((b) => b.id).join('-')} style={styles.badgeRow}>
-                {row.map((badge) => (
-                  <AchievementBadge key={badge.id} achievement={badge} />
-                ))}
-                {Array.from({ length: COLUMNS - row.length }, (_, i) => (
-                  <View key={i} style={styles.flex} />
-                ))}
-              </View>
-            ))}
-          </View>
-        </Section>
-      </Animated.View>
-
-      <Animated.View entering={stagger(4)}>
         <Section title="Your clubs" action={{ label: 'See all', onPress: () => router.navigate('/clubs') }}>
           {store.myClubs.length > 0 ? (
             <Rail snap={176}>
@@ -128,7 +94,7 @@ export default function ProfileScreen() {
         </Section>
       </Animated.View>
 
-      <Animated.View entering={stagger(5)}>
+      <Animated.View entering={stagger(4)}>
         <Section title="Account">
           <ListGroup>
             <ListRow icon="person-outline" title="Personal info" subtitle="Name, phone number" onPress={() => router.push('/personal-info')} />
@@ -171,7 +137,5 @@ const styles = StyleSheet.create({
   },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator },
   statsBleed: { marginHorizontal: -space.md },
-  badges: { ...card, paddingVertical: space.lg, paddingHorizontal: space.sm, gap: space.lg },
-  badgeRow: { flexDirection: 'row' },
   emptyClubs: { ...card, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg },
 });

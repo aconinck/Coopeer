@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import type { PlayedGame } from './profile';
 import { ME, type Club, type ClubLink, type Game, type Member, type NewProfile, type Place, type PlaceKind, type RSVP, type SkillLevel, type SportId, type User } from './models';
 
 // Supabase reads and writes. Rows are mapped to the same models the screens already use;
@@ -294,4 +295,49 @@ export async function saveProfile(uid: string, phone: string, profile: NewProfil
 
 export async function updateProfileName(uid: string, name: string) {
   fail((await db().from('profiles').update({ name }).eq('id', uid)).error);
+}
+
+// Player history -------------------------------------------------------------------
+
+export interface PlayerData {
+  name: string;
+  sports: SportId[];
+  createdAt?: Date;
+  played: PlayedGame[];
+  clubIds: string[];
+}
+
+/** A player's profile plus every ended game they were "going" to. Separate from fetchAll, which only keeps recent games. */
+export async function fetchPlayer(userId: string): Promise<PlayerData | null> {
+  const client = db();
+  const [profile, rsvps, memberships] = await Promise.all([
+    client.from('profiles').select('name, sports, created_at').eq('id', userId).maybeSingle(),
+    client
+      .from('rsvps')
+      .select('games!inner(sport, place_id, starts_at, ends_at, is_canceled)')
+      .eq('user_id', userId)
+      .eq('status', 'going')
+      .eq('games.is_canceled', false)
+      .lt('games.ends_at', new Date().toISOString()),
+    client.from('club_members').select('club_id').eq('user_id', userId),
+  ]);
+  fail(profile.error);
+  fail(rsvps.error);
+  fail(memberships.error);
+  if (!profile.data) return null;
+
+  type Row = { games: { sport: SportId; place_id: string; starts_at: string; ends_at: string } | { sport: SportId; place_id: string; starts_at: string; ends_at: string }[] | null };
+  const played: PlayedGame[] = [];
+  for (const row of (rsvps.data ?? []) as unknown as Row[]) {
+    const g = Array.isArray(row.games) ? row.games[0] : row.games;
+    if (g) played.push({ sport: g.sport, placeId: g.place_id, start: new Date(g.starts_at), end: new Date(g.ends_at) });
+  }
+  const p = profile.data as { name: string; sports: SportId[] | null; created_at: string };
+  return {
+    name: p.name,
+    sports: p.sports ?? [],
+    createdAt: new Date(p.created_at),
+    played,
+    clubIds: ((memberships.data ?? []) as { club_id: string }[]).map((m) => m.club_id),
+  };
 }

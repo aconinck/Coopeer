@@ -25,21 +25,25 @@ export function PostCard({ post, active, liked, onToggleLike }: { post: FeedPost
   // Card anatomy (Strava): header, then media edge to edge, then caption and actions.
   return (
     <View style={styles.card}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${post.author.name}, ${club?.name ?? ''}`} onPress={() => open.club(post.clubId)} style={[styles.header, styles.pad]}>
-        <Avatar member={post.author} size={36} />
+      <View style={[styles.header, styles.pad]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`View ${post.author.name}'s profile`} onPress={() => open.player(post.author.id)} hitSlop={4}>
+          <Avatar member={post.author} size={36} />
+        </Pressable>
         <View style={styles.flex}>
-          <Text style={type.headline} numberOfLines={1}>
-            {post.author.name}
-          </Text>
-          <View style={styles.row}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`View ${post.author.name}'s profile`} onPress={() => open.player(post.author.id)}>
+            <Text style={type.headline} numberOfLines={1}>
+              {post.author.name}
+            </Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={club?.name ?? 'Club'} onPress={() => open.club(post.clubId)} style={styles.row}>
             {club && <ClubLogo club={club} size={16} />}
             <Text style={[type.footnote, styles.secondary]} numberOfLines={1}>
               {club?.name} · {timeAgo(post.minutesAgo)}
             </Text>
-          </View>
+          </Pressable>
         </View>
         <SportIcon sport={post.sport} size={24} />
-      </Pressable>
+      </View>
 
       {post.kind === 'clip' && <FeedClip clip={post.clip} tag={post.tag} active={active} aspect={post.aspect} />}
       {post.kind === 'photo' && <Gallery post={post} />}

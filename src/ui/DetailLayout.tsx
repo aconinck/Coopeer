@@ -1,5 +1,6 @@
 import { createContext, useContext, type ComponentType, type ReactNode } from 'react';
 import { router } from 'expo-router';
+import { ME } from '../state/models';
 import { Screen } from './Screen';
 import { sheetController } from './sheetController';
 
@@ -18,6 +19,7 @@ export type SheetRoute =
   | { kind: 'game'; id: string }
   | { kind: 'club'; id: string }
   | { kind: 'attendees'; id: string }
+  | { kind: 'player'; id: string }
   | { kind: 'pitch'; id: string };
 
 export interface DetailNav {
@@ -25,6 +27,8 @@ export interface DetailNav {
   game: (id: string) => void;
   club: (id: string) => void;
   attendees: (id: string) => void;
+  /** A player's profile. Yourself goes to the Profile tab. */
+  player: (id: string) => void;
 }
 
 const PageLayout = (props: DetailLayoutProps) => <Screen variant="page" {...props} />;
@@ -32,12 +36,23 @@ const ModalLayout = (props: DetailLayoutProps) => <Screen variant="sheet" {...pr
 
 const LayoutContext = createContext<ComponentType<DetailLayoutProps>>(PageLayout);
 
+/** Yourself is the Profile tab; anyone else opens in the sheet. */
+export function openPlayer(id: string) {
+  if (id === ME.id) {
+    sheetController.close();
+    router.navigate('/profile');
+  } else {
+    sheetController.open({ kind: 'player', id });
+  }
+}
+
 // From a routed page: games and places still open in the sheet; clubs push a page.
 const routeNav: DetailNav = {
   place: (id) => sheetController.open({ kind: 'place', id }),
   game: (id) => sheetController.open({ kind: 'game', id }),
   club: (id) => router.push(`/club/${id}`),
   attendees: (id) => sheetController.open({ kind: 'attendees', id }),
+  player: (id) => openPlayer(id),
 };
 
 const NavContext = createContext<DetailNav>(routeNav);

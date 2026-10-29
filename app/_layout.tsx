@@ -44,6 +44,7 @@ function AppStack() {
         <Stack.Screen name="game/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="club/[id]" />
         <Stack.Screen name="attendees/[id]" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="player/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="join/index" options={{ presentation: 'modal' }} />
         <Stack.Screen name="join/[code]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="invite/[id]" options={{ presentation: 'modal' }} />

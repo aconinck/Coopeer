@@ -23,12 +23,14 @@ import * as Haptics from 'expo-haptics';
 import { colors, radius, space, type } from '../constants/theme';
 import { spring } from '../constants/motion';
 import { AttendeesDetail } from '../details/AttendeesDetail';
+import { PlayerDetail } from '../details/PlayerDetail';
+import { ME } from '../state/models';
 import { ClubDetail } from '../details/ClubDetail';
 import { GameDetail } from '../details/GameDetail';
 import { PitchDetail } from '../details/PitchDetail';
 import { PlaceDetail } from '../details/PlaceDetail';
 import { IconButton } from './Buttons';
-import { DetailHost, type DetailLayoutProps, type DetailNav, type SheetRoute } from './DetailLayout';
+import { DetailHost, openPlayer, type DetailLayoutProps, type DetailNav, type SheetRoute } from './DetailLayout';
 import { Glass } from './Glass';
 import { sheetController } from './sheetController';
 
@@ -280,6 +282,7 @@ function SheetHost({
       game: (id) => push({ kind: 'game', id }),
       club: (id) => push({ kind: 'club', id }),
       attendees: (id) => push({ kind: 'attendees', id }),
+      player: (id) => (id === ME.id ? openPlayer(id) : push({ kind: 'player', id })),
     }),
     [push],
   );
@@ -343,6 +346,8 @@ function RouteContent({ route }: { route: SheetRoute }) {
       return <ClubDetail id={route.id} />;
     case 'attendees':
       return <AttendeesDetail id={route.id} />;
+    case 'player':
+      return <PlayerDetail id={route.id} />;
     case 'pitch':
       return <PitchDetail id={route.id} />;
   }

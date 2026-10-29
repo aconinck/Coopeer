@@ -36,8 +36,9 @@ export function Glass({ children, style, radius = radii.card, tint, interactive 
   return (
     <View style={[shadow.glass, { borderRadius: radius }, style]}>
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]}>
-        <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: tint ?? colors.glass, opacity: tint ? 0.92 : 1 }]} />
+        {/* The radius goes on the layers too: on web a rounded parent does not clip backdrop-filter (square block). */}
+        <BlurView intensity={60} tint="light" style={[StyleSheet.absoluteFill, { borderRadius: radius }]} />
+        <View style={[StyleSheet.absoluteFill, { borderRadius: radius, backgroundColor: tint ?? colors.glass, opacity: tint ? 0.92 : 1 }]} />
       </View>
       <View
         pointerEvents="none"

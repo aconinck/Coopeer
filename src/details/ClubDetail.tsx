@@ -226,6 +226,7 @@ function AboutTab({ club }: { club: Club }) {
 }
 
 function MembersTab({ club }: { club: Club }) {
+  const nav = useDetailNav();
   const [query, setQuery] = useState('');
   const filtered = query ? club.members.filter((m) => m.name.toLowerCase().includes(query.toLowerCase())) : club.members;
 
@@ -248,10 +249,17 @@ function MembersTab({ club }: { club: Club }) {
           layout={LinearTransition.duration(240)}
           entering={enter(index)}
           exiting={exit()}
-          style={styles.memberItem}
         >
-          <Avatar member={member} size={36} />
-          <Text style={type.body}>{member.name}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`View ${member.name}'s profile`}
+            onPress={() => nav.player(member.id)}
+            style={({ pressed }) => [styles.memberItem, pressed && { opacity: 0.6 }]}
+          >
+            <Avatar member={member} size={36} />
+            <Text style={[type.body, { flex: 1 }]}>{member.name}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.label3} />
+          </Pressable>
         </Animated.View>
       ))}
     </>

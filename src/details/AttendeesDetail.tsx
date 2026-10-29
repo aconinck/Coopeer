@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
 import { spring } from '../constants/motion';
-import { DetailLayout } from '../ui/DetailLayout';
+import { DetailLayout, useDetailNav } from '../ui/DetailLayout';
 import type { Member } from '../state/models';
 import { useStore } from '../state/store';
 import { Avatar, card } from '../ui/Display';
@@ -46,6 +46,7 @@ export function AttendeesDetail({ id }: { id: string }) {
 }
 
 function Section({ title, members }: { title: string; members: Member[] }) {
+  const nav = useDetailNav();
   if (members.length === 0) return null;
   return (
     <View style={styles.section}>
@@ -59,10 +60,18 @@ function Section({ title, members }: { title: string; members: Member[] }) {
             layout={LinearTransition.springify().mass(1).stiffness(spring.smooth.stiffness).damping(spring.smooth.damping)}
             entering={FadeIn.delay(Math.min(index, 10) * 30)}
             exiting={FadeOut.duration(120)}
-            style={[styles.row, index > 0 && styles.divider]}
+            style={index > 0 && styles.divider}
           >
-            <Avatar member={member} size={32} />
-            <Text style={type.body}>{member.name}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`View ${member.name}'s profile`}
+              onPress={() => nav.player(member.id)}
+              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+            >
+              <Avatar member={member} size={32} />
+              <Text style={[type.body, styles.name]}>{member.name}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.label3} />
+            </Pressable>
           </Animated.View>
         ))}
       </View>
@@ -85,5 +94,7 @@ const styles = StyleSheet.create({
   section: { gap: space.xs },
   sectionTitle: { color: colors.label2, paddingHorizontal: space.lg },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.sm },
+  name: { flex: 1 },
+  pressed: { backgroundColor: colors.fill },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
 });

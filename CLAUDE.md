@@ -58,7 +58,7 @@ References: AllTrails (map, places, badges), Strava (activity cards, stats), Air
 - **Gutter**: everything aligns to `layout.gutter` (16). Horizontal card lists use `Rail`, which bleeds to the edges and snaps.
 - **Hierarchy per card**: 1) media/cover, 2) title, 3) one secondary line (label2), 4) `StatRow` of big numbers,
   5) footer (avatars, tags). At most one status pill per cover corner.
-- **Cards** (calm style: warm `bg`, white `card` with no outline and a whisper of shadow, radius 26, generous padding, soft tinted pills, one pill CTA bottom-right): `GameRow`, `ClubCard` (logo + verified, name, members, next-game pill), `ClubRow`, `PostCard`, `SportLevelCard`. All use `card` from `Display`.
+- **Cards** (calm style: warm `bg`, white `card` with no outline and a whisper of shadow, radius 26, generous padding, soft tinted pills, one pill CTA bottom-right): `GameRow`, `ClubCard` (logo + verified, name, members, next-game pill), `ClubRow`, `PostCard`, `SportStatCard`. All use `card` from `Display`.
 - **Picking a sport** (sign-up, create club, create game): always the `SportTile` row from `StepFlow` (icon + name, fills with the sport color). Never text chips.
 - **Numbers**: `StatRow` (Strava stats); `ProgressBar` for anything with progress.
 - **Rows**: settings and menus use `ListGroup` + `ListRow` (`IconTile` + title + optional subtitle/value + chevron).
@@ -68,8 +68,7 @@ References: AllTrails (map, places, badges), Strava (activity cards, stats), Air
 - **Color**: neutral by default; color carries meaning. Sport color only when a sport is selected or for sport identity on
   covers; brand orange for primary actions and upcoming activity; red only for LIVE and destructive; blue only for
   verified; gold/silver/bronze only for achievements.
-- **Profile**: identity card + `StatRow`, "Your sports" rail (`SportLevelCard`), per-sport `SkillTree`, achievements grid
-  (`AchievementBadge`), "Your clubs" rail, account `ListGroup`. Data in `src/state/profile.ts` (mock). Only show stats we can count from ended games you RSVP'd to (count, hours, places, people, club vs open, hosted, start time, weekly streak) — never goals, wins, MVPs or miles.
+- **Profile** (yours and everyone's): identity + four numbers (Games · Hours · Places · Clubs), "Sports" rail (`SportStatCard`: games and hours), achievements (`AchievementBadge`), clubs, then account `ListGroup` on your own. Every number is DERIVED, never typed in: `computeStats()` in `src/state/profile.ts` runs over the games a player was "going" to that ended (not canceled) plus their club count; achievements are plain thresholds over that (`achievementsFor`). `usePlayer(id)` gives the same result for you and others (Supabase: `api.fetchPlayer`, which reads ended RSVPs separately because the store only keeps recent games; demo: derived from the store). "Played" = RSVP'd going to a game that ended, there is no check-in. No levels, skill trees, goals, wins, MVPs or miles: if a number cannot be computed from games already recorded, do not show it. People are tappable (`useDetailNav().player(id)` / `open.player(id)`): attendee lists, club members and feed post authors open `PlayerDetail` in the sheet; your own id goes to the Profile tab.
 
 ## Bottom sheet
 
@@ -101,7 +100,7 @@ app/
   (tabs)/                map, clubs, explore (feed, center tab), schedule ("+" = new open game, no club), profile — custom glass TabBar
   create/club.tsx        Create a club (name → photo → sport → place → price → payout → done)
   create/game.tsx        Create a game: open or club, date/time, repeat, location, members
-  place|game|club|attendees/[id].tsx   Thin route wrappers (deep links, Clubs tab page) around src/details/*
+  place|game|club|attendees|player/[id].tsx   Thin route wrappers (deep links, Clubs tab page) around src/details/*
   join/index.tsx         Scan QR or type 8-digit code → "club found" panel
   join/[code].tsx        Deep link coopeer://join/<code>
   invite/[id].tsx        Club QR + code + share
@@ -115,13 +114,13 @@ src/
   state/session.tsx      Phone-OTP session: Supabase phone auth (or mockAuth without keys)
   lib/format.ts          Time, phone, team-code parsing, share, directions, confirm
   lib/nav.ts             open.place / open.game / open.club
-  details/               PlaceDetail, GameDetail (Figma "Evento"), ClubDetail (Games/About/Members), AttendeesDetail
+  details/               PlaceDetail, GameDetail (Figma "Evento"), ClubDetail (Games/About/Members), AttendeesDetail, PlayerDetail
   map/                   StreetMap, TileLayer, PlacePin, MapControls, MapTopBar, UserDot, projection, mapData (generated: parks + pitches)
   lib/useLocation.ts     useCurrentLocation(): foreground permission + position watch
   ui/                    Glass, Buttons, Display, Rows, Layout, ListGroup, Media, Screen, Segmented (iOS segmented control, use it for any tab switch), StepFlow, TabBar, Hero, Sheet, DetailLayout, PlaceHero, PlaceResults
-  profile/               SportLevelCard, SkillTree, AchievementBadge
+  profile/               SportStatCard, AchievementBadge, PlayerSections (sports + achievements, shared), usePlayer
   tour/Tour.tsx          First-run guided tour over the tabs: `TourProvider` (in `(tabs)/_layout`), `useTourTarget(id)` to mark what a step spotlights (modes, drawer, create, tabs), `requestTour()` queues it once (AsyncStorage `tour.pending`)
-  state/profile.ts       Player levels, skill trees, achievements (mock)
+  state/profile.ts       computeStats / achievementsFor: all profile numbers derived from played games
 ```
 
 ## Figma

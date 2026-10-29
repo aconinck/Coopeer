@@ -1,5 +1,8 @@
 import type { Club, Game, Member, Payment, Place } from './models';
 
+// Same as ME in models.ts (not imported: scripts/make_seed.ts loads this file straight in Node).
+const ME: Member = { id: 'me', name: 'You' };
+
 // Bentonville, AR — launch market. Game times are relative to app start so
 // there is always something live, soon and later.
 
@@ -79,7 +82,36 @@ export function makeGames(now: Date): Game[] {
   };
   const base = { declined: [] as Member[], noResponse: [] as Member[], myRSVP: 'none' as const };
 
+  // A few weeks of finished games so profiles have real history (you were at most of them).
+  const history: Game[] = Array.from({ length: 14 }, (_, i): Game => {
+    const week = Math.floor(i / 2) + 1;
+    const kind = [
+      { sport: 'soccer' as const, placeId: 'p1', clubId: 'c1', title: 'Friday Night Soccer', hour: 20, hours: 1.5, capacity: 14 },
+      { sport: 'pickleball' as const, placeId: i % 4 < 2 ? 'p2' : 'p3', clubId: 'c4', title: 'Doubles Ladder', hour: 18, hours: 2, capacity: 8 },
+    ][i % 2];
+    const start = day(-(week * 7 - (i % 2) * 2), kind.hour);
+    const end = new Date(start.getTime() + kind.hours * 3_600_000);
+    const trail = i === 4 || i === 11;
+    return {
+      ...base,
+      id: `h${i + 1}`,
+      sport: trail ? 'trails' : kind.sport,
+      placeId: trail ? (i === 4 ? 'p7' : 'p8') : kind.placeId,
+      clubId: trail ? 'c8' : kind.clubId,
+      title: trail ? 'Sunrise Hike' : kind.title,
+      details: '',
+      start: trail ? day(-(week * 7), 7) : start,
+      end: trail ? new Date(day(-(week * 7), 7).getTime() + 2 * 3_600_000) : end,
+      capacity: trail ? 12 : kind.capacity,
+      going: i % 3 === 2 ? crowd(6, i) : [ME, ...crowd(7, i)],
+      dropInPrice: trail ? 0 : 7,
+      level: 'All levels',
+      myRSVP: i % 3 === 2 ? 'none' : 'going',
+    };
+  });
+
   return [
+    ...history,
     { ...base, id: 'g1', sport: 'soccer', placeId: 'p1', clubId: 'c1', title: 'Friday Night Soccer',
       details: 'Weekly 7v7. Bring a light and a dark shirt.', start: at(-25), end: at(65), capacity: 14,
       going: crowd(11), declined: crowd(2, 12), noResponse: crowd(3, 14), dropInPrice: 7, level: 'Casual' },

@@ -9,7 +9,7 @@ const SIZE = 68;
 /** AllTrails-style medal: tier-colored ring when earned, gray with progress when not yet. */
 export function AchievementBadge({ achievement }: { achievement: Achievement }) {
   const tone = achievement.earned ? colors[achievement.tier] : colors.locked;
-  const [current, total] = achievement.progress ?? [0, 1];
+  const [current, total] = achievement.progress;
   return (
     <View style={styles.root} accessible accessibilityLabel={`${achievement.title}. ${achievement.description} ${achievement.earned ? 'Earned' : `${current} of ${total}`}`}>
       <View style={[styles.medal, { borderColor: tone, backgroundColor: achievement.earned ? `${tone}1F` : colors.fill }]}>
@@ -21,7 +21,7 @@ export function AchievementBadge({ achievement }: { achievement: Achievement }) 
         {achievement.title}
       </Text>
       {achievement.earned ? (
-        <Text style={[type.caption, styles.muted]}>{achievement.earnedLabel}</Text>
+        <Text style={[type.caption, styles.muted]}>Earned</Text>
       ) : (
         <View style={styles.progress}>
           <ProgressBar value={current / total} color={colors.label2} height={4} />
