@@ -5,7 +5,7 @@ import type { NewProfile, User } from './models';
 import { hasBackend, supabase } from '../lib/supabase';
 import * as api from './api';
 
-// Phone or email OTP login. With Supabase keys it uses Supabase auth; without them it
+// Phone OTP + email/password login. With Supabase keys it uses Supabase auth; without them it
 // falls back to `mockAuth` so the app still runs on demo data.
 const mockAuth = {
   async sendCode(_contact: string) {
@@ -42,9 +42,8 @@ interface Session {
   sendCode: (phone: string) => Promise<void>;
   /** Resolves true when the phone is new and we still need a name. */
   verify: (phone: string, code: string) => Promise<boolean>;
-  sendEmailCode: (email: string) => Promise<void>;
-  /** Resolves true when the email is new and we still need a name. */
-  verifyEmail: (email: string, code: string) => Promise<boolean>;
+  /** Sign in or sign up with email + password. Resolves true when new and needs profile setup. */
+  emailAuth: (email: string, password: string, mode: 'signin' | 'signup') => Promise<boolean>;
   completeProfile: (profile: NewProfile) => Promise<void>;
   updateName: (name: string) => Promise<void>;
   signOut: () => void;
@@ -122,25 +121,37 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         pendingPhone.current = phone;
         return true;
       },
-      sendEmailCode: async (email) => {
-        if (!supabase) return mockAuth.sendCode(email);
-        const { error } = await supabase.auth.signInWithOtp({ email });
-        if (error) throw new Error(error.message);
-      },
-      verifyEmail: async (email, code) => {
-        if (supabase) {
-          const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
-          if (error || !data.user) throw new Error("That code didn't work. Check your email and try again.");
+      emailAuth: async (email, password, mode) => {
+        if (!supabase) {
+          await new Promise((r) => setTimeout(r, 600));
+          const known = JSON.parse((await AsyncStorage.getItem(KNOWN_KEY)) ?? '{}') as Record<string, string>;
+          if (mode === 'signin') {
+            if (known[email]) { await signIn({ id: email, email, name: known[email] }); return false; }
+            throw new Error('No account found with that email. Try creating one.');
+          }
+          if (known[email]) { await signIn({ id: email, email, name: known[email] }); return false; }
+          pendingEmail.current = email;
+          return true;
+        }
+        if (mode === 'signup') {
+          const { data, error } = await supabase.auth.signUp({ email, password });
+          if (error) throw new Error(error.message);
+          if (!data.user) throw new Error('Sign up failed. Try again.');
+          const existing = await api.loadProfile(data.user.id, undefined, email);
+          if (existing) { await signIn(existing); return false; }
+          pendingEmail.current = email;
+          pendingUid.current = data.user.id;
+          return true;
+        } else {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw new Error(error.message);
+          if (!data.user) throw new Error('Sign in failed. Try again.');
           const existing = await api.loadProfile(data.user.id, undefined, email);
           if (existing) { await signIn(existing); return false; }
           pendingEmail.current = email;
           pendingUid.current = data.user.id;
           return true;
         }
-        const result = await mockAuth.verify(email, code, 'email');
-        if ('existing' in result) { await signIn(result.existing); return false; }
-        pendingEmail.current = email;
-        return true;
       },
       completeProfile: async (profile) => {
         const phone = pendingPhone.current;

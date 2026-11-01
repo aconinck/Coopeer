@@ -10,7 +10,7 @@ import { TextButton } from '../src/ui/Buttons';
 import { CodeField, OptionCard, SportTile, StepScaffold, UnderlineField } from '../src/ui/StepFlow';
 import { sportIds, sports, type Goal, type SportId } from '../src/state/models';
 
-type Step = 'phone' | 'code' | 'email' | 'emailCode' | 'name' | 'age' | 'sports' | 'goal';
+type Step = 'phone' | 'code' | 'emailAuth' | 'name' | 'age' | 'sports' | 'goal';
 type Direction = 'forward' | 'back';
 
 /**
@@ -26,6 +26,7 @@ export default function Auth() {
     setDirection(dir);
     setStepState(next);
   };
+  const [nameBack, setNameBack] = useState<'code' | 'emailAuth'>('code');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -44,7 +45,7 @@ export default function Auth() {
 
   switch (step) {
     case 'phone':
-      return <PhoneStep phone={phone} setPhone={setPhone} digits={digits} direction={direction} onSent={() => go('code')} onEmail={() => go('email')} />;
+      return <PhoneStep phone={phone} setPhone={setPhone} digits={digits} direction={direction} onSent={() => go('code')} onEmail={() => go('emailAuth')} />;
     case 'code':
       return (
         <CodeStep
@@ -52,22 +53,21 @@ export default function Auth() {
           displayPhone={phone}
           direction={direction}
           onBack={() => go('phone', 'back')}
-          onVerified={(needsName) => (needsName ? go('name') : finish())}
+          onVerified={(needsName) => { if (needsName) { setNameBack('code'); go('name'); } else finish(); }}
         />
       );
-    case 'email':
-      return <EmailStep email={email} setEmail={setEmail} direction={direction} onBack={() => go('phone', 'back')} onSent={() => go('emailCode')} />;
-    case 'emailCode':
+    case 'emailAuth':
       return (
-        <EmailCodeStep
+        <EmailAuthStep
           email={email}
+          setEmail={setEmail}
           direction={direction}
-          onBack={() => go('email', 'back')}
-          onVerified={(needsName) => (needsName ? go('name') : finish())}
+          onBack={() => go('phone', 'back')}
+          onVerified={(needsName) => { if (needsName) { setNameBack('emailAuth'); go('name'); } else finish(); }}
         />
       );
     case 'name':
-      return <NameStep name={name} setName={setName} direction={direction} onBack={() => go('code', 'back')} onDone={() => go('age')} />;
+      return <NameStep name={name} setName={setName} direction={direction} onBack={() => go(nameBack, 'back')} onDone={() => go('age')} />;
     case 'age':
       return <AgeStep birthYear={birthYear} setBirthYear={setBirthYear} direction={direction} onBack={() => go('name', 'back')} onDone={() => go('sports')} />;
     case 'sports':
@@ -160,45 +160,49 @@ function PhoneStep({
   );
 }
 
-function EmailStep({
+function EmailAuthStep({
   email,
   setEmail,
   direction,
   onBack,
-  onSent,
+  onVerified,
 }: {
   email: string;
   setEmail: (v: string) => void;
   direction: Direction;
   onBack: () => void;
-  onSent: () => void;
+  onVerified: (needsProfile: boolean) => void;
 }) {
   const session = useSession();
-  const [sending, setSending] = useState(false);
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const canContinue = validEmail && password.length >= 6;
 
-  const send = async () => {
-    setSending(true);
+  const submit = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      await session.sendEmailCode(email.trim().toLowerCase());
-      onSent();
+      const needsProfile = await session.emailAuth(email.trim().toLowerCase(), password, mode);
+      onVerified(needsProfile);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Try again.');
     } finally {
-      setSending(false);
+      setLoading(false);
     }
   };
 
   return (
     <StepScaffold
-      title="Email address"
-      subtitle="We'll send you a code. No password, ever."
+      title={mode === 'signin' ? 'Sign in' : 'Create account'}
+      subtitle={mode === 'signin' ? 'Welcome back.' : "Let's get you set up."}
       progress={0.14}
-      canContinue={valid}
-      loading={sending}
-      onNext={send}
+      canContinue={canContinue}
+      loading={loading}
+      onNext={submit}
       onBack={onBack}
       direction={direction}
     >
@@ -210,89 +214,24 @@ function EmailStep({
         textContentType="emailAddress"
         autoComplete="email"
         autoCapitalize="none"
-        error={!!error}
-        onSubmitEditing={() => valid && send()}
+        returnKeyType="next"
+      />
+      <UnderlineField
+        placeholder="Password (6+ characters)"
+        value={password}
+        onChangeText={(text) => { setError(null); setPassword(text); }}
+        secureTextEntry
+        textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+        autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+        returnKeyType="done"
+        onSubmitEditing={() => canContinue && submit()}
       />
       {error ? <Text style={[type.footnote, styles.error]}>{error}</Text> : null}
       <Text style={[type.footnote, styles.muted]}>By continuing you agree to Coopeer&apos;s Terms and Privacy Policy.</Text>
-    </StepScaffold>
-  );
-}
-
-function EmailCodeStep({
-  email,
-  direction,
-  onBack,
-  onVerified,
-}: {
-  email: string;
-  direction: Direction;
-  onBack: () => void;
-  onVerified: (needsName: boolean) => void;
-}) {
-  const session = useSession();
-  const [code, setCode] = useState('');
-  const [verifying, setVerifying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [resendIn, setResendIn] = useState(30);
-  const reduceMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (resendIn <= 0) return;
-    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [resendIn]);
-
-  const verify = async (value: string) => {
-    if (verifying || value.length !== 6) return;
-    setVerifying(true);
-    try {
-      const needsName = await session.verifyEmail(email, value);
-      setSuccess(true);
-      setTimeout(() => onVerified(needsName), reduceMotion ? 0 : 480);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "That code didn't work.");
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  return (
-    <StepScaffold
-      title="Confirmation"
-      subtitle={`Enter the 6-digit code we sent to ${email}.`}
-      progress={0.28}
-      canContinue={code.length === 6}
-      loading={verifying}
-      success={success}
-      onNext={() => verify(code)}
-      onBack={onBack}
-      direction={direction}
-    >
-      <CodeField
-        value={code}
-        onChange={(next) => {
-          setCode(next);
-          if (next.length < 6) setError(null);
-          if (next.length === 6) verify(next);
-        }}
-        length={6}
-        groupSize={3}
-        error={!!error}
-        oneTimeCode
-      />
-      {error ? <Text style={[type.footnote, styles.error]}>{error}</Text> : null}
       <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
         <TextButton
-          title={resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
-          disabled={resendIn > 0}
-          onPress={() => {
-            setCode('');
-            setError(null);
-            setResendIn(30);
-            session.sendEmailCode(email);
-          }}
+          title={mode === 'signin' ? "New to Coopeer? Create account" : "Already have an account? Sign in"}
+          onPress={() => { setMode((m) => (m === 'signin' ? 'signup' : 'signin')); setError(null); }}
         />
       </View>
     </StepScaffold>
