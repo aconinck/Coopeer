@@ -5,24 +5,29 @@ import type { NewProfile, User } from './models';
 import { hasBackend, supabase } from '../lib/supabase';
 import * as api from './api';
 
-// Phone-only login. With Supabase keys set it uses Supabase phone auth (SMS via Twilio);
-// without them it falls back to `mockAuth` so the app still runs on demo data.
+// Phone or email OTP login. With Supabase keys it uses Supabase auth; without them it
+// falls back to `mockAuth` so the app still runs on demo data.
 const mockAuth = {
-  async sendCode(_phone: string) {
+  async sendCode(_contact: string) {
     await new Promise((resolve) => setTimeout(resolve, 700));
   },
   // Any 6-digit code works except 000000, which simulates a wrong code.
-  async verify(phone: string, code: string): Promise<{ existing: User } | { isNew: true }> {
+  async verify(contact: string, code: string, kind: 'phone' | 'email'): Promise<{ existing: User } | { isNew: true }> {
     await new Promise((resolve) => setTimeout(resolve, 600));
     if (code.length !== 6 || code === '000000') {
       throw new Error("That code didn't work. Check the text and try again.");
     }
     const known = JSON.parse((await AsyncStorage.getItem(KNOWN_KEY)) ?? '{}') as Record<string, string>;
-    return known[phone] ? { existing: { id: phone, phone, name: known[phone] } } : { isNew: true };
+    if (known[contact]) {
+      const base = { id: contact, name: known[contact] };
+      return { existing: kind === 'email' ? { ...base, email: contact } : { ...base, phone: contact } };
+    }
+    return { isNew: true };
   },
   async remember(user: User) {
     const known = JSON.parse((await AsyncStorage.getItem(KNOWN_KEY)) ?? '{}') as Record<string, string>;
-    known[user.phone] = user.name;
+    const key = user.email ?? user.phone ?? user.id;
+    known[key] = user.name;
     await AsyncStorage.setItem(KNOWN_KEY, JSON.stringify(known));
   },
 };
@@ -37,6 +42,9 @@ interface Session {
   sendCode: (phone: string) => Promise<void>;
   /** Resolves true when the phone is new and we still need a name. */
   verify: (phone: string, code: string) => Promise<boolean>;
+  sendEmailCode: (email: string) => Promise<void>;
+  /** Resolves true when the email is new and we still need a name. */
+  verifyEmail: (email: string, code: string) => Promise<boolean>;
   completeProfile: (profile: NewProfile) => Promise<void>;
   updateName: (name: string) => Promise<void>;
   signOut: () => void;
@@ -52,6 +60,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [isReady, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const pendingPhone = useRef<string | null>(null);
+  const pendingEmail = useRef<string | null>(null);
   const pendingAction = useRef<(() => void) | null>(null);
   const pendingUid = useRef<string | null>(null);
 
@@ -63,7 +72,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           const { data } = await client.auth.getSession();
           const authUser = data.session?.user;
           // A session without a profile means sign-up was not finished: treat as signed out.
-          if (authUser) setUser(await api.loadProfile(authUser.id, authUser.phone ?? ''));
+          if (authUser) setUser(await api.loadProfile(authUser.id, authUser.phone ?? undefined, authUser.email ?? undefined));
         } catch (error) {
           console.warn('Could not restore session', error);
         }
@@ -103,29 +112,47 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           const { data, error } = await supabase.auth.verifyOtp({ phone, token: code, type: 'sms' });
           if (error || !data.user) throw new Error("That code didn't work. Check the text and try again.");
           const existing = await api.loadProfile(data.user.id, phone);
-          if (existing) {
-            await signIn(existing);
-            return false;
-          }
+          if (existing) { await signIn(existing); return false; }
           pendingPhone.current = phone;
           pendingUid.current = data.user.id;
           return true;
         }
-        const result = await mockAuth.verify(phone, code);
-        if ('existing' in result) {
-          await signIn(result.existing);
-          return false;
-        }
+        const result = await mockAuth.verify(phone, code, 'phone');
+        if ('existing' in result) { await signIn(result.existing); return false; }
         pendingPhone.current = phone;
+        return true;
+      },
+      sendEmailCode: async (email) => {
+        if (!supabase) return mockAuth.sendCode(email);
+        const { error } = await supabase.auth.signInWithOtp({ email });
+        if (error) throw new Error(error.message);
+      },
+      verifyEmail: async (email, code) => {
+        if (supabase) {
+          const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
+          if (error || !data.user) throw new Error("That code didn't work. Check your email and try again.");
+          const existing = await api.loadProfile(data.user.id, undefined, email);
+          if (existing) { await signIn(existing); return false; }
+          pendingEmail.current = email;
+          pendingUid.current = data.user.id;
+          return true;
+        }
+        const result = await mockAuth.verify(email, code, 'email');
+        if ('existing' in result) { await signIn(result.existing); return false; }
+        pendingEmail.current = email;
         return true;
       },
       completeProfile: async (profile) => {
         const phone = pendingPhone.current;
-        if (!phone) return;
+        const email = pendingEmail.current;
+        const contact = phone ?? email;
+        if (!contact) return;
         const uid = pendingUid.current;
-        const next: User = { id: uid ?? phone, phone, ...profile, name: profile.name.trim() };
-        if (uid) await api.saveProfile(uid, phone, { ...profile, name: next.name });
+        const next: User = { id: uid ?? contact, phone: phone ?? undefined, email: email ?? undefined, ...profile, name: profile.name.trim() };
+        if (uid) await api.saveProfile(uid, phone ?? undefined, email ?? undefined, { ...profile, name: next.name });
         else await mockAuth.remember(next);
+        pendingPhone.current = null;
+        pendingEmail.current = null;
         await signIn(next);
       },
       updateName: async (name) => {

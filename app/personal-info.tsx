@@ -40,11 +40,19 @@ export default function PersonalInfoScreen() {
           style={[type.title3, styles.input]}
         />
       </View>
-      <View style={styles.field}>
-        <Text style={[type.caption, styles.label]}>Phone</Text>
-        <Text style={[type.title3, styles.readOnly]}>{session.user?.phone ?? ''}</Text>
-      </View>
-      <Text style={[type.footnote, styles.label]}>Your phone number is how you sign in. No password needed.</Text>
+      {session.user?.phone ? (
+        <View style={styles.field}>
+          <Text style={[type.caption, styles.label]}>Phone</Text>
+          <Text style={[type.title3, styles.readOnly]}>{session.user.phone}</Text>
+        </View>
+      ) : null}
+      {session.user?.email ? (
+        <View style={styles.field}>
+          <Text style={[type.caption, styles.label]}>Email</Text>
+          <Text style={[type.title3, styles.readOnly]}>{session.user.email}</Text>
+        </View>
+      ) : null}
+      <Text style={[type.footnote, styles.label]}>This is how you sign in. No password needed.</Text>
     </Screen>
   );
 }

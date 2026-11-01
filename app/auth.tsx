@@ -10,11 +10,11 @@ import { TextButton } from '../src/ui/Buttons';
 import { CodeField, OptionCard, SportTile, StepScaffold, UnderlineField } from '../src/ui/StepFlow';
 import { sportIds, sports, type Goal, type SportId } from '../src/state/models';
 
-type Step = 'phone' | 'code' | 'name' | 'age' | 'sports' | 'goal';
+type Step = 'phone' | 'code' | 'email' | 'emailCode' | 'name' | 'age' | 'sports' | 'goal';
 type Direction = 'forward' | 'back';
 
 /**
- * Phone-only login: number → SMS code. New players then set up a quick profile —
+ * Phone or email OTP login. New players then set up a quick profile —
  * name → age → favorite sports → what they want to do first — and land right in that flow.
  */
 export default function Auth() {
@@ -27,6 +27,7 @@ export default function Auth() {
     setStepState(next);
   };
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const [favorites, setFavorites] = useState<SportId[]>([]);
@@ -43,7 +44,7 @@ export default function Auth() {
 
   switch (step) {
     case 'phone':
-      return <PhoneStep phone={phone} setPhone={setPhone} digits={digits} direction={direction} onSent={() => go('code')} />;
+      return <PhoneStep phone={phone} setPhone={setPhone} digits={digits} direction={direction} onSent={() => go('code')} onEmail={() => go('email')} />;
     case 'code':
       return (
         <CodeStep
@@ -51,6 +52,17 @@ export default function Auth() {
           displayPhone={phone}
           direction={direction}
           onBack={() => go('phone', 'back')}
+          onVerified={(needsName) => (needsName ? go('name') : finish())}
+        />
+      );
+    case 'email':
+      return <EmailStep email={email} setEmail={setEmail} direction={direction} onBack={() => go('phone', 'back')} onSent={() => go('emailCode')} />;
+    case 'emailCode':
+      return (
+        <EmailCodeStep
+          email={email}
+          direction={direction}
+          onBack={() => go('email', 'back')}
           onVerified={(needsName) => (needsName ? go('name') : finish())}
         />
       );
@@ -88,12 +100,14 @@ function PhoneStep({
   digits,
   direction,
   onSent,
+  onEmail,
 }: {
   phone: string;
   setPhone: (v: string) => void;
   digits: string;
   direction: Direction;
   onSent: () => void;
+  onEmail: () => void;
 }) {
   const session = useSession();
   const [sending, setSending] = useState(false);
@@ -139,6 +153,148 @@ function PhoneStep({
       />
       {error ? <Text style={[type.footnote, styles.error]}>{error}</Text> : null}
       <Text style={[type.footnote, styles.muted]}>By continuing you agree to Coopeer&apos;s Terms and Privacy Policy.</Text>
+      <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
+        <TextButton title="Use email instead" onPress={onEmail} />
+      </View>
+    </StepScaffold>
+  );
+}
+
+function EmailStep({
+  email,
+  setEmail,
+  direction,
+  onBack,
+  onSent,
+}: {
+  email: string;
+  setEmail: (v: string) => void;
+  direction: Direction;
+  onBack: () => void;
+  onSent: () => void;
+}) {
+  const session = useSession();
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const send = async () => {
+    setSending(true);
+    try {
+      await session.sendEmailCode(email.trim().toLowerCase());
+      onSent();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <StepScaffold
+      title="Email address"
+      subtitle="We'll send you a code. No password, ever."
+      progress={0.14}
+      canContinue={valid}
+      loading={sending}
+      onNext={send}
+      onBack={onBack}
+      direction={direction}
+    >
+      <UnderlineField
+        placeholder="you@example.com"
+        value={email}
+        onChangeText={(text) => { setError(null); setEmail(text); }}
+        keyboardType="email-address"
+        textContentType="emailAddress"
+        autoComplete="email"
+        autoCapitalize="none"
+        error={!!error}
+        onSubmitEditing={() => valid && send()}
+      />
+      {error ? <Text style={[type.footnote, styles.error]}>{error}</Text> : null}
+      <Text style={[type.footnote, styles.muted]}>By continuing you agree to Coopeer&apos;s Terms and Privacy Policy.</Text>
+    </StepScaffold>
+  );
+}
+
+function EmailCodeStep({
+  email,
+  direction,
+  onBack,
+  onVerified,
+}: {
+  email: string;
+  direction: Direction;
+  onBack: () => void;
+  onVerified: (needsName: boolean) => void;
+}) {
+  const session = useSession();
+  const [code, setCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [resendIn, setResendIn] = useState(30);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
+
+  const verify = async (value: string) => {
+    if (verifying || value.length !== 6) return;
+    setVerifying(true);
+    try {
+      const needsName = await session.verifyEmail(email, value);
+      setSuccess(true);
+      setTimeout(() => onVerified(needsName), reduceMotion ? 0 : 480);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That code didn't work.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  return (
+    <StepScaffold
+      title="Confirmation"
+      subtitle={`Enter the 6-digit code we sent to ${email}.`}
+      progress={0.28}
+      canContinue={code.length === 6}
+      loading={verifying}
+      success={success}
+      onNext={() => verify(code)}
+      onBack={onBack}
+      direction={direction}
+    >
+      <CodeField
+        value={code}
+        onChange={(next) => {
+          setCode(next);
+          if (next.length < 6) setError(null);
+          if (next.length === 6) verify(next);
+        }}
+        length={6}
+        groupSize={3}
+        error={!!error}
+        oneTimeCode
+      />
+      {error ? <Text style={[type.footnote, styles.error]}>{error}</Text> : null}
+      <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
+        <TextButton
+          title={resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
+          disabled={resendIn > 0}
+          onPress={() => {
+            setCode('');
+            setError(null);
+            setResendIn(30);
+            session.sendEmailCode(email);
+          }}
+        />
+      </View>
     </StepScaffold>
   );
 }

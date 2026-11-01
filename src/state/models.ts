@@ -147,7 +147,8 @@ export type Goal = 'play' | 'join' | 'host';
 
 export interface User {
   id: string;
-  phone: string;
+  phone?: string;
+  email?: string;
   name: string;
   birthYear?: number;
   /** Favorite sports, picked at sign-up. Filters the map and feed first. */
