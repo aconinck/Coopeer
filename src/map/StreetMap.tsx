@@ -10,6 +10,7 @@ import Animated, {
   useSharedValue,
   withDecay,
   withSpring,
+  cancelAnimation,
   type SharedValue,
 } from 'react-native-reanimated';
 import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
@@ -72,6 +73,10 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
   const startScale = useSharedValue(1);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
+  // Separate start values for pinch so pan and pinch don't stomp each other.
+  const pinchStartScale = useSharedValue(1);
+  const pinchStartX = useSharedValue(0);
+  const pinchStartY = useSharedValue(0);
   const focalX = useSharedValue(0);
   const focalY = useSharedValue(0);
   const ready = useSharedValue(0);
@@ -148,6 +153,9 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
     .averageTouches(true)
     .onStart(() => {
       runOnJS(movedByUser)();
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      cancelAnimation(scale);
       startX.value = tx.value;
       startY.value = ty.value;
     })
@@ -174,20 +182,23 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
   const pinch = Gesture.Pinch()
     .onStart((e) => {
       runOnJS(movedByUser)();
-      startScale.value = scale.value;
-      startX.value = tx.value;
-      startY.value = ty.value;
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      cancelAnimation(scale);
+      pinchStartScale.value = scale.value;
+      pinchStartX.value = tx.value;
+      pinchStartY.value = ty.value;
       focalX.value = e.focalX;
       focalY.value = e.focalY;
     })
     .onUpdate((e) => {
-      const raw = startScale.value * e.scale;
+      const raw = pinchStartScale.value * e.scale;
       // Soft limits: resist beyond min/max instead of stopping dead.
       const next = raw > maxScale ? maxScale + (raw - maxScale) * 0.2 : raw < minScale ? minScale - (minScale - raw) * 0.2 : raw;
-      const ratio = next / startScale.value;
+      const ratio = next / pinchStartScale.value;
       scale.value = next;
-      tx.value = focalX.value - (focalX.value - startX.value) * ratio;
-      ty.value = focalY.value - (focalY.value - startY.value) * ratio;
+      tx.value = focalX.value - (focalX.value - pinchStartX.value) * ratio;
+      ty.value = focalY.value - (focalY.value - pinchStartY.value) * ratio;
     })
     .onEnd(() => {
       const clamped = Math.min(Math.max(scale.value, minScale), maxScale);
@@ -203,6 +214,9 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
     .numberOfTaps(2)
     .onEnd((e) => {
       runOnJS(movedByUser)();
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      cancelAnimation(scale);
       const next = Math.min(scale.value * 1.7, maxScale);
       const ratio = next / scale.value;
       tx.value = withSpring(e.x - (e.x - tx.value) * ratio, CAMERA_SPRING);

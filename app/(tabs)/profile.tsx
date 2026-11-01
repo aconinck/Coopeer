@@ -6,6 +6,7 @@ import { colors, space, type } from '../../src/constants/theme';
 import { enter } from '../../src/constants/motion';
 import { useSession } from '../../src/state/session';
 import { useStore } from '../../src/state/store';
+import { ME, type Club } from '../../src/state/models';
 import { confirmDestructive } from '../../src/lib/format';
 import { open } from '../../src/lib/nav';
 import { formatHours } from '../../src/state/profile';
@@ -77,21 +78,7 @@ export default function ProfileScreen() {
       </Animated.View>
 
       <Animated.View entering={stagger(3)}>
-        <Section title="Your clubs" action={{ label: 'See all', onPress: () => router.navigate('/clubs') }}>
-          {store.myClubs.length > 0 ? (
-            <Rail snap={176}>
-              {store.myClubs.map((club) => (
-                <ClubCard key={club.id} club={club} width={176} onPress={() => open.clubPage(club.id)} />
-              ))}
-            </Rail>
-          ) : (
-            <Pressable accessibilityRole="button" onPress={() => router.navigate('/map')} style={({ pressed }) => [styles.emptyClubs, pressed && { opacity: 0.7 }]}>
-              <Ionicons name="people-outline" size={22} color={colors.label2} />
-              <Text style={[type.subhead, styles.flex]}>You haven't joined a club yet. Find one on the map.</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.label3} />
-            </Pressable>
-          )}
-        </Section>
+        <ClubsSection myClubs={store.myClubs} uid={user?.id} />
       </Animated.View>
 
       <Animated.View entering={stagger(4)}>
@@ -112,6 +99,49 @@ export default function ProfileScreen() {
         </Section>
       </Animated.View>
     </Screen>
+  );
+}
+
+function ClubsSection({ myClubs, uid }: { myClubs: Club[]; uid?: string }) {
+  const meId = uid ?? ME.id;
+  const adminClubs = myClubs.filter((c) => c.adminIds?.includes(meId));
+  const memberClubs = myClubs.filter((c) => !c.adminIds?.includes(meId));
+
+  if (myClubs.length === 0) {
+    return (
+      <Section title="Your clubs" action={{ label: 'See all', onPress: () => router.navigate('/clubs') }}>
+        <Pressable accessibilityRole="button" onPress={() => router.navigate('/map')} style={({ pressed }) => [styles.emptyClubs, pressed && { opacity: 0.7 }]}>
+          <Ionicons name="people-outline" size={22} color={colors.label2} />
+          <Text style={[type.subhead, styles.flex]}>You haven't joined a club yet. Find one on the map.</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.label3} />
+        </Pressable>
+      </Section>
+    );
+  }
+
+  return (
+    <Section title="Your clubs" action={{ label: 'See all', onPress: () => router.navigate('/clubs') }}>
+      {adminClubs.length > 0 && (
+        <View style={styles.subGroup}>
+          <Text style={[type.footnote, styles.subLabel]}>Managing</Text>
+          <Rail snap={176}>
+            {adminClubs.map((club) => (
+              <ClubCard key={club.id} club={club} width={176} onPress={() => open.clubPage(club.id)} />
+            ))}
+          </Rail>
+        </View>
+      )}
+      {memberClubs.length > 0 && (
+        <View style={adminClubs.length > 0 ? styles.subGroup : undefined}>
+          {adminClubs.length > 0 && <Text style={[type.footnote, styles.subLabel]}>Member</Text>}
+          <Rail snap={176}>
+            {memberClubs.map((club) => (
+              <ClubCard key={club.id} club={club} width={176} onPress={() => open.clubPage(club.id)} />
+            ))}
+          </Rail>
+        </View>
+      )}
+    </Section>
   );
 }
 
@@ -138,4 +168,6 @@ const styles = StyleSheet.create({
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator },
   statsBleed: { marginHorizontal: -space.md },
   emptyClubs: { ...card, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg },
+  subGroup: { gap: space.xs },
+  subLabel: { color: colors.label2, paddingHorizontal: space.lg },
 });
