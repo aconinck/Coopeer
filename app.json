@@ -57,7 +57,8 @@
           "photosPermission": "Coopeer uses your photos to set your club picture.",
           "cameraPermission": "Coopeer uses the camera to take your club picture."
         }
-      ]
+      ],
+      "@stripe/stripe-react-native"
     ],
     "experiments": {
       "typedRoutes": false

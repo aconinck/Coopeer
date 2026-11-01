@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   },
   titlePill: { paddingHorizontal: space.lg, paddingVertical: space.sm },
   scanFooter: { position: 'absolute', left: space.md, right: space.md, bottom: 0 },
-  viewfinderWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  viewfinderWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   viewfinder: { width: 250, height: 250, borderRadius: radius.sheet, borderWidth: 4, borderColor: colors.white },
   permission: {
     flex: 1,

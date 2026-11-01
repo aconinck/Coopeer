@@ -66,5 +66,5 @@ const styles = StyleSheet.create({
   title: { color: colors.white, maxWidth: 260 },
   body: { color: colors.white, maxWidth: 230, marginTop: 12 },
   actions: { marginTop: 44 },
-  splash: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  splash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
 });

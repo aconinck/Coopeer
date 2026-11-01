@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, Text, View, type ViewToken } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+// ViewToken was removed from react-native in RN 0.88; define a compatible local type
+type ListViewToken<T = unknown> = { isViewable: boolean; item: T | null | undefined; key: string; index: number | null | undefined };
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
@@ -45,7 +47,7 @@ export default function ExploreFeed() {
   );
 
   // Play the first clip that is at least 60% visible; everything else stays paused.
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<Row>[] }) => {
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ListViewToken<Row>[] }) => {
     const clip = viewableItems.find((v) => v.isViewable && v.item?.kind === 'post' && v.item.post.kind === 'clip');
     setVisibleClipId(clip?.item?.id ?? null);
   }).current;

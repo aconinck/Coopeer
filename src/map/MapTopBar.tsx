@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   segment: { flex: 1 },
   divider: { width: StyleSheet.hairlineWidth, height: 22, backgroundColor: colors.separator, marginHorizontal: space.sm },
   toggle: { height: HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, borderRadius: radius.full, backgroundColor: colors.fill, overflow: 'hidden' },
-  toggleFill: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.live, borderRadius: radius.full },
+  toggleFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.live, borderRadius: radius.full },
   toggleLabel: { fontWeight: '600' },
   dotBox: { width: 8, height: 8, alignItems: 'center', justifyContent: 'center' },
   dot: { width: 8, height: 8, borderRadius: 4 },

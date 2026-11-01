@@ -34,18 +34,25 @@ export async function requestTour() {
 
 type Rect = { x: number; y: number; width: number; height: number };
 
-const TourContext = createContext<{ register: (id: TourTargetId, ref: RefObject<View | null>) => () => void } | null>(null);
+interface Measurable {
+  measureInWindow(cb: (x: number, y: number, width: number, height: number) => void): void;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ViewRef = any;
+
+const TourContext = createContext<{ register: (id: TourTargetId, ref: RefObject<ViewRef>) => () => void } | null>(null);
 
 /** Attach the returned ref to the View the tour should spotlight (keep `collapsable={false}`). */
-export function useTourTarget(id: TourTargetId) {
+export function useTourTarget(id: TourTargetId): RefObject<ViewRef> {
   const ctx = useContext(TourContext);
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewRef>(null);
   useEffect(() => ctx?.register(id, ref), [ctx, id]);
   return ref;
 }
 
 export function TourProvider({ children }: { children: ReactNode }) {
-  const targets = useRef(new Map<TourTargetId, RefObject<View | null>>());
+  const targets = useRef(new Map<TourTargetId, RefObject<ViewRef>>());
   const [step, setStep] = useState<number | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
 
@@ -69,7 +76,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
     setRect(null);
     const id = current?.target;
     if (!id) return;
-    const node = targets.current.get(id)?.current;
+    const node = targets.current.get(id)?.current as Measurable | null | undefined;
     // Skip steps whose target is not on screen (e.g. they landed on Clubs instead of the map).
     const skip = () =>
       setStep((s) => {

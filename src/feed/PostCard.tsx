@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', gap: 2 },
   stack: { gap: 2 },
   cell: { overflow: 'hidden', backgroundColor: colors.fill },
-  more: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
+  more: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   board: { borderRadius: radius.card, backgroundColor: colors.bg, padding: space.lg, gap: space.md },
   boardTop: { flexDirection: 'row', alignItems: 'center', gap: space.sm },

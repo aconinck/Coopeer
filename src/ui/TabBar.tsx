@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { BottomTabBarProps } from 'expo-router/build/layouts/Tabs';
 import { colors, layout, radius, space } from '../constants/theme';
 import { spring } from '../constants/motion';
 import { haptic, type IconName } from './Buttons';
@@ -19,7 +19,7 @@ const tabs: Record<string, { label: string; icon: IconName; activeIcon: IconName
 };
 
 /** Floating Liquid Glass tab bar (iOS 26 style) with a sliding active pill. */
-export function TabBar({ state, navigation }: BottomTabBarProps) {
+export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const [slots, setSlots] = useState<Record<number, { x: number; width: number }>>({});
@@ -67,10 +67,9 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
                 setSlots((current) => (current[index]?.x === x && current[index]?.width === width ? current : { ...current, [index]: { x, width } }));
               }}
               onPress={() => {
-                const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-                if (!focused && !event.defaultPrevented) {
+                if (!focused) {
                   haptic.selection();
-                  navigation.navigate(route.name);
+                  navigateToTab(route.key);
                 }
               }}
               style={styles.item}

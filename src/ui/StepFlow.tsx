@@ -200,7 +200,8 @@ export function UnderlineField({
   autoFocus = true,
   ...props
 }: TextInputProps & { prefix?: string; error?: boolean }) {
-  const input = useRef<TextInput>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const input = useRef<any>(null);
   const focus = useSharedValue(0);
 
   // Focus after the entrance animation; a plain autoFocus is lost while the view animates in.
@@ -271,7 +272,8 @@ export function CodeField({
   error?: boolean;
   oneTimeCode?: boolean;
 }) {
-  const input = useRef<TextInput>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const input = useRef<any>(null);
   const [focused, setFocused] = useState(false);
   const complete = value.length === length;
   const shake = useShake(!!error);
