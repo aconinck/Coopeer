@@ -26,7 +26,7 @@ function haptic(kind: Haptics.NotificationFeedbackType) {
 export default function Join() {
   const params = useLocalSearchParams<{ mode?: string; code?: string }>();
   const store = useStore();
-  const [mode, setMode] = useState<'scan' | 'code'>(params.mode === 'scan' ? 'scan' : 'code');
+  const [mode, setMode] = useState<'scan' | 'code'>(params.mode === 'code' ? 'code' : 'scan');
   const [code, setCode] = useState(params.code?.replace(/\D/g, '').slice(0, TEAM_CODE_LENGTH) ?? '');
   const [lookingUp, setLookingUp] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -80,8 +80,8 @@ export default function Join() {
           loading={lookingUp}
           success={success}
           onNext={() => lookUp(code)}
-          onBack={() => router.back()}
-          backIcon="close"
+          onBack={() => setMode('scan')}
+          backIcon="arrow-back"
         >
           <CodeField
             value={code}
@@ -184,7 +184,7 @@ function ScanStep({ onCode, onTypeInstead }: { onCode: (code: string) => void; o
         <ActionBar
           caption={invalid ? "That QR isn't a Coopeer club code." : granted && Platform.OS !== 'web' ? "Point at the club's QR code." : null}
         >
-          <SecondaryButton title="Enter code instead" icon="keypad-outline" onPress={onTypeInstead} />
+          <SecondaryButton title="Type code instead" icon="keypad-outline" onPress={onTypeInstead} />
         </ActionBar>
       </View>
     </View>
