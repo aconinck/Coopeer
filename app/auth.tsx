@@ -456,14 +456,14 @@ function YearWheelPicker({ year, onChange }: { year: number; onChange: (y: numbe
           </View>
         ))}
       </ScrollView>
-      {/* top + bottom gradient fades */}
+      {/* top + bottom gradient fades — must match StepScaffold's colors.surface background */}
       <LinearGradient
-        colors={[colors.bg, colors.bg + '00']}
+        colors={[colors.surface, colors.surface + '00']}
         style={[styles.wheelGrad, { top: 0 }]}
         pointerEvents="none"
       />
       <LinearGradient
-        colors={[colors.bg + '00', colors.bg]}
+        colors={[colors.surface + '00', colors.surface]}
         style={[styles.wheelGrad, { bottom: 0 }]}
         pointerEvents="none"
       />
