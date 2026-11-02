@@ -191,18 +191,21 @@ function Spinner() {
   return <Animated.View style={[styles.spinner, style]} accessibilityLabel="Loading" />;
 }
 
-/** Underline-only input (Figma: 24pt semibold, no box). The underline lights up on focus. */
+/** Underline-only input (Figma: 24pt semibold, no box). The underline lights up on focus.
+ *  Passing `secureTextEntry` automatically adds an eye-toggle button. */
 export function UnderlineField({
   prefix,
   error,
   onFocus,
   onBlur,
   autoFocus = true,
+  secureTextEntry,
   ...props
 }: TextInputProps & { prefix?: string; error?: boolean }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const input = useRef<any>(null);
   const focus = useSharedValue(0);
+  const [revealed, setRevealed] = useState(false);
 
   // Focus after the entrance animation; a plain autoFocus is lost while the view animates in.
   useEffect(() => {
@@ -225,6 +228,7 @@ export function UnderlineField({
           ref={input}
           placeholderTextColor={colors.label3}
           style={[flow.input, styles.input]}
+          secureTextEntry={secureTextEntry && !revealed}
           onFocus={(e) => {
             focus.value = withTiming(1, { duration: 200 });
             onFocus?.(e);
@@ -235,6 +239,21 @@ export function UnderlineField({
           }}
           {...props}
         />
+        {secureTextEntry ? (
+          <Pressable
+            onPress={() => setRevealed((v) => !v)}
+            hitSlop={12}
+            accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
+            accessibilityRole="button"
+            style={({ pressed }) => pressed && { opacity: 0.4 }}
+          >
+            <Ionicons
+              name={revealed ? 'eye-off-outline' : 'eye-outline'}
+              size={22}
+              color={colors.label3}
+            />
+          </Pressable>
+        ) : null}
       </View>
       <Animated.View style={[styles.line, line]} />
     </Animated.View>
