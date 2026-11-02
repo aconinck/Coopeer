@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ScrollViewInstance } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, radius, space, type } from '../src/constants/theme';
 import { formatUSPhone } from '../src/lib/format';
@@ -10,6 +11,12 @@ import { sportIds, sports, type Goal, type SportId } from '../src/state/models';
 
 type Step = 'contact' | 'password' | 'newPassword' | 'name' | 'age' | 'sports' | 'goal';
 type Direction = 'forward' | 'back';
+
+const THIS_YEAR = new Date().getFullYear();
+const MIN_AGE = 13;
+const WHEEL_ITEM_H = 50;
+const WHEEL_VISIBLE = 5;
+const WHEEL_PAD = WHEEL_ITEM_H * Math.floor(WHEEL_VISIBLE / 2);
 
 /**
  * Identifier-first auth: enter email or phone → system checks if registered →
@@ -30,7 +37,7 @@ export default function Auth() {
   const [phone, setPhone] = useState('');
   const [isExisting, setIsExisting] = useState(false);
   const [name, setName] = useState('');
-  const [birthYear, setBirthYear] = useState('');
+  const [birthYear, setBirthYear] = useState(THIS_YEAR - 25);
   const [favorites, setFavorites] = useState<SportId[]>([]);
   const [goal, setGoal] = useState<Goal | null>(null);
 
@@ -97,7 +104,7 @@ export default function Auth() {
           onBack={() => go('sports', 'back')}
           onDone={async () => {
             const chosen = goal ?? 'play';
-            await session.completeProfile({ name, birthYear: Number(birthYear) || undefined, sports: favorites, goal: chosen });
+            await session.completeProfile({ name, birthYear, sports: favorites, goal: chosen });
             await requestTour();
             session.finishAuth();
             if (chosen === 'join') router.replace('/clubs');
@@ -398,8 +405,64 @@ function NameStep({
   );
 }
 
-const THIS_YEAR = new Date().getFullYear();
-const MIN_AGE = 13;
+// ─── Year wheel picker ────────────────────────────────────────────────────────
+
+function YearWheelPicker({ year, onChange }: { year: number; onChange: (y: number) => void }) {
+  const minYear = THIS_YEAR - 100;
+  const maxYear = THIS_YEAR - MIN_AGE;
+  const years = useMemo(
+    () => Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i),
+    [minYear, maxYear],
+  );
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+  const [centeredYear, setCenteredYear] = useState(year);
+
+  useEffect(() => {
+    const idx = years.indexOf(year);
+    if (idx < 0) return;
+    setTimeout(() => scrollRef.current?.scrollTo({ y: idx * WHEEL_ITEM_H, animated: false }), 80);
+  }, []);
+
+  const fromOffset = useCallback(
+    (offsetY: number, haptic: boolean) => {
+      const idx = Math.max(0, Math.min(years.length - 1, Math.round(offsetY / WHEEL_ITEM_H)));
+      const y = years[idx];
+      setCenteredYear(y);
+      if (haptic && y !== centeredYear && Platform.OS !== 'web') {
+        void Haptics.selectionAsync();
+      }
+      return y;
+    },
+    [years, centeredYear],
+  );
+
+  return (
+    <View style={styles.wheelOuter}>
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={WHEEL_ITEM_H}
+        decelerationRate="fast"
+        contentContainerStyle={{ paddingVertical: WHEEL_PAD }}
+        scrollEventThrottle={16}
+        onScroll={(e) => fromOffset(e.nativeEvent.contentOffset.y, false)}
+        onMomentumScrollEnd={(e) => onChange(fromOffset(e.nativeEvent.contentOffset.y, true))}
+        onScrollEndDrag={(e) => onChange(fromOffset(e.nativeEvent.contentOffset.y, true))}
+      >
+        {years.map((y) => (
+          <View key={y} style={styles.wheelItem}>
+            <Text style={[styles.wheelText, y === centeredYear && styles.wheelTextSelected]}>{y}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      {/* top + bottom fade masks */}
+      <View style={[styles.wheelFade, styles.wheelFadeTop]} pointerEvents="none" />
+      <View style={[styles.wheelFade, styles.wheelFadeBottom]} pointerEvents="none" />
+      {/* selection indicator lines */}
+      <View style={styles.wheelSelector} pointerEvents="none" />
+    </View>
+  );
+}
 
 function AgeStep({
   birthYear,
@@ -408,16 +471,14 @@ function AgeStep({
   onBack,
   onDone,
 }: {
-  birthYear: string;
-  setBirthYear: (v: string) => void;
+  birthYear: number;
+  setBirthYear: (v: number) => void;
   direction: Direction;
   onBack: () => void;
   onDone: () => void;
 }) {
-  const year = Number(birthYear);
-  const age = birthYear.length === 4 ? THIS_YEAR - year : null;
-  const valid = age !== null && age >= MIN_AGE && age <= 100;
-  const tooYoung = age !== null && age < MIN_AGE;
+  const age = THIS_YEAR - birthYear;
+  const valid = age >= MIN_AGE && age <= 100;
   return (
     <StepScaffold
       title="Birth year"
@@ -428,17 +489,8 @@ function AgeStep({
       onBack={onBack}
       direction={direction}
     >
-      <UnderlineField
-        placeholder="1996"
-        value={birthYear}
-        onChangeText={(text) => setBirthYear(text.replace(/\D/g, '').slice(0, 4))}
-        keyboardType="number-pad"
-        autoComplete="birthdate-year"
-        error={tooYoung || (age !== null && age > 100)}
-        onSubmitEditing={() => valid && onDone()}
-      />
+      <YearWheelPicker year={birthYear} onChange={setBirthYear} />
       {valid && <Text style={[type.subhead, styles.muted]}>You're {age}.</Text>}
-      {tooYoung && <Text style={[type.footnote, styles.error]}>You need to be at least {MIN_AGE} to use Coopeer.</Text>}
     </StepScaffold>
   );
 }
@@ -553,5 +605,52 @@ const styles = StyleSheet.create({
   },
   kindBtnTextActive: {
     color: colors.label,
+  },
+  // ─── Wheel picker ───────────────────────────────────────────────────────────
+  wheelOuter: {
+    height: WHEEL_ITEM_H * WHEEL_VISIBLE,
+    overflow: 'hidden',
+    alignSelf: 'stretch',
+  },
+  wheelItem: {
+    height: WHEEL_ITEM_H,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  wheelText: {
+    fontSize: 18,
+    fontWeight: '400',
+    color: colors.label3,
+  },
+  wheelTextSelected: {
+    fontSize: 26,
+    fontWeight: '600',
+    color: colors.label,
+  },
+  wheelFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: WHEEL_PAD,
+  },
+  wheelFadeTop: {
+    top: 0,
+    backgroundColor: colors.bg,
+    opacity: 0.88,
+  },
+  wheelFadeBottom: {
+    bottom: 0,
+    backgroundColor: colors.bg,
+    opacity: 0.88,
+  },
+  wheelSelector: {
+    position: 'absolute',
+    top: WHEEL_PAD,
+    left: 32,
+    right: 32,
+    height: WHEEL_ITEM_H,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.separator,
   },
 });
