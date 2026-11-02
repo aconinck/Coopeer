@@ -125,7 +125,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
         const creds = kind === 'email' ? { email: contact, password } : { phone: contact, password };
         const { data, error } = await supabase.auth.signUp(creds);
-        if (error) throw new Error(error.message);
+        // Ignore email-delivery errors — the account was still created
+        if (error && !data.user) throw new Error(error.message);
         if (!data.user) throw new Error('Sign up failed. Try again.');
         if (kind === 'email') pendingEmail.current = contact;
         else pendingPhone.current = contact;
