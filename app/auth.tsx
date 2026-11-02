@@ -178,6 +178,7 @@ function EmailAuthStep({
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
 
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const canContinue = validEmail && password.length >= 6;
@@ -227,11 +228,31 @@ function EmailAuthStep({
         onSubmitEditing={() => canContinue && submit()}
       />
       {error ? <Text style={[type.footnote, styles.error]}>{error}</Text> : null}
+      {resetSent ? <Text style={[type.footnote, styles.muted]}>Reset link sent — check your email.</Text> : null}
       <Text style={[type.footnote, styles.muted]}>By continuing you agree to Coopeer&apos;s Terms and Privacy Policy.</Text>
-      <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
+      <View style={{ alignItems: 'flex-start', marginTop: space.sm, gap: space.xs }}>
+        {mode === 'signin' && (
+          <TextButton
+            title="Forgot password?"
+            onPress={async () => {
+              const trimmed = email.trim().toLowerCase();
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+                setError('Enter your email above first.');
+                return;
+              }
+              setError(null);
+              try {
+                await session.resetPassword(trimmed);
+                setResetSent(true);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'Could not send reset email.');
+              }
+            }}
+          />
+        )}
         <TextButton
           title={mode === 'signin' ? "New to Coopeer? Create account" : "Already have an account? Sign in"}
-          onPress={() => { setMode((m) => (m === 'signin' ? 'signup' : 'signin')); setError(null); }}
+          onPress={() => { setMode((m) => (m === 'signin' ? 'signup' : 'signin')); setError(null); setResetSent(false); }}
         />
       </View>
     </StepScaffold>

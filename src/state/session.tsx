@@ -44,6 +44,8 @@ interface Session {
   verify: (phone: string, code: string) => Promise<boolean>;
   /** Sign in or sign up with email + password. Resolves true when new and needs profile setup. */
   emailAuth: (email: string, password: string, mode: 'signin' | 'signup') => Promise<boolean>;
+  /** Send a password-reset email. No-op in demo mode. */
+  resetPassword: (email: string) => Promise<void>;
   completeProfile: (profile: NewProfile) => Promise<void>;
   updateName: (name: string) => Promise<void>;
   signOut: () => void;
@@ -152,6 +154,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           pendingUid.current = data.user.id;
           return true;
         }
+      },
+      resetPassword: async (email) => {
+        if (!supabase) return;
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        if (error) throw new Error(error.message);
       },
       completeProfile: async (profile) => {
         const phone = pendingPhone.current;
