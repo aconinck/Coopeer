@@ -458,12 +458,12 @@ function YearWheelPicker({ year, onChange }: { year: number; onChange: (y: numbe
       </ScrollView>
       {/* top + bottom gradient fades */}
       <LinearGradient
-        colors={[colors.bg, 'transparent']}
+        colors={[colors.bg, colors.bg + '00']}
         style={[styles.wheelGrad, { top: 0 }]}
         pointerEvents="none"
       />
       <LinearGradient
-        colors={['transparent', colors.bg]}
+        colors={[colors.bg + '00', colors.bg]}
         style={[styles.wheelGrad, { bottom: 0 }]}
         pointerEvents="none"
       />
