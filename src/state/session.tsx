@@ -5,24 +5,13 @@ import type { NewProfile, User } from './models';
 import { hasBackend, supabase } from '../lib/supabase';
 import * as api from './api';
 
-// Phone OTP + email/password login. With Supabase keys it uses Supabase auth; without them it
-// falls back to `mockAuth` so the app still runs on demo data.
+// Identifier-first auth: check if contact exists → sign in or sign up with password.
+// With Supabase keys uses Supabase auth; without falls back to mockAuth (demo data).
 const mockAuth = {
-  async sendCode(_contact: string) {
-    await new Promise((resolve) => setTimeout(resolve, 700));
-  },
-  // Any 6-digit code works except 000000, which simulates a wrong code.
-  async verify(contact: string, code: string, kind: 'phone' | 'email'): Promise<{ existing: User } | { isNew: true }> {
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    if (code.length !== 6 || code === '000000') {
-      throw new Error("That code didn't work. Check the text and try again.");
-    }
+  async checkContact(contact: string): Promise<boolean> {
+    await new Promise((r) => setTimeout(r, 500));
     const known = JSON.parse((await AsyncStorage.getItem(KNOWN_KEY)) ?? '{}') as Record<string, string>;
-    if (known[contact]) {
-      const base = { id: contact, name: known[contact] };
-      return { existing: kind === 'email' ? { ...base, email: contact } : { ...base, phone: contact } };
-    }
-    return { isNew: true };
+    return !!known[contact];
   },
   async remember(user: User) {
     const known = JSON.parse((await AsyncStorage.getItem(KNOWN_KEY)) ?? '{}') as Record<string, string>;
@@ -35,21 +24,24 @@ const mockAuth = {
 const USER_KEY = 'session.user';
 const KNOWN_KEY = 'mock.knownUsers';
 
+export type ContactKind = 'email' | 'phone';
+
 interface Session {
   isReady: boolean;
   user: User | null;
   isSignedIn: boolean;
-  sendCode: (phone: string) => Promise<void>;
-  /** Resolves true when the phone is new and we still need a name. */
-  verify: (phone: string, code: string) => Promise<boolean>;
-  /** Sign in or sign up with email + password. Resolves true when new and needs profile setup. */
-  emailAuth: (email: string, password: string, mode: 'signin' | 'signup') => Promise<boolean>;
+  /** Check whether a contact is already registered. */
+  checkContact: (contact: string, kind: ContactKind) => Promise<boolean>;
+  /** Sign in an existing user with their password. */
+  contactSignIn: (contact: string, password: string, kind: ContactKind) => Promise<void>;
+  /** Begin sign-up: creates auth user, sets pending state for completeProfile. */
+  contactSignUp: (contact: string, password: string, kind: ContactKind) => Promise<void>;
   /** Send a password-reset email. No-op in demo mode. */
   resetPassword: (email: string) => Promise<void>;
   completeProfile: (profile: NewProfile) => Promise<void>;
   updateName: (name: string) => Promise<void>;
   signOut: () => void;
-  /** Runs `action` now if signed in, otherwise opens phone login and runs it afterwards. */
+  /** Runs `action` now if signed in, otherwise opens login and runs it afterwards. */
   requireAuth: (action: () => void) => void;
   /** Called by the login screen when it finishes. */
   finishAuth: () => void;
@@ -72,7 +64,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         try {
           const { data } = await client.auth.getSession();
           const authUser = data.session?.user;
-          // A session without a profile means sign-up was not finished: treat as signed out.
           if (authUser) setUser(await api.loadProfile(authUser.id, authUser.phone ?? undefined, authUser.email ?? undefined));
         } catch (error) {
           console.warn('Could not restore session', error);
@@ -94,6 +85,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (next: User) => {
     setUser(next);
     pendingPhone.current = null;
+    pendingEmail.current = null;
     pendingUid.current = null;
     if (!hasBackend) await AsyncStorage.setItem(USER_KEY, JSON.stringify(next));
   }, []);
@@ -103,57 +95,41 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isReady,
       user,
       isSignedIn: user !== null,
-      sendCode: async (phone) => {
-        if (!supabase) return mockAuth.sendCode(phone);
-        const { error } = await supabase.auth.signInWithOtp({ phone });
-        if (error) throw new Error(error.message);
+      checkContact: async (contact, kind) => {
+        if (!supabase) return mockAuth.checkContact(contact);
+        const col = kind === 'email' ? 'email' : 'phone';
+        const { data } = await supabase.from('profiles').select('id').eq(col, contact).maybeSingle();
+        return !!data;
       },
-      verify: async (phone, code) => {
-        if (supabase) {
-          const { data, error } = await supabase.auth.verifyOtp({ phone, token: code, type: 'sms' });
-          if (error || !data.user) throw new Error("That code didn't work. Check the text and try again.");
-          const existing = await api.loadProfile(data.user.id, phone);
-          if (existing) { await signIn(existing); return false; }
-          pendingPhone.current = phone;
-          pendingUid.current = data.user.id;
-          return true;
-        }
-        const result = await mockAuth.verify(phone, code, 'phone');
-        if ('existing' in result) { await signIn(result.existing); return false; }
-        pendingPhone.current = phone;
-        return true;
-      },
-      emailAuth: async (email, password, mode) => {
+      contactSignIn: async (contact, password, kind) => {
         if (!supabase) {
           await new Promise((r) => setTimeout(r, 600));
           const known = JSON.parse((await AsyncStorage.getItem(KNOWN_KEY)) ?? '{}') as Record<string, string>;
-          if (mode === 'signin') {
-            if (known[email]) { await signIn({ id: email, email, name: known[email] }); return false; }
-            throw new Error('No account found with that email. Try creating one.');
-          }
-          if (known[email]) { await signIn({ id: email, email, name: known[email] }); return false; }
-          pendingEmail.current = email;
-          return true;
+          if (!known[contact]) throw new Error('Incorrect password.');
+          await signIn({ id: contact, [kind]: contact, name: known[contact] } as User);
+          return;
         }
-        if (mode === 'signup') {
-          const { data, error } = await supabase.auth.signUp({ email, password });
-          if (error) throw new Error(error.message);
-          if (!data.user) throw new Error('Sign up failed. Try again.');
-          const existing = await api.loadProfile(data.user.id, undefined, email);
-          if (existing) { await signIn(existing); return false; }
-          pendingEmail.current = email;
-          pendingUid.current = data.user.id;
-          return true;
-        } else {
-          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-          if (error) throw new Error(error.message);
-          if (!data.user) throw new Error('Sign in failed. Try again.');
-          const existing = await api.loadProfile(data.user.id, undefined, email);
-          if (existing) { await signIn(existing); return false; }
-          pendingEmail.current = email;
-          pendingUid.current = data.user.id;
-          return true;
+        const creds = kind === 'email' ? { email: contact, password } : { phone: contact, password };
+        const { data, error } = await supabase.auth.signInWithPassword(creds);
+        if (error || !data.user) throw new Error('Incorrect password. Try again.');
+        const profile = await api.loadProfile(data.user.id, kind === 'phone' ? contact : undefined, kind === 'email' ? contact : undefined);
+        if (!profile) throw new Error('Account not found.');
+        await signIn(profile);
+      },
+      contactSignUp: async (contact, password, kind) => {
+        if (!supabase) {
+          await new Promise((r) => setTimeout(r, 600));
+          if (kind === 'email') pendingEmail.current = contact;
+          else pendingPhone.current = contact;
+          return;
         }
+        const creds = kind === 'email' ? { email: contact, password } : { phone: contact, password };
+        const { data, error } = await supabase.auth.signUp(creds);
+        if (error) throw new Error(error.message);
+        if (!data.user) throw new Error('Sign up failed. Try again.');
+        if (kind === 'email') pendingEmail.current = contact;
+        else pendingPhone.current = contact;
+        pendingUid.current = data.user.id;
       },
       resetPassword: async (email) => {
         if (!supabase) return;
@@ -182,15 +158,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
       signOut: () => {
         setUser(null);
-        // The root layout's auth guard sends signed-out users back to /welcome.
         if (supabase) supabase.auth.signOut();
         else AsyncStorage.removeItem(USER_KEY);
       },
       requireAuth: (action) => {
-        if (user) {
-          action();
-          return;
-        }
+        if (user) { action(); return; }
         pendingAction.current = action;
         router.push('/auth');
       },
