@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ScrollViewInstance } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, radius, space, type } from '../src/constants/theme';
 import { formatUSPhone } from '../src/lib/format';
@@ -455,9 +456,17 @@ function YearWheelPicker({ year, onChange }: { year: number; onChange: (y: numbe
           </View>
         ))}
       </ScrollView>
-      {/* top + bottom fade masks */}
-      <View style={[styles.wheelFade, styles.wheelFadeTop]} pointerEvents="none" />
-      <View style={[styles.wheelFade, styles.wheelFadeBottom]} pointerEvents="none" />
+      {/* top + bottom gradient fades */}
+      <LinearGradient
+        colors={[colors.bg, 'transparent']}
+        style={[styles.wheelGrad, { top: 0 }]}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['transparent', colors.bg]}
+        style={[styles.wheelGrad, { bottom: 0 }]}
+        pointerEvents="none"
+      />
       {/* selection indicator lines */}
       <View style={styles.wheelSelector} pointerEvents="none" />
     </View>
@@ -627,21 +636,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.label,
   },
-  wheelFade: {
+  wheelGrad: {
     position: 'absolute',
     left: 0,
     right: 0,
     height: WHEEL_PAD,
-  },
-  wheelFadeTop: {
-    top: 0,
-    backgroundColor: colors.bg,
-    opacity: 0.88,
-  },
-  wheelFadeBottom: {
-    bottom: 0,
-    backgroundColor: colors.bg,
-    opacity: 0.88,
   },
   wheelSelector: {
     position: 'absolute',
