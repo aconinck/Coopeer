@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ScrollViewInstance } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -12,7 +13,7 @@ import { requestTour } from '../src/tour/Tour';
 import { SportTile, StepScaffold, UnderlineField } from '../src/ui/StepFlow';
 import { sportIds, sports, type SportId } from '../src/state/models';
 
-type Step = 'contact' | 'password' | 'newPassword' | 'name' | 'age' | 'sports';
+type Step = 'contact' | 'password' | 'welcomeBack' | 'newPassword' | 'name' | 'age' | 'sports';
 type Direction = 'forward' | 'back';
 
 const THIS_YEAR = new Date().getFullYear();
@@ -39,7 +40,8 @@ export default function Auth() {
   const [contact, setContact] = useState('');
   const [phone, setPhone] = useState('');
   const [isExisting, setIsExisting] = useState(false);
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [birthYear, setBirthYear] = useState(THIS_YEAR - 25);
   const [favorites, setFavorites] = useState<SportId[]>([]);
 
@@ -78,6 +80,13 @@ export default function Auth() {
           kind={kind}
           direction={direction}
           onBack={() => go('contact', 'back')}
+          onDone={() => go('welcomeBack')}
+        />
+      );
+    case 'welcomeBack':
+      return (
+        <WelcomeBackStep
+          name={session.user?.name ?? ''}
           onDone={finish}
         />
       );
@@ -92,7 +101,7 @@ export default function Auth() {
         />
       );
     case 'name':
-      return <NameStep name={name} setName={setName} direction={direction} onBack={() => go('newPassword', 'back')} onDone={() => go('age')} />;
+      return <NameStep firstName={firstName} setFirstName={setFirstName} lastName={lastName} setLastName={setLastName} direction={direction} onBack={() => go('newPassword', 'back')} onDone={() => go('age')} />;
     case 'age':
       return <AgeStep birthYear={birthYear} setBirthYear={setBirthYear} direction={direction} onBack={() => go('name', 'back')} onDone={() => go('sports')} />;
     case 'sports':
@@ -103,7 +112,7 @@ export default function Auth() {
           direction={direction}
           onBack={() => go('age', 'back')}
           onDone={async () => {
-            await session.completeProfile({ name, birthYear, sports: favorites, goal: 'play' });
+            await session.completeProfile({ name: `${firstName.trim()} ${lastName.trim()}`.trim(), birthYear, sports: favorites, goal: 'play' });
             await requestTour();
             session.finishAuth();
             router.replace(favorites[0] ? `/map?sport=${favorites[0]}` : '/map');
@@ -383,11 +392,15 @@ function NewPasswordStep({
 
 function PasswordStrengthBar({ length }: { length: number }) {
   const MIN = 6;
-  const fill = Math.min(length / MIN, 1);
-  const done = fill >= 1;
+  const done = length >= MIN;
   return (
-    <View style={styles.strengthTrack}>
-      <View style={[styles.strengthFill, { width: `${fill * 100}%` as any, backgroundColor: done ? '#34C759' : colors.brand }]} />
+    <View style={styles.strengthRow}>
+      {Array.from({ length: MIN }, (_, i) => (
+        <View
+          key={i}
+          style={[styles.strengthBlock, i < length && { backgroundColor: done ? '#34C759' : colors.brand }]}
+        />
+      ))}
     </View>
   );
 }
@@ -395,22 +408,27 @@ function PasswordStrengthBar({ length }: { length: number }) {
 // ─── Profile steps ────────────────────────────────────────────────────────────
 
 function NameStep({
-  name,
-  setName,
+  firstName,
+  setFirstName,
+  lastName,
+  setLastName,
   direction,
   onBack,
   onDone,
 }: {
-  name: string;
-  setName: (v: string) => void;
+  firstName: string;
+  setFirstName: (v: string) => void;
+  lastName: string;
+  setLastName: (v: string) => void;
   direction: Direction;
   onBack: () => void;
   onDone: () => void;
 }) {
-  const valid = name.trim().length >= 2;
+  const lastRef = useRef<any>(null);
+  const valid = firstName.trim().length >= 1 && lastName.trim().length >= 1;
   return (
     <StepScaffold
-      title="Full name"
+      title="Your name"
       subtitle="So your teammates know who's coming."
       progress={0.43}
       canContinue={valid}
@@ -419,16 +437,60 @@ function NameStep({
       direction={direction}
     >
       <UnderlineField
-        placeholder="Alex Rivera"
-        value={name}
-        onChangeText={setName}
+        placeholder="First name"
+        value={firstName}
+        onChangeText={setFirstName}
         autoCapitalize="words"
-        textContentType="name"
-        autoComplete="name"
+        textContentType="givenName"
+        autoComplete="given-name"
         returnKeyType="next"
+        onSubmitEditing={() => lastRef.current?.focus?.()}
+      />
+      <UnderlineField
+        ref={lastRef}
+        placeholder="Last name"
+        value={lastName}
+        onChangeText={setLastName}
+        autoCapitalize="words"
+        textContentType="familyName"
+        autoComplete="family-name"
+        autoFocus={false}
+        returnKeyType="done"
         onSubmitEditing={() => valid && onDone()}
       />
     </StepScaffold>
+  );
+}
+
+// ─── Welcome back screen ──────────────────────────────────────────────────────
+
+function WelcomeBackStep({ name, onDone }: { name: string; onDone: () => void }) {
+  const firstName = name.split(' ')[0] || name;
+  const emojiScale = useSharedValue(0);
+  const textOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    emojiScale.value = withSequence(
+      withSpring(1.25, { damping: 7, stiffness: 180 }),
+      withSpring(1.0, { damping: 12, stiffness: 140 }),
+    );
+    textOpacity.value = withDelay(280, withTiming(1, { duration: 380 }));
+    const t = setTimeout(onDone, 2200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const emojiStyle = useAnimatedStyle(() => ({ transform: [{ scale: emojiScale.value }] }));
+  const textStyle = useAnimatedStyle(() => ({ opacity: textOpacity.value }));
+
+  return (
+    <View style={styles.welcomeRoot}>
+      <Animated.Text style={[styles.welcomeEmoji, emojiStyle]}>🙌</Animated.Text>
+      <Animated.View style={textStyle}>
+        <Text style={styles.welcomeLabel}>Welcome back,</Text>
+        <Text style={styles.welcomeName}>{firstName}!</Text>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -686,6 +748,27 @@ const styles = StyleSheet.create({
   pillTextActive: {
     color: colors.white,
   },
+  welcomeRoot: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.lg,
+  },
+  welcomeEmoji: {
+    fontSize: 72,
+  },
+  welcomeLabel: {
+    ...type.title3,
+    color: colors.label2,
+    textAlign: 'center',
+  },
+  welcomeName: {
+    ...type.largeTitle,
+    color: colors.label,
+    textAlign: 'center',
+    fontWeight: '700',
+  },
   domainRow: {
     flexDirection: 'row',
     gap: space.sm,
@@ -704,16 +787,16 @@ const styles = StyleSheet.create({
     ...type.subhead,
     color: colors.label2,
   },
-  strengthTrack: {
+  strengthRow: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: space.sm,
+  },
+  strengthBlock: {
+    width: 20,
     height: 3,
     borderRadius: 100,
     backgroundColor: colors.separator,
-    marginTop: space.sm,
-    overflow: 'hidden',
-  },
-  strengthFill: {
-    height: '100%',
-    borderRadius: 100,
   },
   kindToggle: {
     flexDirection: 'row',

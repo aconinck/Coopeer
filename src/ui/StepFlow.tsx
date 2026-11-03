@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -193,7 +193,7 @@ function Spinner() {
 
 /** Underline-only input (Figma: 24pt semibold, no box). The underline lights up on focus.
  *  Passing `secureTextEntry` automatically adds an eye-toggle button. */
-export function UnderlineField({
+export const UnderlineField = forwardRef<{ focus(): void }, TextInputProps & { prefix?: string; error?: boolean }>(function UnderlineField({
   prefix,
   error,
   onFocus,
@@ -201,9 +201,10 @@ export function UnderlineField({
   autoFocus = true,
   secureTextEntry,
   ...props
-}: TextInputProps & { prefix?: string; error?: boolean }) {
+}, ref) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const input = useRef<any>(null);
+  useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
   const focus = useSharedValue(0);
   const [revealed, setRevealed] = useState(false);
 
@@ -258,7 +259,7 @@ export function UnderlineField({
       <Animated.View style={[styles.line, line]} />
     </Animated.View>
   );
-}
+});
 
 /** Horizontal shake + error haptic whenever `error` turns true. */
 function useShake(error: boolean) {
