@@ -11,6 +11,8 @@ import { formatUSPhone } from '../src/lib/format';
 import { useSession, type ContactKind } from '../src/state/session';
 import { requestTour } from '../src/tour/Tour';
 import { SportTile, StepScaffold, UnderlineField } from '../src/ui/StepFlow';
+import { Segmented } from '../src/ui/Segmented';
+import { Glass } from '../src/ui/Glass';
 import { sportIds, sports, type SportId } from '../src/state/models';
 
 type Step = 'contact' | 'password' | 'welcomeBack' | 'newPassword' | 'name' | 'age' | 'sports';
@@ -178,22 +180,15 @@ function ContactStep({
       backIcon="close"
       direction={direction}
     >
-      <View style={styles.kindToggle}>
-        <TouchableOpacity
-          style={[styles.kindBtn, kind === 'email' && styles.kindBtnActive]}
-          onPress={() => setKind('email')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.kindBtnText, kind === 'email' && styles.kindBtnTextActive]}>Email</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.kindBtn, kind === 'phone' && styles.kindBtnActive]}
-          onPress={() => setKind('phone')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.kindBtnText, kind === 'phone' && styles.kindBtnTextActive]}>Phone</Text>
-        </TouchableOpacity>
-      </View>
+      <Glass radius={40} style={styles.kindToggle}>
+        <Segmented
+          bare
+          size="large"
+          options={[{ value: 'email' as ContactKind, label: 'Email' }, { value: 'phone' as ContactKind, label: 'Phone' }]}
+          value={kind}
+          onChange={setKind}
+        />
+      </Glass>
 
       {kind === 'email' ? (
         <>
@@ -809,35 +804,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     backgroundColor: colors.separator,
   },
-  kindToggle: {
-    flexDirection: 'row',
-    backgroundColor: colors.fill,
-    borderRadius: radius.tile,
-    padding: 3,
-    marginBottom: space.lg,
-    gap: 2,
-  },
-  kindBtn: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: radius.tile - 2,
-    alignItems: 'center',
-  },
-  kindBtnActive: {
-    backgroundColor: colors.surface,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
-  kindBtnText: {
-    ...type.subhead,
-    color: colors.label3,
-  },
-  kindBtnTextActive: {
-    color: colors.label,
-  },
+  kindToggle: { marginBottom: space.lg },
   // ─── Wheel picker ───────────────────────────────────────────────────────────
   wheelOuter: {
     height: WHEEL_ITEM_H * WHEEL_VISIBLE,
