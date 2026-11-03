@@ -187,17 +187,35 @@ function ContactStep({
       </View>
 
       {kind === 'email' ? (
-        <UnderlineField
-          placeholder="you@example.com"
-          value={contact}
-          onChangeText={(text) => { setError(null); setContact(text); }}
-          keyboardType="email-address"
-          textContentType="emailAddress"
-          autoComplete="email"
-          autoCapitalize="none"
-          returnKeyType="done"
-          onSubmitEditing={() => canContinue && proceed()}
-        />
+        <>
+          <UnderlineField
+            placeholder="you@example.com"
+            value={contact}
+            onChangeText={(text) => { setError(null); setContact(text); }}
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            autoComplete="email"
+            autoCapitalize="none"
+            returnKeyType="done"
+            onSubmitEditing={() => canContinue && proceed()}
+          />
+          {contact.endsWith('@') || (contact.includes('@') && !contact.slice(contact.indexOf('@') + 1).includes('.')) ? (
+            <View style={styles.domainRow}>
+              {['gmail.com', 'icloud.com', 'outlook.com'].map((domain) => (
+                <Pressable
+                  key={domain}
+                  style={({ pressed }) => [styles.domainChip, pressed && { opacity: 0.65 }]}
+                  onPress={() => {
+                    const base = contact.includes('@') ? contact.slice(0, contact.indexOf('@') + 1) : `${contact}@`;
+                    setContact(base + domain);
+                  }}
+                >
+                  <Text style={styles.domainChipText}>{domain}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+        </>
       ) : (
         <UnderlineField
           prefix="+1"
@@ -357,8 +375,20 @@ function NewPasswordStep({
         returnKeyType="done"
         onSubmitEditing={() => canContinue && submit()}
       />
+      <PasswordStrengthBar length={password.length} />
       {error ? <Text style={[type.footnote, styles.error]}>{error}</Text> : null}
     </StepScaffold>
+  );
+}
+
+function PasswordStrengthBar({ length }: { length: number }) {
+  const MIN = 6;
+  const fill = Math.min(length / MIN, 1);
+  const done = fill >= 1;
+  return (
+    <View style={styles.strengthTrack}>
+      <View style={[styles.strengthFill, { width: `${fill * 100}%` as any, backgroundColor: done ? '#34C759' : colors.brand }]} />
+    </View>
   );
 }
 
@@ -655,6 +685,35 @@ const styles = StyleSheet.create({
   },
   pillTextActive: {
     color: colors.white,
+  },
+  domainRow: {
+    flexDirection: 'row',
+    gap: space.sm,
+    marginTop: space.sm,
+    flexWrap: 'wrap',
+  },
+  domainChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 100,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.separator,
+  },
+  domainChipText: {
+    ...type.subhead,
+    color: colors.label2,
+  },
+  strengthTrack: {
+    height: 3,
+    borderRadius: 100,
+    backgroundColor: colors.separator,
+    marginTop: space.sm,
+    overflow: 'hidden',
+  },
+  strengthFill: {
+    height: '100%',
+    borderRadius: 100,
   },
   kindToggle: {
     flexDirection: 'row',

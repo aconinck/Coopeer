@@ -186,10 +186,15 @@ export default function MapScreen() {
     open.place(place.id);
   };
 
-  // The drawer steps aside (slides down) while the detail sheet is up.
+  // The drawer slides down while the detail sheet is open OR the create sheet is open.
+  const creatingAnim = useSharedValue(0);
+  useEffect(() => {
+    creatingAnim.value = withTiming(creating ? 1 : 0, { duration: 220 });
+  }, [creating, creatingAnim]);
+
   const drawerStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(sheet.isOpen ? 0 : 1, { duration: 180 }),
-    transform: [{ translateY: withSpring(sheet.isOpen ? 260 : 0, DRAWER_SPRING) }],
+    opacity: withTiming(sheet.isOpen || creatingAnim.value > 0 ? 0 : 1, { duration: 180 }),
+    transform: [{ translateY: withSpring((sheet.isOpen || creatingAnim.value > 0) ? 260 : 0, DRAWER_SPRING) }],
   }));
 
   // Expanding grows only the games list (a clipped height), so the search and chips never stretch.
@@ -382,7 +387,7 @@ export default function MapScreen() {
 
       <OptionSheet visible={creating} onClose={() => setCreating(false)} header={<Text style={[type.title3, styles.createTitle]}>Create new</Text>}>
         <OptionRow
-          title="Start a game"
+          title="Create a match"
           detail="One game at any place. No club needed."
           leading={<IconTile icon="football-outline" color={colors.brand} background={colors.brandSoft} />}
           onPress={() => createThen('/create/game')}
