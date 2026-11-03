@@ -22,6 +22,15 @@ const avatarPalette = [colors.brand, colors.soccer, colors.pickleball, '#30B0C7'
 export function Avatar({ member, size = 36 }: { member: Member; size?: number }) {
   const isMe = member.id === 'me';
   const hash = member.id.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  if (member.photoUri) {
+    return (
+      <Image
+        source={{ uri: member.photoUri }}
+        accessibilityLabel={member.name}
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: avatarPalette[hash % avatarPalette.length] }}
+      />
+    );
+  }
   return (
     <View
       accessibilityLabel={member.name}

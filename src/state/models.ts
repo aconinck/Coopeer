@@ -21,6 +21,7 @@ export const sportIds: SportId[] = ['soccer', 'pickleball', 'trails'];
 export interface Member {
   id: string;
   name: string;
+  photoUri?: string;
 }
 
 export const ME: Member = { id: 'me', name: 'You' };
@@ -81,7 +82,7 @@ export interface Club {
   payoutLast4?: string;
 }
 
-export type Repeat = 'never' | 'weekly' | 'weekdays';
+export type Repeat = 'never' | 'weekly' | 'weekdays' | 'custom';
 
 export interface NewClub {
   name: string;
@@ -104,6 +105,8 @@ export interface NewGame {
   end: Date;
   placeId: string;
   repeat: Repeat;
+  /** Days of the week for custom repeat (0=Sun … 6=Sat). */
+  customDays?: number[];
   /** null = all members. */
   inviteeIds: string[] | null;
 }

@@ -14,7 +14,6 @@ import { HeroButton } from '../../src/ui/Hero';
 import { PlaceResults } from '../../src/ui/PlaceResults';
 import { PlacePickerMap } from '../../src/map/PlacePickerMap';
 import { ChoiceChip, FieldLabel, OptionRow, OptionSheet, haptics } from '../../src/create/ui';
-import { SportTile } from '../../src/ui/StepFlow';
 
 /** Close the flow; opened from a deep link there is nothing to go back to. */
 const leave = () => (router.canGoBack() ? router.back() : router.replace('/map'));
@@ -55,6 +54,7 @@ export default function CreateGame() {
   const [startMin, setStartMin] = useState(19 * 60);
   const [endMin, setEndMin] = useState(20 * 60 + 30);
   const [repeat, setRepeat] = useState<Repeat>('never');
+  const [customDays, setCustomDays] = useState<number[]>([]);
   const [placeId, setPlaceId] = useState<string | null>(pitchPreview?.id ?? initialClub?.homePlaceId ?? null);
   const others = useMemo(() => (club?.members ?? []).filter((m) => m.id !== ME.id), [club]);
   const [invited, setInvited] = useState<Set<string>>(() => new Set(others.map((m) => m.id)));
@@ -87,6 +87,7 @@ export default function CreateGame() {
       end,
       placeId: finalPlace.id,
       repeat,
+      customDays: repeat === 'custom' ? customDays : undefined,
       inviteeIds: allInvited ? null : [...invited],
     });
     haptics.success();
@@ -123,9 +124,9 @@ export default function CreateGame() {
         {!pitch && !club && (
           <View style={styles.field}>
             <FieldLabel>Sport</FieldLabel>
-            <View style={styles.tiles}>
+            <View style={styles.chips}>
               {sportIds.map((id) => (
-                <SportTile key={id} icon={sports[id].icon} color={sports[id].color} title={sports[id].label} selected={openSport === id} onPress={() => setOpenSport(id)} />
+                <ChoiceChip key={id} title={sports[id].label} selected={openSport === id} onPress={() => { haptics.selection(); setOpenSport(id); }} />
               ))}
             </View>
           </View>
@@ -172,7 +173,8 @@ export default function CreateGame() {
           {([
             ['never', 'Never'] as [Repeat, string],
             ['weekly', `Every ${weekday(start)}`] as [Repeat, string],
-            ['weekdays', 'Every weekday'] as [Repeat, string],
+            ['weekdays', 'Weekdays'] as [Repeat, string],
+            ['custom', 'Custom'] as [Repeat, string],
           ]).map(([val, title]) => (
             <ChoiceChip
               key={val}
@@ -182,6 +184,27 @@ export default function CreateGame() {
             />
           ))}
         </View>
+        {repeat === 'custom' && (
+          <View style={styles.dayRow}>
+            {(['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const).map((letter, index) => {
+              const active = customDays.includes(index);
+              return (
+                <Pressable
+                  key={index}
+                  onPress={() => {
+                    haptics.selection();
+                    setCustomDays(active ? customDays.filter((d) => d !== index) : [...customDays, index]);
+                  }}
+                  style={[styles.dayChip, active && styles.dayChipActive]}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: active }}
+                >
+                  <Text style={[styles.dayChipText, active && styles.dayChipTextActive]}>{letter}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         <View style={styles.divider} />
         <Pressable
@@ -462,11 +485,15 @@ const styles = StyleSheet.create({
   underline: { height: 1, backgroundColor: colors.separator },
   underlineFocused: { height: 2, backgroundColor: colors.brand },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tiles: { flexDirection: 'row', gap: space.sm },
   pickerMap: { marginBottom: space.md },
   whenRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   chip: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: 10, borderWidth: 1, borderColor: colors.separator },
   repeatRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  dayRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  dayChip: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.fill, borderWidth: 1, borderColor: colors.separator },
+  dayChipActive: { backgroundColor: colors.label, borderColor: colors.label },
+  dayChipText: { fontSize: 13, fontWeight: '600', color: colors.label2 },
+  dayChipTextActive: { color: colors.white },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 },
   underlineText: { textDecorationLine: 'underline' },

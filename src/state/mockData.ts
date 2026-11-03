@@ -7,10 +7,23 @@ const ME: Member = { id: 'me', name: 'You' };
 // there is always something live, soon and later.
 
 const people: Member[] = [
-  'Alex Rivera', 'Jordan Lee', 'Sam Torres', 'Casey Wong', 'Taylor Brooks', 'Morgan Diaz',
-  'Riley Chen', 'Jamie Patel', 'Drew Carter', 'Avery Kim', 'Quinn Foster', 'Parker Hughes',
-  'Reese Morgan', 'Skyler Ward', 'Emerson Hale', 'Rowan Price',
-].map((name, index) => ({ id: `m${index}`, name }));
+  { id: 'm0',  name: 'Alex Rivera',    photoUri: 'https://i.pravatar.cc/150?img=3'  },
+  { id: 'm1',  name: 'Jordan Lee',     photoUri: 'https://i.pravatar.cc/150?img=5'  },
+  { id: 'm2',  name: 'Sam Torres',     photoUri: 'https://i.pravatar.cc/150?img=8'  },
+  { id: 'm3',  name: 'Casey Wong',     photoUri: 'https://i.pravatar.cc/150?img=11' },
+  { id: 'm4',  name: 'Taylor Brooks',  photoUri: 'https://i.pravatar.cc/150?img=16' },
+  { id: 'm5',  name: 'Morgan Diaz',    photoUri: 'https://i.pravatar.cc/150?img=21' },
+  { id: 'm6',  name: 'Riley Chen',     photoUri: 'https://i.pravatar.cc/150?img=25' },
+  { id: 'm7',  name: 'Jamie Patel',    photoUri: 'https://i.pravatar.cc/150?img=29' },
+  { id: 'm8',  name: 'Drew Carter',    photoUri: 'https://i.pravatar.cc/150?img=33' },
+  { id: 'm9',  name: 'Avery Kim',      photoUri: 'https://i.pravatar.cc/150?img=38' },
+  { id: 'm10', name: 'Quinn Foster',   photoUri: 'https://i.pravatar.cc/150?img=42' },
+  { id: 'm11', name: 'Parker Hughes',  photoUri: 'https://i.pravatar.cc/150?img=47' },
+  { id: 'm12', name: 'Reese Morgan',   photoUri: 'https://i.pravatar.cc/150?img=52' },
+  { id: 'm13', name: 'Skyler Ward',    photoUri: 'https://i.pravatar.cc/150?img=57' },
+  { id: 'm14', name: 'Emerson Hale',   photoUri: 'https://i.pravatar.cc/150?img=61' },
+  { id: 'm15', name: 'Rowan Price',    photoUri: 'https://i.pravatar.cc/150?img=65' },
+];
 
 const crowd = (count: number, offset = 0) =>
   Array.from({ length: count }, (_, i) => people[(i + offset) % people.length]);
@@ -30,45 +43,47 @@ export const places: Place[] = [
 export const clubs: Club[] = [
   {
     id: 'c1', name: 'Bentonville Strikers', sport: 'soccer', homePlaceId: 'p1', cadence: 'Every Fri · 8 PM',
-    about: 'Casual Friday night soccer. All skill levels welcome — we split teams fairly and grab drinks after.',
-    links: [{ title: 'Group chat', url: 'https://chat.whatsapp.com/strikers' }],
+    about: 'Casual Friday night soccer under the lights at Lawrence Plaza. All skill levels — we split teams on the spot and grab beers at Pedaler\'s Pub after. No cleats required.',
+    links: [{ title: 'WhatsApp group', url: 'https://chat.whatsapp.com/strikers' }],
     members: crowd(12), memberCount: 34, monthlyPrice: 29, level: 'Casual', code: '12355654', verified: true,
   },
   {
     id: 'c2', name: 'Sunday League', sport: 'soccer', homePlaceId: 'p2', cadence: 'Every Sun · 10 AM',
-    about: '11v11 on full-size fields. Intermediate to competitive. Referee every match.',
-    links: [], members: crowd(10, 3), memberCount: 48, monthlyPrice: 35, level: 'Competitive', code: '22446688', verified: true,
+    about: '11v11 full-size matches at Memorial Park. Intermediate to competitive level — a volunteer referee every game, standings tracked online. Bring both a light and a dark top.',
+    links: [{ title: 'League table', url: 'https://sundayleaguenwa.com/standings' }],
+    members: crowd(10, 3), memberCount: 48, monthlyPrice: 35, level: 'Competitive', code: '22446688', verified: true,
   },
   {
     id: 'c3', name: 'Osage Park Picklers', sport: 'pickleball', homePlaceId: 'p3', cadence: 'Every Sat · 9 AM',
-    about: 'Weekend round robins at the Osage Park courts. Beginners get paired with experienced players.',
+    about: 'Friendly Saturday round robins at the Osage courts. Beginners are paired with experienced players. All paddles provided — just show up.',
     links: [], members: crowd(8, 5), memberCount: 22, monthlyPrice: 24, level: 'All levels', code: '33557799', isNew: true,
   },
   {
     id: 'c4', name: 'Dink & Drive', sport: 'pickleball', homePlaceId: 'p2', cadence: 'Tue & Thu · 6 PM',
-    about: 'After-work doubles ladder. Rotating partners, ratings 3.0–4.0.',
+    about: 'After-work doubles ladder at Memorial Park. Rotating partners, ratings 3.0–4.0. Points tracked each session — full standings updated every Friday.',
     links: [{ title: 'Ladder standings', url: 'https://dinkanddrive.club/ladder' }],
     members: crowd(9, 7), memberCount: 26, monthlyPrice: 24, level: 'All levels', code: '44668800', verified: true,
   },
   {
     id: 'c5', name: 'Phillips Park FC', sport: 'soccer', homePlaceId: 'p5', cadence: 'Every Wed · 7 PM',
-    about: 'Midweek 7v7 under the lights.', links: [], members: crowd(10, 2), memberCount: 30,
-    monthlyPrice: 29, level: 'All levels', code: '55779911',
+    about: 'Wednesday 7v7 under the lights at Phillips Park. Good mix of ages and levels — come ready to run.',
+    links: [], members: crowd(10, 2), memberCount: 30, monthlyPrice: 29, level: 'All levels', code: '55779911',
   },
   {
     id: 'c6', name: 'Lunch Pickleball', sport: 'pickleball', homePlaceId: 'p6', cadence: 'Mon & Wed · 12 PM',
-    about: 'Indoor open play over lunch. Paddles available to borrow.', links: [], members: crowd(7, 9),
-    memberCount: 18, monthlyPrice: 18, level: 'Casual', code: '66881133',
+    about: 'Drop-in open play at the Community Center over lunch. Loaners paddles available, courts 3 & 4. Wrap up by 1:30.',
+    links: [], members: crowd(7, 9), memberCount: 18, monthlyPrice: 18, level: 'Casual', code: '66881133',
   },
   {
     id: 'c7', name: 'NWA Futsal', sport: 'soccer', homePlaceId: 'p6', cadence: 'Every Thu · 8 PM',
-    about: 'Indoor 5v5 futsal. Fast, technical, fun.', links: [], members: crowd(8, 11),
-    memberCount: 20, monthlyPrice: 32, level: 'Competitive', code: '77992244', isNew: true,
+    about: 'Indoor 5v5 futsal inside the Community Center. Fast, technical, and a lot of fun. Competitive vibe — bring your A-game.',
+    links: [], members: crowd(8, 11), memberCount: 20, monthlyPrice: 32, level: 'Competitive', code: '77992244', isNew: true,
   },
   {
     id: 'c8', name: 'Bentonville Trail Crew', sport: 'trails', homePlaceId: 'p7', cadence: 'Every Sat · 7 AM',
-    about: 'Sunrise group hikes and trail runs on the Crystal Bridges and Slaughter Pen loops. All paces, nobody gets left behind.',
-    links: [], members: crowd(9, 4), memberCount: 41, monthlyPrice: 12, level: 'All levels', code: '88003355', verified: true,
+    about: 'Sunrise group runs and hikes on the Crystal Bridges and Slaughter Pen loop trails. All paces welcome — no one gets left behind. Coffee at Onyx after most Saturdays.',
+    links: [{ title: 'Strava club', url: 'https://strava.com/clubs/bnvtrailcrew' }],
+    members: crowd(9, 4), memberCount: 41, monthlyPrice: 12, level: 'All levels', code: '88003355', verified: true,
   },
 ];
 
