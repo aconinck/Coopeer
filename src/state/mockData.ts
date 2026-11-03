@@ -23,6 +23,14 @@ const people: Member[] = [
   { id: 'm13', name: 'Skyler Ward',    photoUri: 'https://i.pravatar.cc/150?img=57' },
   { id: 'm14', name: 'Emerson Hale',   photoUri: 'https://i.pravatar.cc/150?img=61' },
   { id: 'm15', name: 'Rowan Price',    photoUri: 'https://i.pravatar.cc/150?img=65' },
+  { id: 'm16', name: 'Logan Stewart',  photoUri: 'https://i.pravatar.cc/150?img=10' },
+  { id: 'm17', name: 'Blake Cooper',   photoUri: 'https://i.pravatar.cc/150?img=15' },
+  { id: 'm18', name: 'Harper Reed',    photoUri: 'https://i.pravatar.cc/150?img=20' },
+  { id: 'm19', name: 'Finley Jordan',  photoUri: 'https://i.pravatar.cc/150?img=27' },
+  { id: 'm20', name: 'Sage Hernandez', photoUri: 'https://i.pravatar.cc/150?img=36' },
+  { id: 'm21', name: 'River Nguyen',   photoUri: 'https://i.pravatar.cc/150?img=44' },
+  { id: 'm22', name: 'Dallas Kim',     photoUri: 'https://i.pravatar.cc/150?img=49' },
+  { id: 'm23', name: 'Winter Blake',   photoUri: 'https://i.pravatar.cc/150?img=59' },
 ];
 
 const crowd = (count: number, offset = 0) =>
@@ -55,56 +63,66 @@ export const clubs: Club[] = [
     about: 'Casual Friday night soccer under the lights at Lawrence Plaza. All skill levels — we split teams on the spot and grab beers at Pedaler\'s Pub after. No cleats required.',
     links: [{ title: 'WhatsApp group', url: 'https://chat.whatsapp.com/strikers' }],
     members: crowd(12), memberCount: 34, monthlyPrice: 29, level: 'Casual', code: '12355654', verified: true,
+    photoUri: 'https://picsum.photos/seed/strikers-bnv/200/200',
   },
   {
     id: 'c2', name: 'Sunday League', sport: 'soccer', homePlaceId: 'p2', cadence: 'Every Sun · 10 AM',
     about: '11v11 full-size matches at Memorial Park. Intermediate to competitive level — a volunteer referee every game, standings tracked online. Bring both a light and a dark top.',
     links: [{ title: 'League table', url: 'https://sundayleaguenwa.com/standings' }],
     members: crowd(10, 3), memberCount: 48, monthlyPrice: 35, level: 'Competitive', code: '22446688', verified: true,
+    photoUri: 'https://picsum.photos/seed/sundayleague-nwa/200/200',
   },
   {
     id: 'c3', name: 'Osage Park Picklers', sport: 'pickleball', homePlaceId: 'p3', cadence: 'Every Sat · 9 AM',
     about: 'Friendly Saturday round robins at the Osage courts. Beginners are paired with experienced players. All paddles provided — just show up.',
     links: [], members: crowd(8, 5), memberCount: 22, monthlyPrice: 24, level: 'All levels', code: '33557799', isNew: true,
+    photoUri: 'https://picsum.photos/seed/osage-picklers/200/200',
   },
   {
     id: 'c4', name: 'Dink & Drive', sport: 'pickleball', homePlaceId: 'p2', cadence: 'Tue & Thu · 6 PM',
     about: 'After-work doubles ladder at Memorial Park. Rotating partners, ratings 3.0–4.0. Points tracked each session — full standings updated every Friday.',
     links: [{ title: 'Ladder standings', url: 'https://dinkanddrive.club/ladder' }],
     members: crowd(9, 7), memberCount: 26, monthlyPrice: 24, level: 'All levels', code: '44668800', verified: true,
+    photoUri: 'https://picsum.photos/seed/dink-drive-pb/200/200',
   },
   {
     id: 'c5', name: 'Phillips Park FC', sport: 'soccer', homePlaceId: 'p5', cadence: 'Every Wed · 7 PM',
     about: 'Wednesday 7v7 under the lights at Phillips Park. Good mix of ages and levels — come ready to run.',
     links: [], members: crowd(10, 2), memberCount: 30, monthlyPrice: 29, level: 'All levels', code: '55779911',
+    photoUri: 'https://picsum.photos/seed/phillips-fc/200/200',
   },
   {
     id: 'c6', name: 'Lunch Pickleball', sport: 'pickleball', homePlaceId: 'p6', cadence: 'Mon & Wed · 12 PM',
     about: 'Drop-in open play at the Community Center over lunch. Loaners paddles available, courts 3 & 4. Wrap up by 1:30.',
     links: [], members: crowd(7, 9), memberCount: 18, monthlyPrice: 18, level: 'Casual', code: '66881133',
+    photoUri: 'https://picsum.photos/seed/lunch-pickle/200/200',
   },
   {
     id: 'c7', name: 'NWA Futsal', sport: 'soccer', homePlaceId: 'p6', cadence: 'Every Thu · 8 PM',
     about: 'Indoor 5v5 futsal inside the Community Center. Fast, technical, and a lot of fun. Competitive vibe — bring your A-game.',
     links: [], members: crowd(8, 11), memberCount: 20, monthlyPrice: 32, level: 'Competitive', code: '77992244', isNew: true,
+    photoUri: 'https://picsum.photos/seed/nwa-futsal/200/200',
   },
   {
     id: 'c8', name: 'Bentonville Trail Crew', sport: 'trails', homePlaceId: 'p7', cadence: 'Every Sat · 7 AM',
     about: 'Sunrise group runs and hikes on the Crystal Bridges and Slaughter Pen loop trails. All paces welcome — no one gets left behind. Coffee at Onyx after most Saturdays.',
     links: [{ title: 'Strava club', url: 'https://strava.com/clubs/bnvtrailcrew' }],
     members: crowd(9, 4), memberCount: 41, monthlyPrice: 12, level: 'All levels', code: '88003355', verified: true,
+    photoUri: 'https://picsum.photos/seed/bnv-trail-crew/200/200',
   },
   {
     id: 'c9', name: 'Coler Riders', sport: 'trails', homePlaceId: 'p9', cadence: 'Every Sun · 8 AM',
     about: 'Sunday morning group rides at Coler Mountain Bike Preserve. We roll all skill levels — beginner-friendly flow trails to black diamonds. BYOB (bring your own bike). Code: 11111111',
     links: [],
     members: crowd(7, 6), memberCount: 19, monthlyPrice: 15, level: 'All levels', code: '11111111', isNew: true,
+    photoUri: 'https://picsum.photos/seed/coler-riders/200/200',
   },
   {
     id: 'c10', name: 'Enfield Picklers', sport: 'pickleball', homePlaceId: 'p14', cadence: 'Mon · Wed · Fri · 7 PM',
     about: 'Evening open play at Enfield Park Courts. Three courts, rotating partners, all paddles provided. Great vibe, great people. Code: 22222222',
     links: [],
     members: crowd(8, 10), memberCount: 24, monthlyPrice: 20, level: 'Casual', code: '22222222', isNew: true,
+    photoUri: 'https://picsum.photos/seed/enfield-picklers/200/200',
   },
 ];
 
