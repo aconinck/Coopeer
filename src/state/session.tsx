@@ -144,8 +144,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (!contact) return;
         const uid = pendingUid.current;
         const next: User = { id: uid ?? contact, phone: phone ?? undefined, email: email ?? undefined, ...profile, name: profile.name.trim() };
-        if (uid) await api.saveProfile(uid, phone ?? undefined, email ?? undefined, { ...profile, name: next.name });
-        else await mockAuth.remember(next);
+        if (uid) {
+          try {
+            await api.saveProfile(uid, phone ?? undefined, email ?? undefined, { ...profile, name: next.name });
+          } catch {
+            // Save failed (e.g. no session yet due to email confirmation); profile syncs on next sign-in
+          }
+        } else {
+          await mockAuth.remember(next);
+        }
         pendingPhone.current = null;
         pendingEmail.current = null;
         await signIn(next);

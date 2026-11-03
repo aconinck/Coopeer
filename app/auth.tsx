@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ScrollViewInstance } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ScrollViewInstance } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -512,23 +513,73 @@ function SportsStep({
   onDone: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
-  const toggle = (id: SportId) => setSelected(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
+  const allSelected = sportIds.every((id) => selected.includes(id));
+
+  const toggle = (id: SportId) =>
+    setSelected(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
+
+  const toggleAll = () => setSelected(allSelected ? [] : [...sportIds]);
+
+  const proceed = () => { setBusy(true); onDone().catch(() => setBusy(false)); };
+
   return (
     <StepScaffold
       title="Your sports"
-      subtitle="Tap all you play. We'll show these first."
+      subtitle="Pick all you play."
       progress={0.85}
       canContinue={selected.length > 0 && !busy}
       loading={busy}
-      onNext={() => { setBusy(true); onDone().catch(() => setBusy(false)); }}
+      onNext={proceed}
       onBack={onBack}
       direction={direction}
     >
-      <View style={styles.tiles}>
-        {sportIds.map((id) => (
-          <SportTile key={id} icon={sports[id].icon} color={sports[id].color} title={sports[id].label} selected={selected.includes(id)} onPress={() => toggle(id)} />
-        ))}
+      <View style={styles.pillRow}>
+        {/* All pill */}
+        <Pressable
+          style={({ pressed }) => [styles.pill, allSelected && styles.pillActive, pressed && { opacity: 0.7 }]}
+          onPress={() => { if (Platform.OS !== 'web') void Haptics.selectionAsync(); toggleAll(); }}
+          accessibilityRole="checkbox"
+          accessibilityLabel="All sports"
+          accessibilityState={{ checked: allSelected }}
+        >
+          <Text style={[styles.pillText, allSelected && styles.pillTextActive]}>All</Text>
+        </Pressable>
+
+        {/* Individual sport pills */}
+        {sportIds.map((id) => {
+          const active = selected.includes(id);
+          return (
+            <Pressable
+              key={id}
+              style={({ pressed }) => [
+                styles.pill,
+                active && { backgroundColor: sports[id].color, borderColor: sports[id].color },
+                pressed && { opacity: 0.7 },
+              ]}
+              onPress={() => { if (Platform.OS !== 'web') void Haptics.selectionAsync(); toggle(id); }}
+              accessibilityRole="checkbox"
+              accessibilityLabel={sports[id].label}
+              accessibilityState={{ checked: active }}
+            >
+              <MaterialCommunityIcons
+                name={sports[id].icon}
+                size={16}
+                color={active ? colors.white : colors.label2}
+              />
+              <Text style={[styles.pillText, active && styles.pillTextActive]}>{sports[id].label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
+
+      {/* Not sure yet */}
+      <Pressable
+        onPress={() => { setSelected([...sportIds]); proceed(); }}
+        style={({ pressed }) => [{ alignSelf: 'flex-start', marginTop: space.md }, pressed && { opacity: 0.5 }]}
+        accessibilityRole="button"
+      >
+        <Text style={[type.subhead, styles.link]}>Not sure yet — show me everything</Text>
+      </Pressable>
     </StepScaffold>
   );
 }
@@ -538,6 +589,34 @@ const styles = StyleSheet.create({
   muted: { color: colors.label3 },
   link: { color: colors.brand },
   tiles: { flexDirection: 'row', gap: space.sm },
+  pillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 100,
+    borderWidth: 1.5,
+    borderColor: colors.separator,
+    backgroundColor: colors.surface,
+  },
+  pillActive: {
+    backgroundColor: colors.label,
+    borderColor: colors.label,
+  },
+  pillText: {
+    ...type.subhead,
+    color: colors.label2,
+    fontWeight: '500',
+  },
+  pillTextActive: {
+    color: colors.white,
+  },
   kindToggle: {
     flexDirection: 'row',
     backgroundColor: colors.fill,
