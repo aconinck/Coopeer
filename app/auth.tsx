@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ScrollViewInstance } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -499,6 +500,17 @@ function AgeStep({
   );
 }
 
+const INTEREST_SPORTS: { id: string; label: string; icon: string }[] = [
+  { id: 'basketball', label: 'Basketball', icon: 'basketball' },
+  { id: 'tennis', label: 'Tennis', icon: 'tennis-ball' },
+  { id: 'volleyball', label: 'Volleyball', icon: 'volleyball' },
+  { id: 'running', label: 'Running', icon: 'run' },
+  { id: 'cycling', label: 'Cycling', icon: 'bike' },
+  { id: 'golf', label: 'Golf', icon: 'golf' },
+  { id: 'swimming', label: 'Swimming', icon: 'swim' },
+  { id: 'yoga', label: 'Yoga', icon: 'yoga' },
+];
+
 function SportsStep({
   selected,
   setSelected,
@@ -513,6 +525,7 @@ function SportsStep({
   onDone: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
+  const [interests, setInterests] = useState<string[]>([]);
   const allSelected = sportIds.every((id) => selected.includes(id));
 
   const toggle = (id: SportId) =>
@@ -520,11 +533,20 @@ function SportsStep({
 
   const toggleAll = () => setSelected(allSelected ? [] : [...sportIds]);
 
-  const proceed = () => { setBusy(true); onDone().catch(() => setBusy(false)); };
+  const toggleInterest = (id: string) =>
+    setInterests((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
+
+  const proceed = () => {
+    setBusy(true);
+    const save = interests.length > 0
+      ? AsyncStorage.setItem('coopeer.sport_interests', JSON.stringify(interests)).catch(() => {})
+      : Promise.resolve();
+    save.then(() => onDone()).catch(() => setBusy(false));
+  };
 
   return (
     <StepScaffold
-      title="Your sports"
+      title="Favorite sports"
       subtitle="Pick all you play."
       progress={0.85}
       canContinue={selected.length > 0 && !busy}
@@ -545,7 +567,7 @@ function SportsStep({
           <Text style={[styles.pillText, allSelected && styles.pillTextActive]}>All</Text>
         </Pressable>
 
-        {/* Individual sport pills */}
+        {/* Real sport pills */}
         {sportIds.map((id) => {
           const active = selected.includes(id);
           return (
@@ -570,16 +592,33 @@ function SportsStep({
             </Pressable>
           );
         })}
-      </View>
 
-      {/* Not sure yet */}
-      <Pressable
-        onPress={() => { setSelected([...sportIds]); proceed(); }}
-        style={({ pressed }) => [{ alignSelf: 'flex-start', marginTop: space.md }, pressed && { opacity: 0.5 }]}
-        accessibilityRole="button"
-      >
-        <Text style={[type.subhead, styles.link]}>Not sure yet — show me everything</Text>
-      </Pressable>
+        {/* Interest sport pills (data gathering) */}
+        {INTEREST_SPORTS.map(({ id, label, icon }) => {
+          const active = interests.includes(id);
+          return (
+            <Pressable
+              key={id}
+              style={({ pressed }) => [
+                styles.pill,
+                active && styles.pillActive,
+                pressed && { opacity: 0.7 },
+              ]}
+              onPress={() => { if (Platform.OS !== 'web') void Haptics.selectionAsync(); toggleInterest(id); }}
+              accessibilityRole="checkbox"
+              accessibilityLabel={label}
+              accessibilityState={{ checked: active }}
+            >
+              <MaterialCommunityIcons
+                name={icon as any}
+                size={16}
+                color={active ? colors.white : colors.label2}
+              />
+              <Text style={[styles.pillText, active && styles.pillTextActive]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </StepScaffold>
   );
 }
