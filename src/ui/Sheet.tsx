@@ -40,7 +40,7 @@ export const SPRING = spring.smooth;
 /** Fraction of the screen the sheet covers at its resting ("half") height. */
 export const SHEET_HALF = 0.52;
 /** Side margin (px) when the sheet is at the half detent — creates the floating card look. */
-const FLOAT_SIDE = 10;
+const FLOAT_SIDE = 16;
 /** Bottom gap (px above the safe area) when the sheet is at the half detent. */
 const FLOAT_BOTTOM = 14;
 
@@ -279,18 +279,17 @@ function SheetHost({
   );
 
   // The sheet grows/shrinks (height) between full and half, and only slides (translate) below half.
-  // Its bottom stays on the screen edge, so the action bar and scroll area are always reachable.
-  const sheetStyle = useAnimatedStyle(() => ({
-    height: sheetHeight - Math.min(y.value, half),
-    transform: [{ translateY: Math.max(0, y.value - half) }],
-  }));
-
-  // Floating margins — the sheet narrows inward and lifts off the bottom edge when at half.
-  const floatStyle = useAnimatedStyle(() => ({
-    flex: 1,
-    marginHorizontal: floatProgress.value * FLOAT_SIDE,
-    marginBottom: floatProgress.value * (insets.bottom + FLOAT_BOTTOM),
-  }));
+  // left/right animate to create the floating card narrowing effect at the half detent.
+  const sheetStyle = useAnimatedStyle(() => {
+    const side = floatProgress.value * FLOAT_SIDE;
+    return {
+      height: sheetHeight - Math.min(y.value, half),
+      transform: [{ translateY: Math.max(0, y.value - half) }],
+      left: side,
+      right: side,
+      marginBottom: floatProgress.value * (insets.bottom + FLOAT_BOTTOM),
+    };
+  });
 
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: interpolate(y.value, [full, half], [1, 0], Extrapolation.CLAMP),
@@ -341,19 +340,17 @@ function SheetHost({
         pointerEvents={isOpen ? 'box-none' : 'none'}
         style={[styles.sheet, sheetStyle]}
       >
-        <Animated.View style={floatStyle}>
-          <Glass radius={radius.sheet} style={styles.glass}>
-            <ChromeContext.Provider value={chrome}>
-              <DetailHost layout={SheetLayout} nav={nav}>
-                {top && (
-                  <Animated.View key={`${stack.length}-${top.kind}-${top.id}`} entering={entering} exiting={exiting} style={StyleSheet.absoluteFill}>
-                    <RouteContent route={top} />
-                  </Animated.View>
-                )}
-              </DetailHost>
-            </ChromeContext.Provider>
-          </Glass>
-        </Animated.View>
+        <Glass radius={radius.sheet} style={styles.glass}>
+          <ChromeContext.Provider value={chrome}>
+            <DetailHost layout={SheetLayout} nav={nav}>
+              {top && (
+                <Animated.View key={`${stack.length}-${top.kind}-${top.id}`} entering={entering} exiting={exiting} style={StyleSheet.absoluteFill}>
+                  <RouteContent route={top} />
+                </Animated.View>
+              )}
+            </DetailHost>
+          </ChromeContext.Provider>
+        </Glass>
       </Animated.View>
     </View>
   );
@@ -458,7 +455,7 @@ const styles = StyleSheet.create({
   // display:none so nothing inside can catch touches while a full-screen flow is on top.
   hidden: { display: 'none' },
   backdrop: { backgroundColor: colors.scrim },
-  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  sheet: { position: 'absolute', bottom: 0 },
   glass: { flex: 1, overflow: 'hidden', userSelect: 'none' } as never,
   header: { paddingHorizontal: space.lg, paddingBottom: space.xs },
   grabberHit: { alignItems: 'center', paddingTop: space.sm, paddingBottom: space.xs },

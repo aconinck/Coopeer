@@ -94,6 +94,18 @@ export const clubs: Club[] = [
     links: [{ title: 'Strava club', url: 'https://strava.com/clubs/bnvtrailcrew' }],
     members: crowd(9, 4), memberCount: 41, monthlyPrice: 12, level: 'All levels', code: '88003355', verified: true,
   },
+  {
+    id: 'c9', name: 'Coler Riders', sport: 'trails', homePlaceId: 'p9', cadence: 'Every Sun · 8 AM',
+    about: 'Sunday morning group rides at Coler Mountain Bike Preserve. We roll all skill levels — beginner-friendly flow trails to black diamonds. BYOB (bring your own bike). Code: 11111111',
+    links: [],
+    members: crowd(7, 6), memberCount: 19, monthlyPrice: 15, level: 'All levels', code: '11111111', isNew: true,
+  },
+  {
+    id: 'c10', name: 'Enfield Picklers', sport: 'pickleball', homePlaceId: 'p14', cadence: 'Mon · Wed · Fri · 7 PM',
+    about: 'Evening open play at Enfield Park Courts. Three courts, rotating partners, all paddles provided. Great vibe, great people. Code: 22222222',
+    links: [],
+    members: crowd(8, 10), memberCount: 24, monthlyPrice: 20, level: 'Casual', code: '22222222', isNew: true,
+  },
 ];
 
 export function makeGames(now: Date): Game[] {
@@ -172,6 +184,18 @@ export function makeGames(now: Date): Game[] {
     { ...base, id: 'g12', sport: 'trails', placeId: 'p8', clubId: null, title: 'Trail Run · Slaughter Pen',
       details: 'Easy 5K on the Slaughter Pen loop.', start: day(1, 7), end: day(1, 9), capacity: 12,
       going: crowd(4, 9), dropInPrice: 0, level: 'Casual' },
+    { ...base, id: 'g13', sport: 'trails', placeId: 'p9', clubId: 'c9', title: 'Coler Sunday Ride',
+      details: 'Group ride at Coler Preserve. All skill levels — flow trails for beginners, tech lines for the rippers.', start: day(2, 8), end: day(2, 10), capacity: 18,
+      going: crowd(6, 5), noResponse: crowd(4, 1), dropInPrice: 0, level: 'All levels' },
+    { ...base, id: 'g14', sport: 'soccer', placeId: 'p11', clubId: null, title: 'Pickup Soccer · Town Branch',
+      details: 'Open pickup at the Town Branch field. 5v5, teams picked on the spot.', start: at(240), end: at(360), capacity: 12,
+      going: crowd(5, 3), dropInPrice: 7, level: 'Casual', isNew: true },
+    { ...base, id: 'g15', sport: 'soccer', placeId: 'p12', clubId: null, title: 'Morning Pickup',
+      details: 'Casual 7v7 at Park Springs. Good turf, good vibes.', start: day(3, 9), end: day(3, 11), capacity: 14,
+      going: crowd(7, 8), noResponse: crowd(3, 2), dropInPrice: 7, level: 'All levels' },
+    { ...base, id: 'g16', sport: 'pickleball', placeId: 'p14', clubId: 'c10', title: 'Enfield Evening Play',
+      details: 'Open play at Enfield Park Courts. Three courts, rotating partners.', start: at(120), end: at(240), capacity: 12,
+      going: crowd(8, 11), dropInPrice: 7, level: 'Casual' },
   ];
 }
 

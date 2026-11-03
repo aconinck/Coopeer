@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ScrollViewInstance } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ScrollViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, radius, space, type } from '../src/constants/theme';
@@ -15,7 +16,7 @@ import { Segmented } from '../src/ui/Segmented';
 import { Glass } from '../src/ui/Glass';
 import { sportIds, sports, type SportId } from '../src/state/models';
 
-type Step = 'contact' | 'password' | 'welcomeBack' | 'newPassword' | 'name' | 'age' | 'sports';
+type Step = 'contact' | 'password' | 'welcomeBack' | 'newPassword' | 'name' | 'photo' | 'age' | 'sports';
 type Direction = 'forward' | 'back';
 
 const THIS_YEAR = new Date().getFullYear();
@@ -44,6 +45,7 @@ export default function Auth() {
   const [isExisting, setIsExisting] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [birthYear, setBirthYear] = useState(THIS_YEAR - 25);
   const [favorites, setFavorites] = useState<SportId[]>([]);
 
@@ -103,9 +105,11 @@ export default function Auth() {
         />
       );
     case 'name':
-      return <NameStep firstName={firstName} setFirstName={setFirstName} lastName={lastName} setLastName={setLastName} direction={direction} onBack={() => go('newPassword', 'back')} onDone={() => go('age')} />;
+      return <NameStep firstName={firstName} setFirstName={setFirstName} lastName={lastName} setLastName={setLastName} direction={direction} onBack={() => go('newPassword', 'back')} onDone={() => go('photo')} />;
+    case 'photo':
+      return <PhotoStep photoUri={photoUri} setPhotoUri={setPhotoUri} direction={direction} onBack={() => go('name', 'back')} onDone={() => go('age')} />;
     case 'age':
-      return <AgeStep birthYear={birthYear} setBirthYear={setBirthYear} direction={direction} onBack={() => go('name', 'back')} onDone={() => go('sports')} />;
+      return <AgeStep birthYear={birthYear} setBirthYear={setBirthYear} direction={direction} onBack={() => go('photo', 'back')} onDone={() => go('sports')} />;
     case 'sports':
       return (
         <SportsStep
@@ -401,6 +405,90 @@ function PasswordStrengthBar({ length }: { length: number }) {
 }
 
 // ─── Profile steps ────────────────────────────────────────────────────────────
+
+function PhotoStep({
+  photoUri,
+  setPhotoUri,
+  direction,
+  onBack,
+  onDone,
+}: {
+  photoUri: string | null;
+  setPhotoUri: (uri: string | null) => void;
+  direction: Direction;
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) setPhotoUri(result.assets[0].uri);
+  };
+
+  const takePhoto = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) return;
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) setPhotoUri(result.assets[0].uri);
+  };
+
+  return (
+    <StepScaffold
+      title="Add a photo"
+      subtitle="Help your teammates recognize you."
+      progress={0.5}
+      canContinue={true}
+      onNext={onDone}
+      onBack={onBack}
+      direction={direction}
+    >
+      <View style={styles.photoCenter}>
+        <Pressable
+          onPress={pickImage}
+          style={({ pressed }) => [styles.avatarWrap, pressed && { opacity: 0.8 }]}
+          accessibilityLabel="Choose photo"
+        >
+          {photoUri ? (
+            <Image source={{ uri: photoUri }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Ionicons name="person" size={52} color={colors.label3} />
+            </View>
+          )}
+          <View style={styles.avatarBadge}>
+            <Ionicons name="camera" size={18} color={colors.white} />
+          </View>
+        </Pressable>
+        <View style={styles.photoActions}>
+          {Platform.OS !== 'web' && (
+            <Pressable onPress={takePhoto} style={({ pressed }) => [styles.photoBtn, pressed && { opacity: 0.7 }]}>
+              <Ionicons name="camera-outline" size={18} color={colors.label} />
+              <Text style={[type.subhead, styles.photoBtnText]}>Take photo</Text>
+            </Pressable>
+          )}
+          <Pressable onPress={pickImage} style={({ pressed }) => [styles.photoBtn, pressed && { opacity: 0.7 }]}>
+            <Ionicons name="images-outline" size={18} color={colors.label} />
+            <Text style={[type.subhead, styles.photoBtnText]}>Choose from library</Text>
+          </Pressable>
+          {photoUri && (
+            <Pressable onPress={() => setPhotoUri(null)} style={({ pressed }) => [styles.photoBtn, pressed && { opacity: 0.7 }]}>
+              <Ionicons name="trash-outline" size={18} color={colors.live} />
+              <Text style={[type.subhead, { color: colors.live }]}>Remove</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+    </StepScaffold>
+  );
+}
 
 function NameStep({
   firstName,
@@ -805,6 +893,45 @@ const styles = StyleSheet.create({
     backgroundColor: colors.separator,
   },
   kindToggle: { marginBottom: space.lg },
+  photoCenter: { alignItems: 'center', gap: space.lg },
+  avatarWrap: { position: 'relative', width: 120, height: 120 },
+  avatar: { width: 120, height: 120, borderRadius: 60 },
+  avatarPlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.separator,
+  },
+  avatarBadge: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  photoActions: { gap: space.sm, alignItems: 'center' },
+  photoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.lg,
+    borderRadius: radius.full,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.separator,
+  },
+  photoBtnText: { color: colors.label },
   // ─── Wheel picker ───────────────────────────────────────────────────────────
   wheelOuter: {
     height: WHEEL_ITEM_H * WHEEL_VISIBLE,

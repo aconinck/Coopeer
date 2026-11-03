@@ -5,7 +5,7 @@ import { colors, space, type } from '../../src/constants/theme';
 import { useSession } from '../../src/state/session';
 import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
-import { PrimaryButton, SecondaryButton, TextButton } from '../../src/ui/Buttons';
+import { IconButton, PrimaryButton, SecondaryButton, TextButton } from '../../src/ui/Buttons';
 import { ClubCard, GamesVsClubsCard } from '../../src/ui/Rows';
 import { MoreMenu, Screen } from '../../src/ui/Screen';
 import { Rail, Section } from '../../src/ui/Layout';
@@ -27,16 +27,18 @@ export default function ClubsScreen() {
 
   return (
     <Screen variant="tab" title="Your Clubs" trailing={
-        <MoreMenu
-          icon="add"
-          label="Add a club"
-          items={[
-            { label: 'Create a club', icon: 'add-circle-outline', onPress: createClub },
-            { label: 'Scan QR code', icon: 'qr-code-outline', onPress: joinScan },
-            { label: 'Enter team code', icon: 'keypad-outline', onPress: joinCode },
-            { label: 'Find clubs on the map', icon: 'map-outline', onPress: () => router.navigate('/map') },
-          ]}
-        />
+        <View style={styles.headerButtons}>
+          <IconButton icon="qr-code-outline" label="Scan QR" onPress={joinScan} />
+          <MoreMenu
+            icon="add"
+            label="Add a club"
+            items={[
+              { label: 'Create a club', icon: 'add-circle-outline', onPress: createClub },
+              { label: 'Enter team code', icon: 'keypad-outline', onPress: joinCode },
+              { label: 'Find clubs on the map', icon: 'map-outline', onPress: () => router.navigate('/map') },
+            ]}
+          />
+        </View>
       }>
       {clubs.length > 0 ? (
         <Section first title="Your clubs" caption={`${clubs.length} ${clubs.length === 1 ? 'club' : 'clubs'} · games land in your schedule`}>
@@ -82,6 +84,7 @@ export default function ClubsScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   gridRow: { flexDirection: 'row', gap: space.md },
   empty: { alignItems: 'center', gap: space.md, paddingVertical: space.xl },
   emptyText: { color: colors.label2, textAlign: 'center', paddingHorizontal: space.lg },
