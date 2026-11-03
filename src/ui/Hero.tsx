@@ -207,6 +207,7 @@ export function HeroButton({
       accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
       onPress={onPress}
+      style={{ alignSelf: 'stretch' }}
       onPressIn={() => {
         scale.value = withTiming(pressScale, motionTiming.press);
       }}
@@ -227,13 +228,11 @@ const styles = StyleSheet.create({
   isolate: { isolation: 'isolate', overflow: 'hidden' },
   mono: { backgroundColor: colors.black, mixBlendMode: 'saturation' },
   cta: {
-    width: flow.ctaWidth,
-    maxWidth: '100%',
+    alignSelf: 'stretch',
     height: flow.ctaHeight,
     borderRadius: flow.ctaHeight / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'center',
   },
   ctaFilled: { backgroundColor: colors.brand },
 });

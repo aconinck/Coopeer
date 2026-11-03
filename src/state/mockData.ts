@@ -38,6 +38,15 @@ export const places: Place[] = [
   { id: 'p7', kind: 'trail', name: 'Crystal Bridges Trails', address: '600 Museum Way, Bentonville, AR', latitude: 36.3815, longitude: -94.2024, sports: ['trails'],
     photos: [{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Crystal_Bridges_Museum_of_American_Art_May_2017_03.jpg/960px-Crystal_Bridges_Museum_of_American_Art_May_2017_03.jpg', credit: 'Photo: Michael Barera · CC BY-SA 4.0' }] },
   { id: 'p8', kind: 'trail', name: 'Slaughter Pen Trails', address: 'Slaughter Pen Hollow, Bentonville, AR', latitude: 36.3862, longitude: -94.2165, sports: ['trails'] },
+  { id: 'p9', kind: 'trail', name: 'Coler Mountain Bike Preserve', address: 'SW 28th St, Bentonville, AR', latitude: 36.3873, longitude: -94.2372, sports: ['trails'],
+    photos: [{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/My_secret_spot_%28Unsplash%29.jpg/800px-My_secret_spot_%28Unsplash%29.jpg', credit: 'Jared Sluyter · CC0 1.0' }] },
+  { id: 'p10', kind: 'trail', name: 'Handcut Hollow MTB Park', address: 'Handcut Hollow, Bentonville, AR', latitude: 36.3962, longitude: -94.1768, sports: ['trails'] },
+  { id: 'p11', kind: 'park', name: 'Town Branch Park', address: '401 SE 5th St, Bentonville, AR', latitude: 36.3713, longitude: -94.2041, sports: ['soccer'],
+    photos: [{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/A_Street_Promenade_in_Bentonville%2C_Arkansas.jpg/800px-A_Street_Promenade_in_Bentonville%2C_Arkansas.jpg', credit: 'Brandonrush · CC0 1.0' }] },
+  { id: 'p12', kind: 'park', name: 'Park Springs Park', address: 'NW Orchard Dr, Bentonville, AR', latitude: 36.3856, longitude: -94.2114, sports: ['soccer', 'pickleball'],
+    photos: [{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Dave_Peel_Park_in_Bentonville%2C_AR.jpg/800px-Dave_Peel_Park_in_Bentonville%2C_AR.jpg', credit: 'Brandonrush · CC0 1.0' }] },
+  { id: 'p13', kind: 'park', name: 'Orchards Park', address: 'Orchards Park, Bentonville, AR', latitude: 36.3762, longitude: -94.1953, sports: ['soccer'] },
+  { id: 'p14', kind: 'courts', name: 'Enfield Park Courts', address: 'NW Enfield Rd, Bentonville, AR', latitude: 36.3869, longitude: -94.2007, sports: ['pickleball'] },
 ];
 
 export const clubs: Club[] = [
