@@ -250,6 +250,7 @@ export function TextButton({ title, onPress, disabled, color = colors.brand }: {
 const styles = StyleSheet.create({
   button: {
     flex: 1,
+    alignSelf: 'stretch',
     height: layout.control,
     borderRadius: radius.full,
     alignItems: 'center',

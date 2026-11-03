@@ -15,6 +15,7 @@ import Animated, {
   runOnJS,
   useAnimatedScrollHandler,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withSpring,
   type SharedValue,
@@ -38,6 +39,10 @@ import { sheetController } from './sheetController';
 export const SPRING = spring.smooth;
 /** Fraction of the screen the sheet covers at its resting ("half") height. */
 export const SHEET_HALF = 0.52;
+/** Side margin (px) when the sheet is at the half detent — creates the floating card look. */
+const FLOAT_SIDE = 10;
+/** Bottom gap (px above the safe area) when the sheet is at the half detent. */
+const FLOAT_BOTTOM = 14;
 
 type Direction = 'open' | 'forward' | 'back';
 
@@ -54,6 +59,8 @@ interface Chrome {
   pan: ReturnType<typeof Gesture.Pan>;
   bodyPan: ReturnType<typeof Gesture.Pan>;
   scrollY: SharedValue<number>;
+  /** 0 = fully expanded, 1 = half/floating. Drives the footer safe-area animation. */
+  floatProgress: SharedValue<number>;
   canGoBack: boolean;
   back: () => void;
   close: () => void;
@@ -266,12 +273,25 @@ function SheetHost({
     return { header, body };
   }, [closed, half, clear, beginClose, start, y, scrollY, pulling, pullFrom]);
 
+  // 0 = fully expanded, 1 = resting at half/floating position.
+  const floatProgress = useDerivedValue(() =>
+    interpolate(Math.min(y.value, half), [0, half], [0, 1], Extrapolation.CLAMP),
+  );
+
   // The sheet grows/shrinks (height) between full and half, and only slides (translate) below half.
   // Its bottom stays on the screen edge, so the action bar and scroll area are always reachable.
   const sheetStyle = useAnimatedStyle(() => ({
     height: sheetHeight - Math.min(y.value, half),
     transform: [{ translateY: Math.max(0, y.value - half) }],
   }));
+
+  // Floating margins — the sheet narrows inward and lifts off the bottom edge when at half.
+  const floatStyle = useAnimatedStyle(() => ({
+    flex: 1,
+    marginHorizontal: floatProgress.value * FLOAT_SIDE,
+    marginBottom: floatProgress.value * (insets.bottom + FLOAT_BOTTOM),
+  }));
+
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: interpolate(y.value, [full, half], [1, 0], Extrapolation.CLAMP),
   }));
@@ -292,6 +312,7 @@ function SheetHost({
       pan: pan.header,
       bodyPan: pan.body,
       scrollY,
+      floatProgress,
       canGoBack: stack.length > 1,
       back,
       close,
@@ -302,7 +323,7 @@ function SheetHost({
       y,
       half,
     }),
-    [pan, scrollY, stack.length, back, close, snapTo, atFull, y, half],
+    [pan, scrollY, floatProgress, stack.length, back, close, snapTo, atFull, y, half],
   );
 
   const top = stack[stack.length - 1];
@@ -320,17 +341,19 @@ function SheetHost({
         pointerEvents={isOpen ? 'box-none' : 'none'}
         style={[styles.sheet, sheetStyle]}
       >
-        <Glass radius={radius.sheet} style={styles.glass}>
-          <ChromeContext.Provider value={chrome}>
-            <DetailHost layout={SheetLayout} nav={nav}>
-              {top && (
-                <Animated.View key={`${stack.length}-${top.kind}-${top.id}`} entering={entering} exiting={exiting} style={StyleSheet.absoluteFill}>
-                  <RouteContent route={top} />
-                </Animated.View>
-              )}
-            </DetailHost>
-          </ChromeContext.Provider>
-        </Glass>
+        <Animated.View style={floatStyle}>
+          <Glass radius={radius.sheet} style={styles.glass}>
+            <ChromeContext.Provider value={chrome}>
+              <DetailHost layout={SheetLayout} nav={nav}>
+                {top && (
+                  <Animated.View key={`${stack.length}-${top.kind}-${top.id}`} entering={entering} exiting={exiting} style={StyleSheet.absoluteFill}>
+                    <RouteContent route={top} />
+                  </Animated.View>
+                )}
+              </DetailHost>
+            </ChromeContext.Provider>
+          </Glass>
+        </Animated.View>
       </Animated.View>
     </View>
   );
@@ -362,6 +385,16 @@ function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
   const onScroll = useAnimatedScrollHandler((e) => {
     if (scrollY) scrollY.value = e.contentOffset.y;
   });
+  // When the sheet floats (floatProgress → 1), the bottom gap absorbs the safe area,
+  // so footer only needs a small constant pad instead of insets.bottom.
+  const footerPadStyle = useAnimatedStyle(() => ({
+    paddingBottom: interpolate(
+      chrome?.floatProgress.value ?? 0,
+      [0, 1],
+      [Math.max(insets.bottom, space.sm), space.sm],
+      Extrapolation.CLAMP,
+    ),
+  }));
   // The scroll view keeps scrolling; the body pan only takes over when pulled down at the top.
   const bodyGesture = useMemo(
     () => (chrome ? Gesture.Simultaneous(Gesture.Native(), chrome.bodyPan) : Gesture.Native()),
@@ -407,7 +440,7 @@ function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
 
       {footer ? (
         <Animated.View
-          style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space.sm) }]}
+          style={[styles.footer, footerPadStyle]}
           onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
         >
           {footer}
