@@ -446,6 +446,7 @@ function NameStep({
         returnKeyType="next"
         onSubmitEditing={() => lastRef.current?.focus?.()}
       />
+      <View style={{ height: space.lg }} />
       <UnderlineField
         ref={lastRef}
         placeholder="Last name"
@@ -618,12 +619,22 @@ function SportsStep({
 }) {
   const [busy, setBusy] = useState(false);
   const [interests, setInterests] = useState<string[]>([]);
-  const allSelected = sportIds.every((id) => selected.includes(id));
+  const allSelected =
+    sportIds.every((id) => selected.includes(id)) &&
+    INTEREST_SPORTS.every(({ id }) => interests.includes(id));
 
   const toggle = (id: SportId) =>
     setSelected(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
 
-  const toggleAll = () => setSelected(allSelected ? [] : [...sportIds]);
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected([]);
+      setInterests([]);
+    } else {
+      setSelected([...sportIds]);
+      setInterests(INTEREST_SPORTS.map((s) => s.id));
+    }
+  };
 
   const toggleInterest = (id: string) =>
     setInterests((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
@@ -667,7 +678,7 @@ function SportsStep({
               key={id}
               style={({ pressed }) => [
                 styles.pill,
-                active && { backgroundColor: sports[id].color, borderColor: sports[id].color },
+                active && styles.pillActive,
                 pressed && { opacity: 0.7 },
               ]}
               onPress={() => { if (Platform.OS !== 'web') void Haptics.selectionAsync(); toggle(id); }}

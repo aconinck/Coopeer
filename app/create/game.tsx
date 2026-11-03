@@ -19,7 +19,7 @@ import { SportTile } from '../../src/ui/StepFlow';
 /** Close the flow; opened from a deep link there is nothing to go back to. */
 const leave = () => (router.canGoBack() ? router.back() : router.replace('/map'));
 
-type Picker = 'date' | 'start' | 'end' | 'repeat' | 'place' | 'members' | null;
+type Picker = 'date' | 'start' | 'end' | 'place' | 'members' | null;
 
 const OPEN = 'open';
 const DAY = 24 * 3600 * 1000;
@@ -74,7 +74,6 @@ export default function CreateGame() {
   const end = at(day, endMin);
   const valid = title.trim().length >= 2 && !!place && endMin > startMin && start.getTime() > Date.now();
   const allInvited = invited.size === others.length;
-  const repeatLabel = repeat === 'never' ? 'Repeat' : repeat === 'weekly' ? `Every ${weekday(start)}` : 'Every weekday';
 
   const create = () => {
     if (!valid || !place) return;
@@ -169,13 +168,20 @@ export default function CreateGame() {
           <Text style={styles.muted}>–</Text>
           <ValueChip text={label(endMin)} onPress={() => setPicker('end')} label="End time" />
         </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setPicker('repeat')}
-          style={({ pressed }) => [styles.repeat, pressed && styles.pressed]}
-        >
-          <Text style={[type.subhead, { fontWeight: '600' }]}>{repeatLabel}</Text>
-        </Pressable>
+        <View style={styles.repeatRow}>
+          {([
+            ['never', 'Never'] as [Repeat, string],
+            ['weekly', `Every ${weekday(start)}`] as [Repeat, string],
+            ['weekdays', 'Every weekday'] as [Repeat, string],
+          ]).map(([val, title]) => (
+            <ChoiceChip
+              key={val}
+              title={title}
+              selected={repeat === val}
+              onPress={() => { haptics.selection(); setRepeat(val); }}
+            />
+          ))}
+        </View>
 
         <View style={styles.divider} />
         <Pressable
@@ -266,7 +272,6 @@ export default function CreateGame() {
           ))}
       </OptionSheet>
 
-      <RepeatSheet visible={picker === 'repeat'} value={repeat} start={start} onClose={() => setPicker(null)} onApply={setRepeat} />
 
       <PlaceSheet
         visible={picker === 'place'}
@@ -304,55 +309,6 @@ function SheetTitle({ children }: { children: string }) {
   return <Text style={[type.headline, styles.sheetTitle]}>{children}</Text>;
 }
 
-/** Figma "Repetir": pick, then Apply. */
-function RepeatSheet({
-  visible,
-  value,
-  start,
-  onClose,
-  onApply,
-}: {
-  visible: boolean;
-  value: Repeat;
-  start: Date;
-  onClose: () => void;
-  onApply: (r: Repeat) => void;
-}) {
-  const [draft, setDraft] = useState<Repeat>(value);
-  const options: [Repeat, string][] = [
-    ['never', 'Never'],
-    ['weekly', `Every ${weekday(start)}`],
-    ['weekdays', 'Every weekday (Mon–Fri)'],
-  ];
-  return (
-    <OptionSheet
-      visible={visible}
-      onClose={onClose}
-      header={<SheetTitle>Repeat</SheetTitle>}
-      footer={
-        <HeroButton
-          title="Apply"
-          onPress={() => {
-            onApply(draft);
-            onClose();
-          }}
-        />
-      }
-    >
-      {options.map(([id, title]) => (
-        <OptionRow
-          key={id}
-          title={title}
-          selected={draft === id}
-          onPress={() => {
-            haptics.selection();
-            setDraft(id);
-          }}
-        />
-      ))}
-    </OptionSheet>
-  );
-}
 
 /** Figma "Adicionando endereço": search the places Coopeer knows. */
 function PlaceSheet({
@@ -510,7 +466,7 @@ const styles = StyleSheet.create({
   pickerMap: { marginBottom: space.md },
   whenRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   chip: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: 10, borderWidth: 1, borderColor: colors.separator },
-  repeat: { height: 36, borderRadius: radius.tile, backgroundColor: colors.fill, alignItems: 'center', justifyContent: 'center' },
+  repeatRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 },
   underlineText: { textDecorationLine: 'underline' },
