@@ -159,7 +159,7 @@ export function StepNextButton({
       accessibilityLabel="Continue"
       accessibilityState={{ disabled: !enabled, busy: !!loading }}
       disabled={!enabled || loading || success}
-      onPress={onPress}
+      onPress={() => { Keyboard.dismiss(); onPress(); }}
       onPressIn={() => {
         scale.value = withTiming(pressScale, timing.press);
       }}
