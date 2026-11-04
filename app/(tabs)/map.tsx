@@ -85,10 +85,14 @@ export default function MapScreen() {
   const [creating, setCreating] = useState(false);
   const drawerTourRef = useTourTarget('drawer');
   const createTourRef = useTourTarget('create');
-  // Close the menu first; web needs the sheet gone before the next screen takes focus.
+  // Close the menu first, then open the appropriate flow.
   const createThen = (path: '/create/game' | '/create/club') => {
     setCreating(false);
-    setTimeout(() => router.push(path === '/create/game' && sport ? `/create/game?sport=${sport}` : path), 250);
+    if (path === '/create/game') {
+      open.createGame(sport ?? undefined);
+    } else {
+      setTimeout(() => router.push('/create/club'), 250);
+    }
   };
 
   // Whatever the sheet shows, highlight its place on the map and glide the camera to it.

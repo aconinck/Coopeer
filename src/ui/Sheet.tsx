@@ -22,6 +22,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, radius, space, type } from '../constants/theme';
 import { spring } from '../constants/motion';
 import { AttendeesDetail } from '../details/AttendeesDetail';
+import { CreateGameDetail } from '../details/CreateGameDetail';
 import { PlayerDetail } from '../details/PlayerDetail';
 import { ME } from '../state/models';
 import { ClubDetail } from '../details/ClubDetail';
@@ -85,10 +86,13 @@ export function SheetProvider({ children }: { children: ReactNode }) {
   const [openToken, setOpenToken] = useState(0);
   const [closing, setClosing] = useState(false);
 
+  const [openFull, setOpenFull] = useState(false);
+
   const open = useCallback((route: SheetRoute) => {
     setDirection('open');
     setClosing(false);
     setStack([route]);
+    setOpenFull(route.kind === 'create-game');
     setOpenToken((n) => n + 1);
   }, []);
   const push = useCallback((route: SheetRoute) => {
@@ -118,6 +122,7 @@ export function SheetProvider({ children }: { children: ReactNode }) {
         stack={stack}
         direction={direction}
         openToken={openToken}
+        openFull={openFull}
         open={open}
         push={push}
         back={back}
@@ -132,6 +137,7 @@ function SheetHost({
   stack,
   direction,
   openToken,
+  openFull,
   open,
   push,
   back,
@@ -141,6 +147,7 @@ function SheetHost({
   stack: SheetRoute[];
   direction: Direction;
   openToken: number;
+  openFull: boolean;
   open: (route: SheetRoute) => void;
   push: (route: SheetRoute) => void;
   back: () => void;
@@ -183,14 +190,17 @@ function SheetHost({
     return () => sheetController.register(null);
   }, [open, close]);
 
-  // Every new open rises to half height (or stays where it is if already open).
+  // Every new open rises to half height (or full for create-game).
   useEffect(() => {
     if (openToken === 0) return;
-    if (y.value > half) {
+    if (openFull) {
+      y.value = withSpring(full, SPRING);
+      setAtFull(true);
+    } else if (y.value > half) {
       y.value = withSpring(half, SPRING);
       setAtFull(false);
     }
-  }, [openToken, half, y]);
+  }, [openToken, half, y, openFull, full]);
 
   useEffect(() => {
     if (!isOpen || Platform.OS === 'web') return;
@@ -354,7 +364,7 @@ function SheetHost({
           <ChromeContext.Provider value={chrome}>
             <DetailHost layout={SheetLayout} nav={nav}>
               {top && (
-                <Animated.View key={`${stack.length}-${top.kind}-${top.id}`} entering={entering} exiting={exiting} style={StyleSheet.absoluteFill}>
+                <Animated.View key={`${stack.length}-${top.kind}-${'id' in top ? top.id : top.kind}`} entering={entering} exiting={exiting} style={StyleSheet.absoluteFill}>
                   <RouteContent route={top} />
                 </Animated.View>
               )}
@@ -380,6 +390,8 @@ function RouteContent({ route }: { route: SheetRoute }) {
       return <PlayerDetail id={route.id} />;
     case 'pitch':
       return <PitchDetail id={route.id} />;
+    case 'create-game':
+      return <CreateGameDetail sport={route.sport} pitch={route.pitch} club={route.club} />;
   }
 }
 

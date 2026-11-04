@@ -20,7 +20,8 @@ export type SheetRoute =
   | { kind: 'club'; id: string }
   | { kind: 'attendees'; id: string }
   | { kind: 'player'; id: string }
-  | { kind: 'pitch'; id: string };
+  | { kind: 'pitch'; id: string }
+  | { kind: 'create-game'; sport?: string; pitch?: string; club?: string };
 
 export interface DetailNav {
   place: (id: string) => void;

@@ -13,4 +13,6 @@ export const open = {
     sheetController.close();
     router.push(`/club/${id}`);
   },
+  createGame: (sport?: string, pitch?: string, club?: string) =>
+    sheetController.open({ kind: 'create-game', sport, pitch, club }),
 };
