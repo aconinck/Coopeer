@@ -15,18 +15,9 @@ import { gameStatus, sports, type Club, type Game, type PlaceKind, type Place, t
 import { time } from '../lib/format';
 import { placeKindIllustration } from './placeIllustrations';
 
-const kindBorderColor: Record<string, string> = {
-  park:   '#30B35A',
-  field:  '#1E8A3B',
-  courts: '#5B5BD6',
-  trail:  '#1F9D8B',
-  center: '#FF9500',
-};
-
 function PlaceIcon({ kind, selected }: { kind: PlaceKind; selected: boolean }) {
-  const borderColor = selected ? colors.brand : (kindBorderColor[kind as string] ?? colors.label3);
   return (
-    <View style={[styles.place, { borderColor }]}>
+    <View style={styles.place}>
       <Image
         source={placeKindIllustration[kind as keyof typeof placeKindIllustration]}
         style={styles.placeImage}
@@ -94,7 +85,6 @@ export function PlacePin({ summary, selected = false }: { summary: PlaceSummary;
   }));
 
   const tone = colors.brand;
-  const tailColor = selected ? colors.brand : (kindBorderColor[summary.place.kind] ?? colors.label3);
 
   return (
     <View style={styles.root}>
@@ -121,7 +111,6 @@ export function PlacePin({ summary, selected = false }: { summary: PlaceSummary;
         </View>
       )}
       <PlaceIcon kind={summary.place.kind} selected={selected} />
-      <View style={[styles.placeTail, { borderTopColor: tailColor }]} />
     </View>
   );
 }
@@ -162,27 +151,16 @@ const styles = StyleSheet.create({
     borderRightColor: 'transparent',
   },
   place: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 2,
     ...shadow.soft,
   },
   placeImage: { width: '100%', height: '100%' },
   placeOverlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.brand,
-    opacity: 0.18,
-  },
-  placeTail: {
-    width: 0,
-    height: 0,
-    marginTop: -1,
-    borderLeftWidth: 4,
-    borderRightWidth: 4,
-    borderTopWidth: 5,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
+    opacity: 0.22,
   },
 });

@@ -32,6 +32,7 @@ import { IconButton } from './Buttons';
 import { DetailHost, openPlayer, type DetailLayoutProps, type DetailNav, type SheetRoute } from './DetailLayout';
 import { Glass } from './Glass';
 import { sheetController } from './sheetController';
+import { sheetSwipeController } from './sheetSwipeController';
 
 /** Sheets glide without bounce; gestures hand their release velocity to this spring. */
 export const SPRING = spring.smooth;
@@ -66,6 +67,7 @@ interface Chrome {
   expand: () => void;
   y: SharedValue<number>;
   half: number;
+  atFull: boolean;
 }
 
 const ChromeContext = createContext<Chrome | null>(null);
@@ -319,6 +321,7 @@ function SheetHost({
       },
       y,
       half,
+      atFull,
     }),
     [pan, scrollY, floatProgress, stack.length, back, close, snapTo, atFull, y, half],
   );
@@ -405,11 +408,26 @@ function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
     [chrome],
   );
 
+  // Horizontal swipe on the header to navigate between nearby places (only when at half snap).
+  const floatProgress = chrome?.floatProgress;
+  const swipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-44, 44])
+        .failOffsetY([-12, 12])
+        .onEnd((e) => {
+          if (!floatProgress || floatProgress.value < 0.5) return;
+          if (e.velocityX < -400) runOnJS(sheetSwipeController.left)();
+          else if (e.velocityX > 400) runOnJS(sheetSwipeController.right)();
+        }),
+    [floatProgress],
+  );
+
   if (!chrome) return null;
 
   return (
     <View style={styles.flex}>
-      <GestureDetector gesture={chrome.pan}>
+      <GestureDetector gesture={Gesture.Simultaneous(chrome.pan, swipeGesture)}>
         <View collapsable={false} style={[styles.header, styles.noSelect]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Resize sheet" onPress={chrome.toggle} style={styles.grabberHit}>
             <View style={styles.grabber} />

@@ -1,11 +1,12 @@
-import { forwardRef, memo, useImperativeHandle, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
   interpolate,
   Extrapolation,
   runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withDecay,
