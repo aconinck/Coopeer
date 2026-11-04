@@ -1,13 +1,14 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, space, type } from '../constants/theme';
 import { DetailLayout, useDetailNav } from '../ui/DetailLayout';
 import { useStore } from '../state/store';
 import { openDirections } from '../lib/format';
 import { ActionBar, PrimaryButton } from '../ui/Buttons';
-import { SectionHeader, SportIcon } from '../ui/Display';
+import { SectionHeader } from '../ui/Display';
 import { ClubRow, GameRow } from '../ui/Rows';
 import { PlaceHero } from '../ui/PlaceHero';
 import { placeKinds, sports, type SportId } from '../state/models';
+import { sportSticker } from '../map/placeIllustrations';
 
 const listSports = (ids: SportId[]) => {
   const names = ids.map((id) => sports[id].label.toLowerCase());
@@ -52,14 +53,25 @@ export function PlaceDetail({ id }: { id: string }) {
       {place.sports.length > 0 && (
         <>
           <SectionHeader title="Sports here" caption={`Available here: ${listSports(place.sports)}.`} />
-          <View style={styles.sportRow}>
-            {place.sports.map((sport) => (
-              <View key={sport} style={styles.sportPill}>
-                <SportIcon sport={sport} size={26} />
-                <Text style={[type.subhead, { fontWeight: '600' }]}>{sports[sport].label}</Text>
-              </View>
-            ))}
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.stickerScroll}
+          >
+            {place.sports.map((sport) => {
+              const sticker = sportSticker[sport];
+              return (
+                <View key={sport} style={styles.stickerItem}>
+                  {sticker ? (
+                    <Image source={sticker} style={styles.stickerImage} resizeMode="contain" />
+                  ) : (
+                    <View style={styles.stickerPlaceholder} />
+                  )}
+                  <Text style={[type.footnote, styles.stickerLabel]}>{sports[sport].label}</Text>
+                </View>
+              );
+            })}
+          </ScrollView>
         </>
       )}
 
@@ -77,8 +89,13 @@ export function PlaceDetail({ id }: { id: string }) {
   );
 }
 
+const STICKER_SIZE = 92;
+
 const styles = StyleSheet.create({
   titleBlock: { gap: 2 },
-  sportRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  sportPill: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 6, paddingLeft: 6, paddingRight: space.md, borderRadius: radius.full, backgroundColor: colors.fill },
+  stickerScroll: { gap: space.md, paddingRight: space.lg },
+  stickerItem: { alignItems: 'center', gap: 6, width: STICKER_SIZE },
+  stickerImage: { width: STICKER_SIZE, height: STICKER_SIZE },
+  stickerPlaceholder: { width: STICKER_SIZE, height: STICKER_SIZE, borderRadius: radius.tile, backgroundColor: colors.fill },
+  stickerLabel: { color: colors.label2, fontWeight: '600', textAlign: 'center' },
 });
