@@ -15,10 +15,11 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
-import { colors, mapColors } from '../constants/theme';
+import { colors, mapColors, shadow } from '../constants/theme';
 import { spring } from '../constants/motion';
 import type { Place } from '../state/models';
 import { PlacePin, type PlaceSummary } from './PlacePin';
+import { placeKindIllustration } from './placeIllustrations';
 import { BENTONVILLE_CENTER, DEFAULT_SPAN, MAP_BOUNDS, RENDER, RENDER_HEIGHT, RENDER_WIDTH, project } from './projection';
 import { parks, pitches, WORLD, type Pitch } from './mapData';
 import { TileLayer } from './TileLayer';
@@ -50,9 +51,44 @@ interface StreetMapProps {
   onUserMove?: () => void;
   /** Where the OSM/CARTO credit sits (below any overlay on top of the map). */
   attributionTop?: number;
+  /** Tapping a cluster of overlapping pins — zoom in to separate them. */
+  onClusterPress?: (places: Place[]) => void;
 }
 
 const CAMERA_SPRING = spring.camera;
+
+type ClusterEntry = {
+  summaries: PlaceSummary[];
+  centroid: { x: number; y: number };
+  key: string;
+};
+
+const CLUSTER_THRESHOLD = 52;
+
+function computeClusters(summaries: PlaceSummary[], scale: number): ClusterEntry[] {
+  if (summaries.length === 0) return [];
+  const pts = summaries.map((s) => ({ s, pt: project(s.place.latitude, s.place.longitude) }));
+  const used = new Set<number>();
+  const result: ClusterEntry[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    if (used.has(i)) continue;
+    const members = [i];
+    used.add(i);
+    for (let j = i + 1; j < pts.length; j++) {
+      if (used.has(j)) continue;
+      const dx = (pts[i].pt.x - pts[j].pt.x) * scale;
+      const dy = (pts[i].pt.y - pts[j].pt.y) * scale;
+      if (Math.sqrt(dx * dx + dy * dy) < CLUSTER_THRESHOLD) {
+        members.push(j);
+        used.add(j);
+      }
+    }
+    const cx = members.reduce((acc, idx) => acc + pts[idx].pt.x, 0) / members.length;
+    const cy = members.reduce((acc, idx) => acc + pts[idx].pt.y, 0) / members.length;
+    result.push({ summaries: members.map((idx) => pts[idx].s), centroid: { x: cx, y: cy }, key: pts[members[0]].s.place.id });
+  }
+  return result;
+}
 
 /**
  * Apple Maps–like grayscale map of Bentonville drawn in SVG (same look on iOS, Android, web).
@@ -60,7 +96,7 @@ const CAMERA_SPRING = spring.camera;
  * fade in as you zoom. Soccer fields and pickleball courts are drawn as small illustrations.
  */
 export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function StreetMap(
-  { summaries, selectedId, onSelect, onBackgroundPress, onPitchPress, selectedPitchId = null, userLocation = null, onUserMove, attributionTop = 4 },
+  { summaries, selectedId, onSelect, onBackgroundPress, onPitchPress, selectedPitchId = null, userLocation = null, onUserMove, attributionTop = 4, onClusterPress },
   ref,
 ) {
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -81,6 +117,27 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
   const focalX = useSharedValue(0);
   const focalY = useSharedValue(0);
   const ready = useSharedValue(0);
+
+  const [clusters, setClusters] = useState<ClusterEntry[]>([]);
+  const latestSummaries = useRef(summaries);
+  const recompute = useCallback((s: number) => {
+    setClusters(computeClusters(latestSummaries.current, s));
+  }, []);
+
+  useEffect(() => {
+    latestSummaries.current = summaries;
+    recompute(scale.value);
+  }, [summaries, recompute]);
+
+  useAnimatedReaction(
+    () => scale.value,
+    (newScale, oldScale) => {
+      if (oldScale === null || Math.abs(newScale - oldScale) / Math.max(Math.abs(oldScale), 0.001) > 0.08) {
+        runOnJS(recompute)(newScale);
+      }
+    },
+    [recompute],
+  );
 
   const centerOn = (point: { x: number; y: number }, s: number, centerY: number, animate: boolean) => {
     const nextX = size.width / 2 - point.x * s;
@@ -143,6 +200,7 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
       tx.value = width / 2 - BENTONVILLE_CENTER.x * s;
       ty.value = height * 0.42 - BENTONVILLE_CENTER.y * s;
       ready.value = 1;
+      recompute(s);
     }
   };
 
@@ -273,20 +331,33 @@ export const StreetMap = forwardRef<StreetMapHandle, StreetMapProps>(function St
 
       <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
         {width > 0 &&
-          summaries.map((summary, index) => (
-            <Marker
-              key={summary.place.id}
-              summary={summary}
-              index={index}
-              selected={summary.place.id === selectedId}
-              dimmed={selectedId !== null && summary.place.id !== selectedId}
-              scale={scale}
-              tx={tx}
-              ty={ty}
-              baseScale={baseScale}
-              onPress={() => onSelect(summary.place)}
-            />
-          ))}
+          clusters.map((cluster, index) =>
+            cluster.summaries.length === 1 ? (
+              <Marker
+                key={cluster.key}
+                summary={cluster.summaries[0]}
+                index={index}
+                selected={cluster.summaries[0].place.id === selectedId}
+                dimmed={selectedId !== null && cluster.summaries[0].place.id !== selectedId}
+                scale={scale}
+                tx={tx}
+                ty={ty}
+                baseScale={baseScale}
+                onPress={() => onSelect(cluster.summaries[0].place)}
+              />
+            ) : (
+              <ClusterMarker
+                key={cluster.key}
+                cluster={cluster}
+                selected={cluster.summaries.some((s) => s.place.id === selectedId)}
+                dimmed={selectedId !== null && cluster.summaries.every((s) => s.place.id !== selectedId)}
+                scale={scale}
+                tx={tx}
+                ty={ty}
+                onPress={() => onClusterPress?.(cluster.summaries.map((s) => s.place))}
+              />
+            ),
+          )}
       </View>
 
       {width > 0 && userLocation && (
@@ -442,6 +513,69 @@ function Marker({
   );
 }
 
+function ClusterMarker({
+  cluster,
+  selected,
+  dimmed,
+  scale,
+  tx,
+  ty,
+  onPress,
+}: {
+  cluster: ClusterEntry;
+  selected: boolean;
+  dimmed: boolean;
+  scale: SharedValue<number>;
+  tx: SharedValue<number>;
+  ty: SharedValue<number>;
+  onPress: () => void;
+}) {
+  const { centroid, summaries } = cluster;
+  const pressed = useSharedValue(0);
+
+  const position = useAnimatedStyle(() => ({
+    transform: [{ translateX: centroid.x * scale.value + tx.value }, { translateY: centroid.y * scale.value + ty.value }],
+  }));
+
+  const pinStyle = useAnimatedStyle(() => ({
+    opacity: withSpring(dimmed ? 0.5 : 1, spring.smooth),
+    transform: [
+      { translateY: withSpring(selected ? -4 : 0, spring.smooth) },
+      { scale: withSpring((selected ? 1.1 : 1) * (1 - pressed.value * 0.04), pressed.value ? spring.quick : spring.smooth) },
+    ],
+  }));
+
+  const repr = summaries[0];
+  const illustration = placeKindIllustration[repr.place.kind as keyof typeof placeKindIllustration];
+
+  return (
+    <Animated.View pointerEvents="box-none" style={[styles.anchor, { zIndex: selected ? 3 : 1 }, position]}>
+      <View pointerEvents="box-none" style={styles.pinBox}>
+        <Animated.View entering={FadeIn.duration(260)}>
+          <Animated.View style={pinStyle}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${summaries.length} places`}
+              onPress={onPress}
+              onPressIn={() => { pressed.value = 1; }}
+              onPressOut={() => { pressed.value = 0; }}
+              hitSlop={8}
+            >
+              <View style={styles.clusterWrap}>
+                <Image source={illustration} style={styles.clusterImage} resizeMode="cover" />
+                {selected && <View style={[StyleSheet.absoluteFill, styles.placeOverlay]} />}
+                <View style={styles.clusterBadge}>
+                  <Text style={styles.clusterCount}>{summaries.length}</Text>
+                </View>
+              </View>
+            </Pressable>
+          </Animated.View>
+        </Animated.View>
+      </View>
+    </Animated.View>
+  );
+}
+
 const PIN_BOX = 240;
 
 const styles = StyleSheet.create({
@@ -478,5 +612,38 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: mapColors.pinName,
     opacity: 0.5,
+  },
+  clusterWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...shadow.soft,
+  },
+  clusterImage: { width: '100%', height: '100%' },
+  placeOverlay: {
+    backgroundColor: colors.brand,
+    opacity: 0.22,
+  },
+  clusterBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.white,
+    ...shadow.soft,
+  },
+  clusterCount: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.white,
+    fontVariant: ['tabular-nums'],
   },
 });

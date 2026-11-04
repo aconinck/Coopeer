@@ -34,6 +34,7 @@ import { ClubCard, GameRow } from '../../src/ui/Rows';
 import { useTabBarSpace } from '../../src/ui/Screen';
 import { SHEET_HALF, useSheet } from '../../src/ui/Sheet';
 import { sheetController } from '../../src/ui/sheetController';
+import { sheetSwipeController } from '../../src/ui/sheetSwipeController';
 
 const DRAWER_SPRING = spring.smooth;
 const CLUB_CARD_WIDTH = 176;
@@ -186,6 +187,32 @@ export default function MapScreen() {
     open.place(place.id);
   };
 
+  const handleClusterPress = (places: Place[]) => {
+    setFollowing(false);
+    map.current?.fit(places, insets.top + TOP_BAR_HEIGHT + space.lg, height - tabBarSpace - 170);
+  };
+
+  // Register left/right swipe callbacks on the half-sheet header.
+  // Sorted by longitude so swiping right → east, left → west.
+  useEffect(() => {
+    if (!selectedPlaceId) {
+      sheetSwipeController.register();
+      return;
+    }
+    const sorted = summaries.slice().sort((a, b) => a.place.longitude - b.place.longitude);
+    const idx = sorted.findIndex((s) => s.place.id === selectedPlaceId);
+    if (idx === -1) {
+      sheetSwipeController.register();
+      return;
+    }
+    const prev = idx > 0 ? sorted[idx - 1].place : null;
+    const next = idx < sorted.length - 1 ? sorted[idx + 1].place : null;
+    sheetSwipeController.register(
+      next ? () => { setExpanded(false); open.place(next.id); } : undefined,
+      prev ? () => { setExpanded(false); open.place(prev.id); } : undefined,
+    );
+  }, [selectedPlaceId, summaries]);
+
   // The drawer slides down while the detail sheet is open OR the create sheet is open.
   const creatingAnim = useSharedValue(0);
   useEffect(() => {
@@ -246,6 +273,7 @@ export default function MapScreen() {
           if (sheet.isOpen) sheetController.close();
           else setExpanded(false);
         }}
+        onClusterPress={handleClusterPress}
       />
 
       <View style={[styles.topBar, { top: insets.top + space.sm }]} pointerEvents="box-none">
