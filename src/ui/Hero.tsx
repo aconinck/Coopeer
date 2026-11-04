@@ -106,14 +106,14 @@ function HeroShade({ shadeFrom }: { shadeFrom: number }) {
 }
 
 export const heroVideo = {
-  source: require('../../assets/video/hero.mp4') as VideoSource,
-  poster: require('../../assets/video/hero.jpg') as ImageSourcePropType,
-};
-
-// Sign-up "Welcome": a pickup match, shown in black and white (Mixkit free license).
-export const doneVideo = {
   source: require('../../assets/video/match.mp4') as VideoSource,
   poster: require('../../assets/video/match.jpg') as ImageSourcePropType,
+};
+
+// Sign-up "Welcome": trick shot close-up, shown in black and white (Mixkit free license).
+export const doneVideo = {
+  source: require('../../assets/video/hero.mp4') as VideoSource,
+  poster: require('../../assets/video/hero.jpg') as ImageSourcePropType,
 };
 
 /**

@@ -23,7 +23,7 @@ export default function Welcome() {
   return (
     <View style={styles.root}>
       <StatusBar style={splash ? 'dark' : 'light'} />
-      <HeroVideo source={heroVideo.source} poster={heroVideo.poster} />
+      <HeroVideo source={heroVideo.source} poster={heroVideo.poster} mono />
 
       {!splash && (
         <View style={[styles.content, { paddingBottom: Math.max(insets.bottom, 34) + 45 }]}>
