@@ -249,6 +249,6 @@ const styles = StyleSheet.create({
     backgroundColor: flowColors.grabber,
     marginBottom: space.md,
   },
-  panelBody: { paddingHorizontal: space.sm, paddingBottom: space.md },
+  panelBody: { paddingBottom: space.md },
   panelFooter: { paddingHorizontal: space.lg, paddingTop: space.sm },
 });

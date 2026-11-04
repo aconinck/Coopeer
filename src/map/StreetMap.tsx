@@ -63,7 +63,8 @@ type ClusterEntry = {
   key: string;
 };
 
-const CLUSTER_THRESHOLD = 52;
+// Merge when centres are within half the pin width (56px) → >50% overlap
+const CLUSTER_THRESHOLD = 28;
 
 function computeClusters(summaries: PlaceSummary[], scale: number): ClusterEntry[] {
   if (summaries.length === 0) return [];
@@ -561,9 +562,11 @@ function ClusterMarker({
               onPressOut={() => { pressed.value = 0; }}
               hitSlop={8}
             >
-              <View style={styles.clusterWrap}>
-                <Image source={illustration} style={styles.clusterImage} resizeMode="cover" />
-                {selected && <View style={[StyleSheet.absoluteFill, styles.placeOverlay]} />}
+              <View style={styles.clusterContainer}>
+                <View style={styles.clusterWrap}>
+                  <Image source={illustration} style={styles.clusterImage} resizeMode="cover" />
+                  {selected && <View style={[StyleSheet.absoluteFill, styles.placeOverlay]} />}
+                </View>
                 <View style={styles.clusterBadge}>
                   <Text style={styles.clusterCount}>{summaries.length}</Text>
                 </View>
@@ -613,6 +616,10 @@ const styles = StyleSheet.create({
     color: mapColors.pinName,
     opacity: 0.5,
   },
+  clusterContainer: {
+    width: 56,
+    height: 56,
+  },
   clusterWrap: {
     width: 56,
     height: 56,
@@ -627,11 +634,11 @@ const styles = StyleSheet.create({
   },
   clusterBadge: {
     position: 'absolute',
-    top: -6,
-    right: -6,
+    top: -7,
+    right: -7,
     minWidth: 20,
     height: 20,
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
     borderRadius: 10,
     backgroundColor: colors.brand,
     alignItems: 'center',
@@ -639,6 +646,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.white,
     ...shadow.soft,
+    zIndex: 10,
   },
   clusterCount: {
     fontSize: 11,

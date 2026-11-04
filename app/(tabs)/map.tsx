@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   },
   createNewPressed: { opacity: 0.8 },
   createNewText: { color: colors.brand, fontWeight: '600' },
-  createTitle: { paddingHorizontal: space.sm, paddingBottom: space.sm },
+  createTitle: { paddingHorizontal: space.lg, paddingTop: space.xs, paddingBottom: space.sm },
   listClip: { overflow: 'hidden' },
   list: { gap: space.md, paddingBottom: space.lg },
   rail: { gap: space.md },
