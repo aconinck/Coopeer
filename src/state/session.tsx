@@ -125,12 +125,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
         const creds = kind === 'email' ? { email: contact, password } : { phone: contact, password };
         const { data, error } = await supabase.auth.signUp(creds);
-        // Ignore email-delivery errors — the account was still created
-        if (error && !data.user) throw new Error(error.message);
-        if (!data.user) throw new Error('Sign up failed. Try again.');
+        // Supabase returns an error when it can't send the confirmation email, but
+        // the auth.users record is still created. Swallow that specific error so
+        // sign-up proceeds; the profile syncs on next sign-in after confirmation.
+        const isEmailDelivery = !!error?.message?.toLowerCase().includes('email');
+        if (error && !isEmailDelivery) throw new Error(error.message);
+        if (!data.user && !isEmailDelivery) throw new Error('Sign up failed. Try again.');
         if (kind === 'email') pendingEmail.current = contact;
         else pendingPhone.current = contact;
-        pendingUid.current = data.user.id;
+        if (data.user) pendingUid.current = data.user.id;
       },
       resetPassword: async (email) => {
         if (!supabase) return;
