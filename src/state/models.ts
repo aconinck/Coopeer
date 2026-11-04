@@ -138,11 +138,25 @@ export interface Game {
   isNew?: boolean;
 }
 
+export type CardBrand = 'visa' | 'mastercard' | 'amex' | 'discover' | 'applepay' | 'googlepay';
+
+export interface PaymentMethod {
+  id: string;
+  brand: CardBrand;
+  /** Absent for Apple Pay / Google Pay */
+  last4?: string;
+  expMonth?: number;
+  expYear?: number;
+  isDefault: boolean;
+}
+
 export interface Payment {
   id: string;
   clubName: string;
+  clubId: string;
   amount: number;
-  method: string;
+  /** References PaymentMethod.id */
+  methodId: string;
 }
 
 /** What the player wants to do first; decides where sign-up lands them. */

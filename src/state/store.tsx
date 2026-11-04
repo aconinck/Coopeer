@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ME, gameStatus, type Club, type Game, type NewClub, type NewGame, type Payment, type Place, type RSVP } from './models';
+import { ME, gameStatus, type Club, type Game, type NewClub, type NewGame, type Payment, type PaymentMethod, type Place, type RSVP } from './models';
 import { time, weekday } from '../lib/format';
 import { pitchById, pitchTitle, placeForPitch as nearestPlace, type Pitch } from '../map/pitches';
 import * as mock from './mockData';
@@ -17,6 +17,11 @@ interface Store {
   clubs: Club[];
   games: Game[];
   payments: Payment[];
+  paymentMethods: PaymentMethod[];
+  addPaymentMethod: (method: Omit<PaymentMethod, 'id' | 'isDefault'>) => void;
+  removePaymentMethod: (id: string) => void;
+  setDefaultPaymentMethod: (id: string) => void;
+  setMembershipMethod: (paymentId: string, methodId: string) => void;
   place: (id: string) => Place | undefined;
   club: (id: string) => Club | undefined;
   game: (id: string) => Game | undefined;
@@ -87,6 +92,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [games, setGames] = useState<Game[]>(() => (hasBackend ? [] : mock.makeGames(new Date())));
   const [memberships, setMemberships] = useState<Set<string>>(() => new Set(hasBackend ? [] : ['c1', 'c4']));
   const [payments, setPayments] = useState(mock.payments);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(mock.paymentMethods);
   // Writes run one after another so a new place lands before the game that uses it.
   const queue = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -309,12 +315,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return clubs.find((c) => c.code === code);
       },
       cancelPayment: (paymentId) => setPayments((list) => list.filter((p) => p.id !== paymentId)),
+      paymentMethods,
+      addPaymentMethod: (input) => {
+        const id = newId('mth');
+        const isFirst = paymentMethods.length === 0;
+        setPaymentMethods((list) => [...list, { ...input, id, isDefault: isFirst }]);
+      },
+      removePaymentMethod: (id) => {
+        setPaymentMethods((list) => {
+          const next = list.filter((m) => m.id !== id);
+          if (next.length > 0 && !next.some((m) => m.isDefault)) {
+            next[0] = { ...next[0], isDefault: true };
+          }
+          return next;
+        });
+      },
+      setDefaultPaymentMethod: (id) =>
+        setPaymentMethods((list) => list.map((m) => ({ ...m, isDefault: m.id === id }))),
+      setMembershipMethod: (paymentId, methodId) =>
+        setPayments((list) => list.map((p) => (p.id === paymentId ? { ...p, methodId } : p))),
       createClub,
       createGame,
       placeForPitch,
       addPlace,
     };
-  }, [now, places, clubs, games, payments, memberships, join, leave, setRSVP, createClub, createGame, placeForPitch, addPlace, uid, refresh]);
+  }, [now, places, clubs, games, payments, paymentMethods, memberships, join, leave, setRSVP, createClub, createGame, placeForPitch, addPlace, uid, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

@@ -1,4 +1,4 @@
-import type { Club, Game, Member, Payment, Place } from './models';
+import type { Club, Game, Member, Payment, PaymentMethod, Place } from './models';
 
 // Same as ME in models.ts (not imported: scripts/make_seed.ts loads this file straight in Node).
 const ME: Member = { id: 'me', name: 'You' };
@@ -217,7 +217,13 @@ export function makeGames(now: Date): Game[] {
   ];
 }
 
+export const paymentMethods: PaymentMethod[] = [
+  { id: 'mth1', brand: 'visa',       last4: '2315', expMonth: 9,  expYear: 2027, isDefault: true  },
+  { id: 'mth2', brand: 'mastercard', last4: '8821', expMonth: 3,  expYear: 2026, isDefault: false },
+  { id: 'mth3', brand: 'applepay',   isDefault: false },
+];
+
 export const payments: Payment[] = [
-  { id: 'pm1', clubName: 'Bentonville Strikers', amount: 29, method: 'Apple Pay' },
-  { id: 'pm2', clubName: 'Dink & Drive', amount: 24, method: 'Visa •••• 2315' },
+  { id: 'pm1', clubId: 'c1', clubName: 'Bentonville Strikers', amount: 29, methodId: 'mth1' },
+  { id: 'pm2', clubId: 'c5', clubName: 'Dink & Drive',         amount: 24, methodId: 'mth3' },
 ];
