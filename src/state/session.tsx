@@ -40,6 +40,7 @@ interface Session {
   resetPassword: (email: string) => Promise<void>;
   completeProfile: (profile: NewProfile) => Promise<void>;
   updateName: (name: string) => Promise<void>;
+  updatePhoto: (photoUri: string | null) => Promise<void>;
   signOut: () => void;
   /** Runs `action` now if signed in, otherwise opens login and runs it afterwards. */
   requireAuth: (action: () => void) => void;
@@ -164,6 +165,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (!user) return;
         const next = { ...user, name: name.trim() };
         if (hasBackend) await api.updateProfileName(user.id, next.name);
+        else await mockAuth.remember(next);
+        await signIn(next);
+      },
+      updatePhoto: async (photoUri) => {
+        if (!user) return;
+        const next = { ...user, photoUri: photoUri ?? undefined };
+        if (hasBackend) await api.updateProfilePhoto(user.id, photoUri);
         else await mockAuth.remember(next);
         await signIn(next);
       },

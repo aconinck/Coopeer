@@ -9,10 +9,92 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
+import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import { colors, radius, shadow, type } from '../constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { gameStatus, placeKinds, sports, type Club, type Game, type Place, type SportId } from '../state/models';
+import { gameStatus, sports, type Club, type Game, type PlaceKind, type Place, type SportId } from '../state/models';
 import { time } from '../lib/format';
+
+const kindStyle: Record<PlaceKind, { bg: string; border: string }> = {
+  park:   { bg: '#E8F5EC', border: '#30B35A' },
+  field:  { bg: '#D4EDD9', border: '#1E8A3B' },
+  courts: { bg: '#ECEAFC', border: '#5B5BD6' },
+  trail:  { bg: '#DFF2EF', border: '#1F9D8B' },
+  center: { bg: '#FFF0E0', border: '#FF9500' },
+};
+
+function PlaceIcon({ kind, selected }: { kind: PlaceKind; selected: boolean }) {
+  const { bg, border } = kindStyle[kind];
+  const iconColor = selected ? colors.brand : border;
+
+  if (kind === 'park') {
+    return (
+      <View style={[styles.place, { backgroundColor: bg, borderColor: selected ? colors.brand : border }]}>
+        <Svg width={20} height={20} viewBox="0 0 20 20">
+          <Circle cx="10" cy="8" r="5.5" fill={iconColor} />
+          <Rect x="8.5" y="12" width="3" height="4" rx="1" fill={selected ? colors.brand : '#8B5E3C'} />
+        </Svg>
+      </View>
+    );
+  }
+
+  if (kind === 'field') {
+    return (
+      <View style={[styles.place, { backgroundColor: bg, borderColor: selected ? colors.brand : border }]}>
+        <Svg width={20} height={20} viewBox="0 0 20 20">
+          {/* center circle */}
+          <Circle cx="10" cy="10" r="4.5" stroke="white" strokeWidth="1.5" fill="none" />
+          {/* center dot */}
+          <Circle cx="10" cy="10" r="1.2" fill="white" />
+          {/* center line */}
+          <Line x1="2" y1="10" x2="18" y2="10" stroke="white" strokeWidth="1.5" />
+        </Svg>
+      </View>
+    );
+  }
+
+  if (kind === 'courts') {
+    return (
+      <View style={[styles.place, { backgroundColor: bg, borderColor: selected ? colors.brand : border }]}>
+        <Svg width={20} height={20} viewBox="0 0 20 20">
+          {/* court outline */}
+          <Rect x="4" y="3" width="12" height="14" rx="1" stroke={iconColor} strokeWidth="1.5" fill="none" />
+          {/* net */}
+          <Line x1="4" y1="10" x2="16" y2="10" stroke={iconColor} strokeWidth="1.5" />
+          {/* kitchen lines */}
+          <Line x1="4" y1="6.5" x2="16" y2="6.5" stroke={iconColor} strokeWidth="1" opacity="0.5" />
+          <Line x1="4" y1="13.5" x2="16" y2="13.5" stroke={iconColor} strokeWidth="1" opacity="0.5" />
+        </Svg>
+      </View>
+    );
+  }
+
+  if (kind === 'trail') {
+    return (
+      <View style={[styles.place, { backgroundColor: bg, borderColor: selected ? colors.brand : border }]}>
+        <Svg width={20} height={20} viewBox="0 0 20 20">
+          {/* mountain peaks */}
+          <Path d="M2 17 L10 4 L18 17 Z" stroke={iconColor} strokeWidth="1.5" fill="none" strokeLinejoin="round" />
+          <Path d="M6 17 L12 9.5 L16 17" stroke={iconColor} strokeWidth="1" fill="none" strokeLinejoin="round" opacity="0.5" />
+        </Svg>
+      </View>
+    );
+  }
+
+  // center / community center
+  return (
+    <View style={[styles.place, { backgroundColor: bg, borderColor: selected ? colors.brand : border }]}>
+      <Svg width={20} height={20} viewBox="0 0 20 20">
+        {/* roof */}
+        <Path d="M2 8 L10 2 L18 8" stroke={iconColor} strokeWidth="1.5" fill="none" strokeLinejoin="round" />
+        {/* building */}
+        <Rect x="4" y="8" width="12" height="10" rx="0.5" stroke={iconColor} strokeWidth="1.5" fill="none" />
+        {/* door */}
+        <Rect x="8" y="13" width="4" height="5" rx="0.5" fill={iconColor} />
+      </Svg>
+    </View>
+  );
+}
 
 export interface PlaceSummary {
   place: Place;
@@ -70,8 +152,8 @@ export function PlacePin({ summary, selected = false }: { summary: PlaceSummary;
     transform: [{ scale: 1 + pulse.value * 0.9 }],
   }));
 
-  const kind = placeKinds[summary.place.kind];
   const tone = colors.brand;
+  const tailColor = selected ? colors.brand : kindStyle[summary.place.kind].border;
 
   return (
     <View style={styles.root}>
@@ -97,10 +179,8 @@ export function PlacePin({ summary, selected = false }: { summary: PlaceSummary;
           <View style={[styles.activityTail, { borderTopColor: tone }]} />
         </View>
       )}
-      <View style={[styles.place, selected && styles.placeSelected]}>
-        <MaterialCommunityIcons name={kind.icon} size={17} color={selected ? colors.brand : colors.label2} />
-      </View>
-      <View style={styles.placeTail} />
+      <PlaceIcon kind={summary.place.kind} selected={selected} />
+      <View style={[styles.placeTail, { borderTopColor: tailColor }]} />
     </View>
   );
 }
@@ -141,17 +221,14 @@ const styles = StyleSheet.create({
     borderRightColor: 'transparent',
   },
   place: {
-    width: 30,
-    height: 30,
-    borderRadius: radius.full,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
     borderWidth: 1.5,
-    borderColor: colors.separator,
     ...shadow.soft,
   },
-  placeSelected: { borderColor: colors.brand },
   placeTail: {
     width: 0,
     height: 0,
@@ -161,6 +238,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 5,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: colors.surface,
   },
 });

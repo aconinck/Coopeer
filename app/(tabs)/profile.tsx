@@ -1,3 +1,4 @@
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useReducedMotion } from 'react-native-reanimated';
 import { router } from 'expo-router';
@@ -17,6 +18,7 @@ import { Rail, Section } from '../../src/ui/Layout';
 import { ListGroup, ListRow } from '../../src/ui/ListGroup';
 import { ClubCard } from '../../src/ui/Rows';
 import { Screen } from '../../src/ui/Screen';
+import { PhotoPicker } from '../../src/ui/PhotoPicker';
 
 const HOME_TOWN = 'Bentonville, AR';
 
@@ -32,18 +34,46 @@ export default function ProfileScreen() {
   const player = usePlayer(user?.id ?? 'me');
   const stagger = (index: number) => (reduceMotion ? undefined : enter(index));
   const { stats } = player;
+  const [editingPhoto, setEditingPhoto] = React.useState(false);
+  const [pendingPhoto, setPendingPhoto] = React.useState<string | null>(null);
+
+  const savePhoto = async () => {
+    await session.updatePhoto(pendingPhoto);
+    setEditingPhoto(false);
+    setPendingPhoto(null);
+  };
 
   return (
     <Screen variant="tab" title="Profile">
+      {editingPhoto && (
+        <View style={styles.photoModal}>
+          <View style={styles.photoModalCard}>
+            <Text style={[type.headline, styles.photoModalTitle]}>Update photo</Text>
+            <PhotoPicker
+              photoUri={pendingPhoto ?? user?.photoUri ?? null}
+              onChange={setPendingPhoto}
+            />
+            <View style={styles.photoModalActions}>
+              <Pressable onPress={() => { setEditingPhoto(false); setPendingPhoto(null); }} style={styles.photoModalCancel}>
+                <Text style={[type.body, { color: colors.label2 }]}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={savePhoto} style={styles.photoModalSave}>
+                <Text style={[type.body, { color: colors.white, fontWeight: '600' }]}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
+
       <Animated.View entering={stagger(0)}>
         <View style={styles.identity}>
           <View style={styles.identityTop}>
-            <View>
+            <Pressable onPress={() => { setPendingPhoto(null); setEditingPhoto(true); }} style={{ position: 'relative' }}>
               {user && <Avatar member={{ id: user.id, name: user.name, photoUri: user.photoUri }} size={84} />}
-              <View style={styles.verified}>
-                <Ionicons name="checkmark" size={14} color={colors.white} />
+              <View style={styles.editPhotoBadge}>
+                <Ionicons name="camera" size={12} color={colors.white} />
               </View>
-            </View>
+            </Pressable>
             <View style={styles.identityText}>
               <Text style={type.title2} numberOfLines={1}>
                 {user?.name ?? 'Player'}
@@ -152,18 +182,52 @@ const styles = StyleSheet.create({
   identityTop: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
   identityText: { flex: 1, gap: 3 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  verified: {
+  editPhotoBadge: {
     position: 'absolute',
     right: 0,
     bottom: 0,
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: colors.verified,
+    backgroundColor: colors.brand,
     borderWidth: 3,
     borderColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  photoModal: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 100,
+    backgroundColor: colors.scrim,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: space.lg,
+  },
+  photoModalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: space.xl,
+    width: '100%',
+    maxWidth: 400,
+    gap: space.xl,
+    alignItems: 'center',
+  },
+  photoModalTitle: { alignSelf: 'flex-start' },
+  photoModalActions: { flexDirection: 'row', gap: space.md, alignSelf: 'stretch' },
+  photoModalCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 100,
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+  },
+  photoModalSave: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 100,
+    alignItems: 'center',
+    backgroundColor: colors.brand,
   },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator },
   statsBleed: { marginHorizontal: -space.md },

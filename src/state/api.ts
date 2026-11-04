@@ -297,6 +297,10 @@ export async function updateProfileName(uid: string, name: string) {
   fail((await db().from('profiles').update({ name }).eq('id', uid)).error);
 }
 
+export async function updateProfilePhoto(uid: string, photoUri: string | null) {
+  fail((await db().from('profiles').update({ photo_uri: photoUri }).eq('id', uid)).error);
+}
+
 // Player history -------------------------------------------------------------------
 
 export interface PlayerData {
