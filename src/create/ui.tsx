@@ -85,6 +85,7 @@ export function OptionRow({
   title,
   detail,
   selected,
+  destructive,
   onPress,
   leading,
   trailing,
@@ -92,6 +93,7 @@ export function OptionRow({
   title: string;
   detail?: string;
   selected?: boolean;
+  destructive?: boolean;
   onPress?: () => void;
   leading?: ReactNode;
   trailing?: ReactNode;
@@ -106,7 +108,7 @@ export function OptionRow({
     >
       {leading}
       <View style={styles.flex}>
-        <Text style={[type.body, selected && { color: colors.brand, fontWeight: '600' }]}>{title}</Text>
+        <Text style={[type.body, selected && { color: colors.brand, fontWeight: '600' }, destructive && { color: colors.live }]}>{title}</Text>
         {detail ? (
           <Text style={[type.footnote, { color: colors.label2 }]} numberOfLines={1}>
             {detail}
@@ -232,12 +234,11 @@ const styles = StyleSheet.create({
   backdrop: { backgroundColor: flowColors.backdrop },
   panel: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+    left: space.lg,
+    right: space.lg,
+    bottom: space.lg,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
+    borderRadius: radius.sheet,
     paddingTop: space.sm,
   },
   grabber: {

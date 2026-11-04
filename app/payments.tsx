@@ -6,7 +6,8 @@ import { useStore } from '../src/state/store';
 import { confirmDestructive, dollars } from '../src/lib/format';
 import { type CardBrand, type PaymentMethod } from '../src/state/models';
 import { SectionHeader, card } from '../src/ui/Display';
-import { Screen, MoreMenu } from '../src/ui/Screen';
+import { Screen } from '../src/ui/Screen';
+import { OptionRow, OptionSheet } from '../src/create/ui';
 
 // ─── Brand helpers ─────────────────────────────────────────────────────────────
 
@@ -264,6 +265,8 @@ export default function PaymentsScreen() {
   const store = useStore();
   const [showAdd, setShowAdd] = useState(false);
   const [changingPaymentId, setChangingPaymentId] = useState<string | null>(null);
+  const [menuMethodId, setMenuMethodId] = useState<string | null>(null);
+  const menuMethod = menuMethodId ? (store.paymentMethods.find((m) => m.id === menuMethodId) ?? null) : null;
 
   const changingPayment = changingPaymentId
     ? store.payments.find((p) => p.id === changingPaymentId)
@@ -279,10 +282,7 @@ export default function PaymentsScreen() {
       }
     >
       {/* ── Payment methods ─────────────────────────────────────── */}
-      <SectionHeader
-        title="Payment methods"
-        action={{ label: 'Add', onPress: () => setShowAdd(true) }}
-      />
+      <SectionHeader title="Payment methods" />
       {store.paymentMethods.length === 0 ? (
         <Pressable onPress={() => setShowAdd(true)} style={styles.emptyCard}>
           <Ionicons name="card-outline" size={28} color={colors.label3} />
@@ -304,25 +304,9 @@ export default function PaymentsScreen() {
                   <Text style={styles.defaultText}>Default</Text>
                 </View>
               )}
-              <MoreMenu
-                items={[
-                  ...(!m.isDefault
-                    ? [{ label: 'Set as default', icon: 'star-outline' as const, onPress: () => store.setDefaultPaymentMethod(m.id) }]
-                    : []),
-                  {
-                    label: 'Remove',
-                    icon: 'trash-outline' as const,
-                    destructive: true,
-                    onPress: () =>
-                      confirmDestructive(
-                        'Remove this card?',
-                        'Any memberships using it will need a new payment method.',
-                        'Remove',
-                        () => store.removePaymentMethod(m.id),
-                      ),
-                  },
-                ]}
-              />
+              <Pressable onPress={() => setMenuMethodId(m.id)} hitSlop={8} accessibilityLabel="Card options">
+                <Ionicons name="ellipsis-horizontal" size={20} color={colors.label2} />
+              </Pressable>
             </View>
           ))}
         </View>
@@ -391,6 +375,30 @@ export default function PaymentsScreen() {
           onClose={() => setChangingPaymentId(null)}
         />
       )}
+      <OptionSheet visible={!!menuMethodId} onClose={() => setMenuMethodId(null)}>
+        {menuMethod && !menuMethod.isDefault && (
+          <OptionRow
+            title="Set as default"
+            leading={<Ionicons name="star-outline" size={20} color={colors.label} />}
+            onPress={() => { store.setDefaultPaymentMethod(menuMethodId!); setMenuMethodId(null); }}
+          />
+        )}
+        <OptionRow
+          title="Remove"
+          destructive
+          leading={<Ionicons name="trash-outline" size={20} color={colors.live} />}
+          onPress={() => {
+            const id = menuMethodId!;
+            setMenuMethodId(null);
+            confirmDestructive(
+              'Remove this card?',
+              'Any memberships using it will need a new payment method.',
+              'Remove',
+              () => store.removePaymentMethod(id),
+            );
+          }}
+        />
+      </OptionSheet>
     </Screen>
   );
 }

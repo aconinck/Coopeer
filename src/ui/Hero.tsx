@@ -106,7 +106,7 @@ function HeroShade({ shadeFrom }: { shadeFrom: number }) {
 }
 
 export const heroVideo = {
-  source: require('../../assets/video/match.mp4') as VideoSource,
+  source: require('../../assets/video/videocover.mp4') as VideoSource,
   poster: require('../../assets/video/match.jpg') as ImageSourcePropType,
 };
 
