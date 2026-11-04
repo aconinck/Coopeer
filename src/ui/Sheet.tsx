@@ -7,10 +7,8 @@ import Animated, {
   Extrapolation,
   FadeIn,
   FadeOut,
-  SlideInLeft,
-  SlideInRight,
-  SlideOutLeft,
-  SlideOutRight,
+  SlideInUp,
+  SlideOutDown,
   interpolate,
   runOnJS,
   useAnimatedScrollHandler,
@@ -326,10 +324,19 @@ function SheetHost({
   );
 
   const top = stack[stack.length - 1];
-  const slide = (builder: typeof SlideInRight | typeof SlideInLeft) =>
-    builder.springify().mass(1).stiffness(SPRING.stiffness).damping(SPRING.damping);
-  const entering = direction === 'forward' ? slide(SlideInRight) : direction === 'back' ? slide(SlideInLeft) : FadeIn.duration(200);
-  const exiting = direction === 'forward' ? SlideOutLeft.duration(220) : direction === 'back' ? SlideOutRight.duration(220) : FadeOut.duration(120);
+  // Vertical Apple-modal feel: forward = new screen rises from below; back = current slides down.
+  const entering =
+    direction === 'forward'
+      ? SlideInUp.springify().mass(0.9).stiffness(300).damping(34)
+      : direction === 'back'
+      ? FadeIn.duration(160)
+      : FadeIn.duration(200);
+  const exiting =
+    direction === 'forward'
+      ? FadeOut.duration(140)
+      : direction === 'back'
+      ? SlideOutDown.springify().mass(0.9).stiffness(300).damping(34)
+      : FadeOut.duration(120);
 
   return (
     <View pointerEvents={hidden ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, styles.host, hidden && styles.hidden]} aria-hidden={hidden}>
