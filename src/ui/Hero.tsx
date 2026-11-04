@@ -142,10 +142,13 @@ export function HeroVideo({
 
   useEffect(() => {
     const sub = player.addListener('statusChange', ({ status }) => {
-      if (status === 'readyToPlay') setReady(true);
+      if (status === 'readyToPlay') {
+        setReady(true);
+        if (!reduceMotion) player.play();
+      }
     });
     return () => sub.remove();
-  }, [player]);
+  }, [player, reduceMotion]);
 
   // Only play while this screen is in front; the welcome screen stays mounted under the app.
   useFocusEffect(
