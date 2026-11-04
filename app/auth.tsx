@@ -118,7 +118,7 @@ export default function Auth() {
           direction={direction}
           onBack={() => go('age', 'back')}
           onDone={async () => {
-            await session.completeProfile({ name: `${firstName.trim()} ${lastName.trim()}`.trim(), birthYear, sports: favorites, goal: 'play' });
+            await session.completeProfile({ name: `${firstName.trim()} ${lastName.trim()}`.trim(), birthYear, sports: favorites, goal: 'play', photoUri: photoUri ?? undefined });
             await requestTour();
             session.finishAuth();
             router.replace(favorites[0] ? `/map?sport=${favorites[0]}` : '/map');

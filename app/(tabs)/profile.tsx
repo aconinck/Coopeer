@@ -39,7 +39,7 @@ export default function ProfileScreen() {
         <View style={styles.identity}>
           <View style={styles.identityTop}>
             <View>
-              {user && <Avatar member={{ id: user.id, name: user.name }} size={84} />}
+              {user && <Avatar member={{ id: user.id, name: user.name, photoUri: user.photoUri }} size={84} />}
               <View style={styles.verified}>
                 <Ionicons name="checkmark" size={14} color={colors.white} />
               </View>

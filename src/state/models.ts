@@ -157,10 +157,11 @@ export interface User {
   /** Favorite sports, picked at sign-up. Filters the map and feed first. */
   sports?: SportId[];
   goal?: Goal;
+  photoUri?: string;
 }
 
 /** Everything sign-up collects after the phone is verified. */
-export type NewProfile = Pick<User, 'name' | 'birthYear' | 'sports' | 'goal'>;
+export type NewProfile = Pick<User, 'name' | 'birthYear' | 'sports' | 'goal' | 'photoUri'>;
 
 export function gameStatus(game: Game, now = new Date()): GameStatus {
   if (game.end < now) return 'ended';

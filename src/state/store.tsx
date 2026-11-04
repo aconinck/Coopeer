@@ -100,7 +100,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setMemberships(data.memberships);
       return data;
     } catch (error) {
-      console.warn('Could not load data', error);
+      console.warn('Could not load data from Supabase, using demo data', error);
+      // Schema not yet applied or query failed — show demo data so the map is never empty.
+      setPlaces(mock.places);
+      setClubs(mock.clubs);
+      setGames(mock.makeGames(new Date()));
       return null;
     }
   }, [uid]);

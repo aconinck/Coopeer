@@ -276,11 +276,11 @@ export async function savePlace(uid: string, place: Place, isNew: boolean) {
 type ProfileFull = { id: string; phone: string | null; name: string; birth_year: number | null; sports: SportId[] | null; goal: User['goal'] | null };
 
 export async function loadProfile(uid: string, phone?: string, email?: string): Promise<User | null> {
-  const { data, error } = await db().from('profiles').select('id, phone, name, birth_year, sports, goal').eq('id', uid).maybeSingle();
+  const { data, error } = await db().from('profiles').select('id, phone, name, birth_year, sports, goal, photo_uri').eq('id', uid).maybeSingle();
   fail(error);
   if (!data) return null;
   const row = data as ProfileFull;
-  return { id: row.id, phone: row.phone ?? phone, email, name: row.name, birthYear: row.birth_year ?? undefined, sports: row.sports ?? [], goal: row.goal ?? undefined };
+  return { id: row.id, phone: row.phone ?? phone, email, name: row.name, birthYear: row.birth_year ?? undefined, sports: row.sports ?? [], goal: row.goal ?? undefined, photoUri: (row as unknown as { photo_uri: string | null }).photo_uri ?? undefined };
 }
 
 export async function saveProfile(uid: string, phone: string | undefined, email: string | undefined, profile: NewProfile) {
@@ -288,7 +288,7 @@ export async function saveProfile(uid: string, phone: string | undefined, email:
     (
       await db()
         .from('profiles')
-        .upsert({ id: uid, phone: phone ?? null, name: profile.name, birth_year: profile.birthYear ?? null, sports: profile.sports ?? [], goal: profile.goal ?? null })
+        .upsert({ id: uid, phone: phone ?? null, name: profile.name, birth_year: profile.birthYear ?? null, sports: profile.sports ?? [], goal: profile.goal ?? null, photo_uri: profile.photoUri ?? null })
     ).error,
   );
 }
