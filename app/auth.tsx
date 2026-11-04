@@ -43,8 +43,7 @@ export default function Auth() {
   const [contact, setContact] = useState('');
   const [phone, setPhone] = useState('');
   const [isExisting, setIsExisting] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [birthYear, setBirthYear] = useState(THIS_YEAR - 25);
   const [favorites, setFavorites] = useState<SportId[]>([]);
@@ -105,7 +104,7 @@ export default function Auth() {
         />
       );
     case 'name':
-      return <NameStep firstName={firstName} setFirstName={setFirstName} lastName={lastName} setLastName={setLastName} direction={direction} onBack={() => go('newPassword', 'back')} onDone={() => go('photo')} />;
+      return <NameStep fullName={fullName} setFullName={setFullName} direction={direction} onBack={() => go('newPassword', 'back')} onDone={() => go('photo')} />;
     case 'photo':
       return <PhotoStep photoUri={photoUri} setPhotoUri={setPhotoUri} direction={direction} onBack={() => go('name', 'back')} onDone={() => go('age')} />;
     case 'age':
@@ -118,7 +117,7 @@ export default function Auth() {
           direction={direction}
           onBack={() => go('age', 'back')}
           onDone={async () => {
-            await session.completeProfile({ name: `${firstName.trim()} ${lastName.trim()}`.trim(), birthYear, sports: favorites, goal: 'play', photoUri: photoUri ?? undefined });
+            await session.completeProfile({ name: fullName.trim(), birthYear, sports: favorites, goal: 'play', photoUri: photoUri ?? undefined });
             await requestTour();
             session.finishAuth();
             router.replace(favorites[0] ? `/map?sport=${favorites[0]}` : '/map');
@@ -435,24 +434,19 @@ function PhotoStep({
 }
 
 function NameStep({
-  firstName,
-  setFirstName,
-  lastName,
-  setLastName,
+  fullName,
+  setFullName,
   direction,
   onBack,
   onDone,
 }: {
-  firstName: string;
-  setFirstName: (v: string) => void;
-  lastName: string;
-  setLastName: (v: string) => void;
+  fullName: string;
+  setFullName: (v: string) => void;
   direction: Direction;
   onBack: () => void;
   onDone: () => void;
 }) {
-  const lastRef = useRef<any>(null);
-  const valid = firstName.trim().length >= 1 && lastName.trim().length >= 1;
+  const valid = fullName.trim().length >= 2;
   return (
     <StepScaffold
       title="Your name"
@@ -464,25 +458,12 @@ function NameStep({
       direction={direction}
     >
       <UnderlineField
-        placeholder="First name"
-        value={firstName}
-        onChangeText={setFirstName}
+        placeholder="Full name"
+        value={fullName}
+        onChangeText={setFullName}
         autoCapitalize="words"
-        textContentType="givenName"
-        autoComplete="given-name"
-        returnKeyType="next"
-        onSubmitEditing={() => lastRef.current?.focus?.()}
-      />
-      <View style={{ height: space.lg }} />
-      <UnderlineField
-        ref={lastRef}
-        placeholder="Last name"
-        value={lastName}
-        onChangeText={setLastName}
-        autoCapitalize="words"
-        textContentType="familyName"
-        autoComplete="family-name"
-        autoFocus={false}
+        textContentType="name"
+        autoComplete="name"
         returnKeyType="done"
         onSubmitEditing={() => valid && onDone()}
       />
