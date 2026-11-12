@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { colors, radius, type } from '../constants/theme';
@@ -7,7 +7,10 @@ import { haptic } from './Buttons';
 
 export interface SegmentOption<T extends string> {
   value: T;
+  /** Also the accessibility label when an icon is shown instead of the text. */
   label: string;
+  /** Icon-only segment: gets whether it is selected so it can tint itself. */
+  icon?: (selected: boolean) => ReactNode;
 }
 
 const PAD = 3;
@@ -54,15 +57,20 @@ export function Segmented<T extends string>({
             key={option.value}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
+            accessibilityLabel={option.label}
             onPress={() => {
               if (!selected) haptic.selection();
               onChange(option.value);
             }}
             style={[styles.segment, { height: h }]}
           >
-            <Text numberOfLines={1} style={[size === 'large' ? type.callout : type.subhead, { fontWeight: selected ? '600' : '500', color: selected ? colors.label : colors.label2 }]}>
-              {option.label}
-            </Text>
+            {option.icon ? (
+              option.icon(selected)
+            ) : (
+              <Text numberOfLines={1} style={[size === 'large' ? type.callout : type.subhead, { fontWeight: selected ? '600' : '500', color: selected ? colors.label : colors.label2 }]}>
+                {option.label}
+              </Text>
+            )}
           </Pressable>
         );
       })}

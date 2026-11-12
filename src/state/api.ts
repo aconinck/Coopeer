@@ -49,7 +49,7 @@ type GameRow = {
   is_canceled: boolean;
   host_id: string | null;
   created_at: string;
-  rsvps: { user_id: string; status: 'going' | 'declined' | 'invited'; updated_at: string; profiles: ProfileRow | null }[];
+  rsvps: { user_id: string; status: 'going' | 'maybe' | 'declined' | 'invited'; updated_at: string; profiles: ProfileRow | null }[];
 };
 
 export interface Snapshot {
@@ -120,7 +120,7 @@ export async function fetchAll(uid: string): Promise<Snapshot> {
         .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
         .map((r) => member(r.profiles, r.user_id));
     const mine = g.rsvps.find((r) => r.user_id === uid)?.status;
-    const myRSVP: RSVP = mine === 'going' || mine === 'declined' ? mine : 'none';
+    const myRSVP: RSVP = mine === 'going' || mine === 'maybe' || mine === 'declined' ? mine : 'none';
     return {
       id: g.id,
       sport: g.sport,
@@ -133,6 +133,7 @@ export async function fetchAll(uid: string): Promise<Snapshot> {
       capacity: g.capacity,
       going: by('going'),
       declined: by('declined'),
+      maybe: by('maybe'),
       noResponse: by('invited'),
       dropInPrice: Number(g.drop_in_price),
       level: g.level,

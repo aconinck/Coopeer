@@ -9,7 +9,7 @@ import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
 import { useCurrentLocation } from '../../src/lib/useLocation';
 import { sports, sportIds, type Club, type SportId } from '../../src/state/models';
-import { IconButton } from '../../src/ui/Buttons';
+import { ProfileButton } from '../../src/ui/ProfileButton';
 import { ClubCard, ClubRow } from '../../src/ui/Rows';
 import { Screen } from '../../src/ui/Screen';
 import { Rail, Section } from '../../src/ui/Layout';
@@ -181,7 +181,7 @@ export default function ClubsScreen() {
       variant="tab"
       title="Your Clubs"
       trailing={
-        <IconButton icon="add" label="Create a club" onPress={() => { session.requireAuth(createClub); }} />
+        <ProfileButton />
       }
     >
       {clubs.length > 0 ? (

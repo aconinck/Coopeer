@@ -1,24 +1,25 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useReducedMotion } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, space, type } from '../../src/constants/theme';
-import { enter } from '../../src/constants/motion';
-import { useSession } from '../../src/state/session';
-import { useStore } from '../../src/state/store';
-import { ME, type Club } from '../../src/state/models';
-import { confirmDestructive } from '../../src/lib/format';
-import { open } from '../../src/lib/nav';
-import { formatHours } from '../../src/state/profile';
-import { AchievementsSection, SportsSection } from '../../src/profile/PlayerSections';
-import { usePlayer } from '../../src/profile/usePlayer';
-import { Avatar, StatRow, card } from '../../src/ui/Display';
-import { Rail, Section } from '../../src/ui/Layout';
-import { ListGroup, ListRow } from '../../src/ui/ListGroup';
-import { ClubCard } from '../../src/ui/Rows';
-import { Screen } from '../../src/ui/Screen';
-import { PhotoPicker } from '../../src/ui/PhotoPicker';
+import { colors, space, type } from '../constants/theme';
+import { enter } from '../constants/motion';
+import { useSession } from '../state/session';
+import { useStore } from '../state/store';
+import { ME, type Club } from '../state/models';
+import { confirmDestructive } from '../lib/format';
+import { open } from '../lib/nav';
+import { formatHours } from '../state/profile';
+import { AchievementsSection, SportsSection } from '../profile/PlayerSections';
+import { usePlayer } from '../profile/usePlayer';
+import { Avatar, StatRow, glassCard } from '../ui/Display';
+import { Rail, Section } from '../ui/Layout';
+import { ListGroup, ListRow } from '../ui/ListGroup';
+import { ClubCard } from '../ui/Rows';
+import { DetailLayout } from '../ui/DetailLayout';
+import { sheetController } from '../ui/sheetController';
+import { PhotoPicker } from '../ui/PhotoPicker';
 
 const HOME_TOWN = 'Bentonville, AR';
 
@@ -26,7 +27,7 @@ const HOME_TOWN = 'Bentonville, AR';
  * Profile (Airbnb / AllTrails / Uber patterns): identity card with four numbers, your sports,
  * achievements, your clubs, then account settings. Every number is derived from games you played.
  */
-export default function ProfileScreen() {
+export function ProfileDetail() {
   const store = useStore();
   const session = useSession();
   const user = session.user;
@@ -34,6 +35,11 @@ export default function ProfileScreen() {
   const player = usePlayer(user?.id ?? 'me');
   const stagger = (index: number) => (reduceMotion ? undefined : enter(index));
   const { stats } = player;
+  // Leaving the sheet for a page: close it first, then navigate once it is gone.
+  const go = (path: Parameters<typeof router.push>[0]) => {
+    sheetController.close();
+    setTimeout(() => router.push(path), 250);
+  };
   const [editingPhoto, setEditingPhoto] = React.useState(false);
   const [pendingPhoto, setPendingPhoto] = React.useState<string | null>(null);
 
@@ -44,15 +50,12 @@ export default function ProfileScreen() {
   };
 
   return (
-    <Screen variant="tab" title="Profile">
-      {editingPhoto && (
+    <DetailLayout title="Profile">
+      <Modal transparent visible={editingPhoto} animationType="fade" onRequestClose={() => { setEditingPhoto(false); setPendingPhoto(null); }}>
         <View style={styles.photoModal}>
           <View style={styles.photoModalCard}>
             <Text style={[type.headline, styles.photoModalTitle]}>Update photo</Text>
-            <PhotoPicker
-              photoUri={pendingPhoto ?? user?.photoUri ?? null}
-              onChange={setPendingPhoto}
-            />
+            <PhotoPicker photoUri={pendingPhoto ?? user?.photoUri ?? null} onChange={setPendingPhoto} />
             <View style={styles.photoModalActions}>
               <Pressable onPress={() => { setEditingPhoto(false); setPendingPhoto(null); }} style={styles.photoModalCancel}>
                 <Text style={[type.body, { color: colors.label2 }]}>Cancel</Text>
@@ -63,13 +66,13 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
-      )}
+      </Modal>
 
       <Animated.View entering={stagger(0)}>
         <View style={styles.identity}>
           <View style={styles.identityTop}>
             <Pressable onPress={() => { setPendingPhoto(null); setEditingPhoto(true); }} style={{ position: 'relative' }}>
-              {user && <Avatar member={{ id: user.id, name: user.name, photoUri: user.photoUri }} size={84} />}
+              {user && <Avatar member={{ id: user.id, name: user.name, photoUri: user.photoUri }} size={84} silhouette />}
               <View style={styles.editPhotoBadge}>
                 <Ionicons name="camera" size={12} color={colors.white} />
               </View>
@@ -113,12 +116,12 @@ export default function ProfileScreen() {
 
       <Animated.View entering={stagger(4)}>
         <Section title="Account">
-          <ListGroup>
-            <ListRow icon="person-outline" title="Personal info" subtitle="Name, phone number" onPress={() => router.push('/personal-info')} />
-            <ListRow icon="card-outline" title="Payments" subtitle="Memberships and payment methods" onPress={() => router.push('/payments')} />
-            <ListRow icon="help-circle-outline" title="How Coopeer works" onPress={() => router.push('/how-it-works')} />
+          <ListGroup glass>
+            <ListRow icon="person-outline" title="Personal info" subtitle="Name, phone number" onPress={() => go('/personal-info')} />
+            <ListRow icon="card-outline" title="Payments" subtitle="Memberships and payment methods" onPress={() => go('/payments')} />
+            <ListRow icon="help-circle-outline" title="How Coopeer works" onPress={() => go('/how-it-works')} />
           </ListGroup>
-          <ListGroup>
+          <ListGroup glass>
             <ListRow
               icon="log-out-outline"
               title="Sign out"
@@ -128,7 +131,7 @@ export default function ProfileScreen() {
           </ListGroup>
         </Section>
       </Animated.View>
-    </Screen>
+    </DetailLayout>
   );
 }
 
@@ -139,8 +142,8 @@ function ClubsSection({ myClubs, uid }: { myClubs: Club[]; uid?: string }) {
 
   if (myClubs.length === 0) {
     return (
-      <Section title="Your clubs" action={{ label: 'See all', onPress: () => router.navigate('/clubs') }}>
-        <Pressable accessibilityRole="button" onPress={() => router.navigate('/map')} style={({ pressed }) => [styles.emptyClubs, pressed && { opacity: 0.7 }]}>
+      <Section title="Your clubs" action={{ label: 'See all', onPress: () => { sheetController.close(); router.navigate('/clubs'); } }}>
+        <Pressable accessibilityRole="button" onPress={() => { sheetController.close(); router.navigate('/map'); }} style={({ pressed }) => [styles.emptyClubs, pressed && { opacity: 0.7 }]}>
           <Ionicons name="people-outline" size={22} color={colors.label2} />
           <Text style={[type.subhead, styles.flex]}>You haven't joined a club yet. Find one on the map.</Text>
           <Ionicons name="chevron-forward" size={16} color={colors.label3} />
@@ -150,13 +153,13 @@ function ClubsSection({ myClubs, uid }: { myClubs: Club[]; uid?: string }) {
   }
 
   return (
-    <Section title="Your clubs" action={{ label: 'See all', onPress: () => router.navigate('/clubs') }}>
+    <Section title="Your clubs" action={{ label: 'See all', onPress: () => { sheetController.close(); router.navigate('/clubs'); } }}>
       {adminClubs.length > 0 && (
         <View style={styles.subGroup}>
           <Text style={[type.footnote, styles.subLabel]}>Managing</Text>
           <Rail snap={176}>
             {adminClubs.map((club) => (
-              <ClubCard key={club.id} club={club} width={176} onPress={() => open.clubPage(club.id)} />
+              <ClubCard key={club.id} club={club} width={176} glass onPress={() => open.clubPage(club.id)} />
             ))}
           </Rail>
         </View>
@@ -166,7 +169,7 @@ function ClubsSection({ myClubs, uid }: { myClubs: Club[]; uid?: string }) {
           {adminClubs.length > 0 && <Text style={[type.footnote, styles.subLabel]}>Member</Text>}
           <Rail snap={176}>
             {memberClubs.map((club) => (
-              <ClubCard key={club.id} club={club} width={176} onPress={() => open.clubPage(club.id)} />
+              <ClubCard key={club.id} club={club} width={176} glass onPress={() => open.clubPage(club.id)} />
             ))}
           </Rail>
         </View>
@@ -178,7 +181,7 @@ function ClubsSection({ myClubs, uid }: { myClubs: Club[]; uid?: string }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   muted: { color: colors.label2 },
-  identity: { ...card, padding: space.lg, gap: space.lg },
+  identity: { ...glassCard, padding: space.lg, gap: space.lg },
   identityTop: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
   identityText: { flex: 1, gap: 3 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -196,9 +199,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   photoModal: {
-    position: 'absolute',
-    inset: 0,
-    zIndex: 100,
+    flex: 1,
     backgroundColor: colors.scrim,
     alignItems: 'center',
     justifyContent: 'center',
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
   },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator },
   statsBleed: { marginHorizontal: -space.md },
-  emptyClubs: { ...card, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg },
+  emptyClubs: { ...glassCard, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg },
   subGroup: { gap: space.xs },
   subLabel: { color: colors.label2, paddingHorizontal: space.lg },
 });

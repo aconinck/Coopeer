@@ -23,6 +23,7 @@ const mockAuth = {
 
 const USER_KEY = 'session.user';
 const KNOWN_KEY = 'mock.knownUsers';
+const PENDING_PROFILE_KEY = 'profile.pending';
 
 export type ContactKind = 'email' | 'phone';
 
@@ -113,7 +114,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const creds = kind === 'email' ? { email: contact, password } : { phone: contact, password };
         const { data, error } = await supabase.auth.signInWithPassword(creds);
         if (error || !data.user) throw new Error('Incorrect password. Try again.');
-        const profile = await api.loadProfile(data.user.id, kind === 'phone' ? contact : undefined, kind === 'email' ? contact : undefined);
+        const phone = kind === 'phone' ? contact : undefined;
+        const email = kind === 'email' ? contact : undefined;
+        let profile = await api.loadProfile(data.user.id, phone, email);
+        if (!profile) {
+          // Sign-up finished before the first session existed (email confirmation), so the profile was not saved yet.
+          const stored = await AsyncStorage.getItem(PENDING_PROFILE_KEY);
+          const pending = stored ? (JSON.parse(stored) as { uid: string; profile: NewProfile }) : null;
+          if (pending?.uid === data.user.id) {
+            await api.saveProfile(data.user.id, phone, email, pending.profile);
+            await AsyncStorage.removeItem(PENDING_PROFILE_KEY);
+            profile = await api.loadProfile(data.user.id, phone, email);
+          }
+        }
         if (!profile) throw new Error('Account not found.');
         await signIn(profile);
       },
@@ -152,7 +165,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           try {
             await api.saveProfile(uid, phone ?? undefined, email ?? undefined, { ...profile, name: next.name });
           } catch {
-            // Save failed (e.g. no session yet due to email confirmation); profile syncs on next sign-in
+            // No session yet (email confirmation): keep the profile and save it on first sign-in.
+            await AsyncStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify({ uid, profile: { ...profile, name: next.name } }));
           }
         } else {
           await mockAuth.remember(next);

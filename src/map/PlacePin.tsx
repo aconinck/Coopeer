@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { useEffect, type ReactNode } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -9,21 +9,15 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { colors, radius, shadow, type } from '../constants/theme';
+import { colors, radius, shadow } from '../constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { gameStatus, sports, type Club, type Game, type PlaceKind, type Place, type SportId } from '../state/models';
-import { time } from '../lib/format';
-import { placeKindIllustration } from './placeIllustrations';
+import { gameStatus, placeKinds, sports, type Club, type Game, type PlaceKind, type Place, type SportId } from '../state/models';
 
-function PlaceIcon({ kind, selected }: { kind: PlaceKind; selected: boolean }) {
+export function PlaceIcon({ kind, selected, size = 40, icon }: { kind: PlaceKind; selected?: boolean; size?: number; icon?: ReactNode }) {
+  const info = placeKinds[kind];
   return (
-    <View style={styles.place}>
-      <Image
-        source={placeKindIllustration[kind as keyof typeof placeKindIllustration]}
-        style={styles.placeImage}
-        resizeMode="cover"
-      />
-      {selected && <View style={styles.placeOverlay} />}
+    <View style={[styles.place, { width: size, height: size, borderRadius: size / 2, backgroundColor: info.color }, selected && styles.placeSelected]}>
+      {icon ?? <MaterialCommunityIcons name={info.icon} size={size * 0.5} color={colors.white} />}
     </View>
   );
 }
@@ -52,26 +46,19 @@ export function summarize(place: Place, games: Game[], clubs: Club[], sport: Spo
   };
 }
 
-export function pinLabel(summary: PlaceSummary) {
-  const game = summary.live ?? summary.next;
-  if (!game) return null;
-  const extra = summary.games.filter((g) => g.id !== game.id && gameStatus(g, new Date()) !== 'later').length;
-  const base = summary.live ? 'LIVE' : time(game.start);
-  return extra > 0 ? `${base} +${extra}` : base;
-}
+const SWAP_MS = 3000;
 
 /**
- * A map marker has two layers that must never look alike:
- *  - the PLACE (park, field, courts, trail) is a calm, neutral badge that is always there;
- *  - ACTIVITY (a game live now or later today) is a loud pill that floats above it.
- * The tail tip is the bottom edge, so callers anchor it at the coordinate.
+ * A map marker is the PLACE (a colored circle with its kind icon, always there). When a game is live or
+ * later today, a small dot sits on its top-right corner (red + pulse for live, orange for later today) and
+ * the circle's icon swaps every 3 seconds between the park icon and the icon of the sport being played.
  */
 export function PlacePin({ summary, selected = false }: { summary: PlaceSummary; selected?: boolean }) {
   const isLive = !!summary.live;
   const activity = summary.live ?? summary.next;
-  const label = pinLabel(summary);
   const reduceMotion = useReducedMotion();
   const pulse = useSharedValue(0);
+  const swap = useSharedValue(0);
 
   useEffect(() => {
     if (!isLive || reduceMotion) return;
@@ -79,38 +66,47 @@ export function PlacePin({ summary, selected = false }: { summary: PlaceSummary;
     return () => cancelAnimation(pulse);
   }, [isLive, reduceMotion, pulse]);
 
-  const pulseStyle = useAnimatedStyle(() => ({
-    opacity: 0.4 * (1 - pulse.value),
-    transform: [{ scale: 1 + pulse.value * 0.9 }],
-  }));
+  useEffect(() => {
+    if (!activity || reduceMotion) {
+      swap.value = 0;
+      return;
+    }
+    let showSport = false;
+    const timer = setInterval(() => {
+      showSport = !showSport;
+      swap.value = withTiming(showSport ? 1 : 0, { duration: 320, easing: Easing.inOut(Easing.quad) });
+    }, SWAP_MS);
+    return () => clearInterval(timer);
+  }, [activity, reduceMotion, swap]);
 
-  const tone = colors.brand;
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: 0.45 * (1 - pulse.value),
+    transform: [{ scale: 1 + pulse.value * 1.1 }],
+  }));
+  const kindStyle = useAnimatedStyle(() => ({ opacity: 1 - swap.value, transform: [{ scale: 1 - swap.value * 0.35 }] }));
+  const sportStyle = useAnimatedStyle(() => ({ opacity: swap.value, transform: [{ scale: 0.65 + swap.value * 0.35 }] }));
+
+  const kind = placeKinds[summary.place.kind];
+  const icon = activity ? (
+    <View style={styles.iconStack}>
+      <Animated.View style={[styles.iconLayer, kindStyle]}>
+        <MaterialCommunityIcons name={kind.icon} size={20} color={colors.white} />
+      </Animated.View>
+      <Animated.View style={[styles.iconLayer, sportStyle]}>
+        <MaterialCommunityIcons name={sports[activity.sport].icon} size={20} color={colors.white} />
+      </Animated.View>
+    </View>
+  ) : undefined;
 
   return (
-    <View style={styles.root}>
-      {isLive && activity && (
-        <View style={styles.activityWrap} accessibilityLabel={`${sports[activity.sport].label} game live now`}>
-          <View style={styles.liveBox}>
-            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.pulse, pulseStyle]} />
-            <View style={styles.liveDot}>
-              <MaterialCommunityIcons name={sports[activity.sport].icon} size={15} color={colors.white} />
-            </View>
-          </View>
-          <View style={[styles.activityTail, { borderTopColor: colors.live }]} />
+    <View style={styles.root} accessibilityLabel={activity ? `${summary.place.name}, ${isLive ? 'game live now' : 'game today'}` : summary.place.name}>
+      <PlaceIcon kind={summary.place.kind} selected={selected} icon={icon} />
+      {activity && (
+        <View pointerEvents="none" style={styles.badgeBox}>
+          {isLive && <Animated.View style={[StyleSheet.absoluteFill, styles.pulse, pulseStyle]} />}
+          <View style={[styles.badge, { backgroundColor: isLive ? colors.live : colors.brand }]} />
         </View>
       )}
-      {!isLive && activity && label && (
-        <View style={styles.activityWrap}>
-          <View style={[styles.activity, { backgroundColor: tone }]}>
-            <MaterialCommunityIcons name={sports[activity.sport].icon} size={14} color={colors.white} />
-            <Text numberOfLines={1} style={[type.footnote, styles.activityLabel]}>
-              {label}
-            </Text>
-          </View>
-          <View style={[styles.activityTail, { borderTopColor: tone }]} />
-        </View>
-      )}
-      <PlaceIcon kind={summary.place.kind} selected={selected} />
     </View>
   );
 }
@@ -118,49 +114,16 @@ export function PlacePin({ summary, selected = false }: { summary: PlaceSummary;
 const styles = StyleSheet.create({
   root: { alignItems: 'center' },
   pulse: { borderRadius: radius.full, backgroundColor: colors.live },
-  liveBox: { width: 30, height: 30 },
-  liveDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  iconStack: { width: 20, height: 20 },
+  iconLayer: { position: 'absolute', left: 0, top: 0, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  badgeBox: { position: 'absolute', top: -3, right: -3, width: 16, height: 16 },
+  badge: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: colors.white, ...shadow.soft },
+  place: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.live,
     borderWidth: 2,
     borderColor: colors.white,
     ...shadow.soft,
   },
-  activityWrap: { alignItems: 'center', marginBottom: 4 },
-  activity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    height: 28,
-    paddingHorizontal: 10,
-    borderRadius: radius.full,
-    ...shadow.soft,
-  },
-  activityLabel: { color: colors.white, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  activityTail: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 5,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-  },
-  place: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...shadow.soft,
-  },
-  placeImage: { width: '100%', height: '100%' },
-  placeOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: colors.brand,
-    opacity: 0.22,
-  },
+  placeSelected: { borderWidth: 3, shadowOpacity: 0.3, shadowRadius: 10 },
 });

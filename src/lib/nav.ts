@@ -9,6 +9,7 @@ export const open = {
   game: (id: string) => sheetController.open({ kind: 'game', id }),
   club: (id: string) => sheetController.open({ kind: 'club', id }),
   player: (id: string) => openPlayer(id),
+  profile: () => sheetController.open({ kind: 'profile' }),
   clubPage: (id: string) => {
     sheetController.close();
     router.push(`/club/${id}`);

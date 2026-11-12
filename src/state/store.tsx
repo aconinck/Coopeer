@@ -3,6 +3,7 @@ import { ME, gameStatus, type Club, type Game, type NewClub, type NewGame, type 
 import { time, weekday } from '../lib/format';
 import { pitchById, pitchTitle, placeForPitch as nearestPlace, type Pitch } from '../map/pitches';
 import * as mock from './mockData';
+import { withSavedPhotos } from '../lib/placePhotos';
 import * as api from './api';
 import { hasBackend } from '../lib/supabase';
 import { useSession } from './session';
@@ -87,7 +88,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => new Date());
   const session = useSession();
   const uid = hasBackend ? (session.user?.id ?? null) : null;
-  const [places, setPlaces] = useState<Place[]>(hasBackend ? [] : mock.places);
+  const [places, setPlaces] = useState<Place[]>(hasBackend ? [] : mock.places.map(withSavedPhotos));
   const [clubs, setClubs] = useState<Club[]>(hasBackend ? [] : mock.clubs);
   const [games, setGames] = useState<Game[]>(() => (hasBackend ? [] : mock.makeGames(new Date())));
   const [memberships, setMemberships] = useState<Set<string>>(() => new Set(hasBackend ? [] : ['c1', 'c4']));
@@ -100,7 +101,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!uid) return null;
     try {
       const data = await api.fetchAll(uid);
-      setPlaces(data.places);
+      setPlaces(data.places.map(withSavedPhotos));
       setClubs(data.clubs);
       setGames(data.games);
       setMemberships(data.memberships);
@@ -108,7 +109,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.warn('Could not load data from Supabase, using demo data', error);
       // Schema not yet applied or query failed — show demo data so the map is never empty.
-      setPlaces(mock.places);
+      setPlaces(mock.places.map(withSavedPhotos));
       setClubs(mock.clubs);
       setGames(mock.makeGames(new Date()));
       return null;
@@ -180,6 +181,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           myRSVP: rsvp,
           going: rsvp === 'going' ? [ME, ...without(g.going)] : without(g.going),
           declined: rsvp === 'declined' ? [ME, ...without(g.declined)] : without(g.declined),
+          maybe: rsvp === 'maybe' ? [ME, ...without(g.maybe ?? [])] : without(g.maybe ?? []),
           noResponse: without(g.noResponse),
         };
       }),

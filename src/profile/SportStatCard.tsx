@@ -3,7 +3,7 @@ import { space, type } from '../constants/theme';
 import { sports, type SportId } from '../state/models';
 import { colors } from '../constants/theme';
 import { formatHours } from '../state/profile';
-import { SportIcon, card } from '../ui/Display';
+import { SportIcon, glassCard } from '../ui/Display';
 
 export const SPORT_CARD_WIDTH = 168;
 
@@ -23,7 +23,7 @@ export function SportStatCard({ sport, games, hours }: { sport: SportId; games: 
 }
 
 const styles = StyleSheet.create({
-  card: { ...card, width: SPORT_CARD_WIDTH, padding: space.md, gap: space.md },
+  card: { ...glassCard, width: SPORT_CARD_WIDTH, padding: space.md, gap: space.md },
   text: { gap: 1 },
   muted: { color: colors.label2 },
 });

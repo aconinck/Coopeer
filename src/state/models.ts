@@ -29,12 +29,12 @@ export const ME: Member = { id: 'me', name: 'You' };
 /** What the place physically is. Drives the quiet marker on the map (never an activity). */
 export type PlaceKind = 'park' | 'field' | 'courts' | 'trail' | 'center';
 
-export const placeKinds: Record<PlaceKind, { label: string; icon: IconName }> = {
-  park: { label: 'Park', icon: 'tree' },
-  field: { label: 'Field', icon: 'soccer-field' },
-  courts: { label: 'Courts', icon: 'tennis' },
-  trail: { label: 'Trail', icon: 'hiking' },
-  center: { label: 'Community center', icon: 'home-city-outline' },
+export const placeKinds: Record<PlaceKind, { label: string; icon: IconName; color: string }> = {
+  park: { label: 'Park', icon: 'tree', color: '#5DB75D' },
+  field: { label: 'Field', icon: 'soccer-field', color: '#2E9E5B' },
+  courts: { label: 'Courts', icon: 'tennis', color: '#3478F6' },
+  trail: { label: 'Trail', icon: 'hiking', color: '#14A3A3' },
+  center: { label: 'Community center', icon: 'home-city-outline', color: '#E0527E' },
 };
 
 export interface Place {
@@ -115,7 +115,7 @@ export interface NewGame {
 export const COOPEER_FEE = 0.03;
 export const memberPrice = (monthlyPrice: number) => Math.round(monthlyPrice * (1 + COOPEER_FEE) * 100) / 100;
 
-export type RSVP = 'going' | 'declined' | 'none';
+export type RSVP = 'going' | 'maybe' | 'declined' | 'none';
 export type GameStatus = 'live' | 'soon' | 'today' | 'later' | 'ended';
 
 export interface Game {
@@ -131,6 +131,8 @@ export interface Game {
   going: Member[];
   declined: Member[];
   noResponse: Member[];
+  /** Said "maybe". Optional so older data without it still works. */
+  maybe?: Member[];
   dropInPrice: number;
   level: SkillLevel;
   myRSVP: RSVP;

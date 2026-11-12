@@ -5,7 +5,8 @@ import { colors, space, type } from '../../src/constants/theme';
 import { gameStatus, isToday } from '../../src/state/models';
 import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
-import { IconButton, PrimaryButton } from '../../src/ui/Buttons';
+import { PrimaryButton } from '../../src/ui/Buttons';
+import { ProfileButton } from '../../src/ui/ProfileButton';
 import { Section } from '../../src/ui/Layout';
 import { GameRow } from '../../src/ui/Rows';
 import { Screen } from '../../src/ui/Screen';
@@ -19,7 +20,7 @@ export default function ScheduleScreen() {
   const upcoming = games.filter((g) => gameStatus(g, store.now) === 'later');
 
   return (
-    <Screen variant="tab" title="Schedule" trailing={<IconButton icon="add" label="New game" onPress={() => router.push('/create/game')} />}>
+    <Screen variant="tab" title="Schedule" trailing={<ProfileButton />}>
       {games.length === 0 && (
         <Empty
           title="Nothing scheduled"

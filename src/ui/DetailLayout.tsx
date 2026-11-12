@@ -11,6 +11,9 @@ export interface DetailLayoutProps {
   title: string;
   trailing?: ReactNode;
   footer?: ReactNode;
+  /** Immersive detail: a cover (absolutely positioned at the top of the content) behind a transparent header, on `coverColor`. */
+  cover?: ReactNode;
+  coverColor?: string;
   children: ReactNode;
 }
 
@@ -20,6 +23,7 @@ export type SheetRoute =
   | { kind: 'club'; id: string }
   | { kind: 'attendees'; id: string }
   | { kind: 'player'; id: string }
+  | { kind: 'profile' }
   | { kind: 'pitch'; id: string }
   | { kind: 'create-game'; sport?: string; pitch?: string; club?: string };
 
@@ -37,11 +41,10 @@ const ModalLayout = (props: DetailLayoutProps) => <Screen variant="sheet" {...pr
 
 const LayoutContext = createContext<ComponentType<DetailLayoutProps>>(PageLayout);
 
-/** Yourself is the Profile tab; anyone else opens in the sheet. */
+/** Yourself opens your profile (with settings); anyone else opens their public profile. Both are sheets. */
 export function openPlayer(id: string) {
   if (id === ME.id) {
-    sheetController.close();
-    router.navigate('/profile');
+    sheetController.open({ kind: 'profile' });
   } else {
     sheetController.open({ kind: 'player', id });
   }

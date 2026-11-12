@@ -39,6 +39,7 @@ export function AttendeesDetail({ id }: { id: string }) {
         />
       </View>
       <Section title="Going" members={match(game.going)} />
+      <Section title="Maybe" members={match(game.maybe ?? [])} />
       <Section title="Not going" members={match(game.declined)} />
       <Section title="No response" members={match(game.noResponse)} />
     </DetailLayout>

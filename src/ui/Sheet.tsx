@@ -16,6 +16,7 @@ import Animated, {
   useDerivedValue,
   useSharedValue,
   withSpring,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -29,9 +30,11 @@ import { ClubDetail } from '../details/ClubDetail';
 import { GameDetail } from '../details/GameDetail';
 import { PitchDetail } from '../details/PitchDetail';
 import { PlaceDetail } from '../details/PlaceDetail';
+import { ProfileDetail } from '../details/ProfileDetail';
 import { IconButton } from './Buttons';
 import { DetailHost, openPlayer, type DetailLayoutProps, type DetailNav, type SheetRoute } from './DetailLayout';
 import { Glass } from './Glass';
+import { SoftBlur } from './TopBlur';
 import { sheetController } from './sheetController';
 import { sheetSwipeController } from './sheetSwipeController';
 
@@ -301,6 +304,9 @@ function SheetHost({
     };
   });
 
+  // A light blur over whatever is behind, whenever the sheet is open.
+  const blurStyle = useAnimatedStyle(() => ({ opacity: withTiming(isOpen ? 1 : 0, { duration: 220 }) }));
+
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: interpolate(y.value, [full, half], [1, 0], Extrapolation.CLAMP),
   }));
@@ -353,6 +359,21 @@ function SheetHost({
 
   return (
     <View pointerEvents={hidden ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, styles.host, hidden && styles.hidden]} aria-hidden={hidden}>
+      <SoftBlur radius={3} style={blurStyle} />
+      <Pressable
+        accessibilityLabel="Close"
+        pointerEvents={isOpen && !atFull ? 'auto' : 'none'}
+        style={StyleSheet.absoluteFill}
+        onPress={(e) => {
+          // Tapping outside the sheet closes it first. On web, a tap that landed on something (a card) is replayed
+          // once the sheet is gone, so that thing then opens its own sheet.
+          const { pageX, pageY } = e.nativeEvent;
+          close();
+          if (Platform.OS === 'web' && typeof document !== 'undefined') {
+            setTimeout(() => document.elementFromPoint(pageX, pageY)?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })), 380);
+          }
+        }}
+      />
       <Animated.View pointerEvents={atFull && isOpen ? 'auto' : 'none'} style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}>
         <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Collapse" onPress={() => snapTo('half')} />
       </Animated.View>
@@ -360,7 +381,7 @@ function SheetHost({
         pointerEvents={isOpen ? 'box-none' : 'none'}
         style={[styles.sheet, sheetStyle]}
       >
-        <Glass radius={radius.sheet} style={styles.glass}>
+        <Glass radius={radius.sheet} bottomRadius={atFull ? 0 : radius.sheet} style={styles.glass}>
           <ChromeContext.Provider value={chrome}>
             <DetailHost layout={SheetLayout} nav={nav}>
               {top && (
@@ -388,6 +409,8 @@ function RouteContent({ route }: { route: SheetRoute }) {
       return <AttendeesDetail id={route.id} />;
     case 'player':
       return <PlayerDetail id={route.id} />;
+    case 'profile':
+      return <ProfileDetail />;
     case 'pitch':
       return <PitchDetail id={route.id} />;
     case 'create-game':
@@ -396,7 +419,7 @@ function RouteContent({ route }: { route: SheetRoute }) {
 }
 
 /** How a detail looks inside the sheet: draggable header, scrolling body, pinned action bar. */
-function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
+function SheetLayout({ title, trailing, footer, cover, coverColor, children }: DetailLayoutProps) {
   const chrome = useContext(ChromeContext);
   const insets = useSafeAreaInsets();
   const [footerHeight, setFooterHeight] = useState(0);
@@ -438,11 +461,11 @@ function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
   if (!chrome) return null;
 
   return (
-    <View style={styles.flex}>
+    <View style={[styles.flex, coverColor ? { backgroundColor: coverColor } : null]}>
       <GestureDetector gesture={Gesture.Simultaneous(chrome.pan, swipeGesture)}>
-        <View collapsable={false} style={[styles.header, styles.noSelect]}>
+        <View collapsable={false} style={[styles.header, styles.noSelect, cover ? styles.headerOverlay : null]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Resize sheet" onPress={chrome.toggle} style={styles.grabberHit}>
-            <View style={styles.grabber} />
+            <View style={[styles.grabber, cover ? styles.grabberOnCover : null]} />
           </Pressable>
           <View style={styles.headerRow}>
             <IconButton
@@ -461,13 +484,15 @@ function SheetLayout({ title, trailing, footer, children }: DetailLayoutProps) {
       <GestureDetector gesture={bodyGesture}>
         <Animated.ScrollView
           style={styles.flex}
-          contentContainerStyle={[styles.body, { paddingBottom: footerHeight + insets.bottom + space.xxl }]}
+          contentContainerStyle={[styles.body, cover ? styles.bodyBleed : null, { paddingBottom: footerHeight + insets.bottom + space.xxl }]}
           onScroll={onScroll}
           scrollEventThrottle={16}
           onScrollBeginDrag={chrome.expand}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {cover}
+          {cover ? <View style={styles.coverSpacer} /> : null}
           {children}
         </Animated.ScrollView>
       </GestureDetector>
@@ -495,11 +520,15 @@ const styles = StyleSheet.create({
   sheet: { position: 'absolute', bottom: 0 },
   glass: { flex: 1, overflow: 'hidden', userSelect: 'none' } as never,
   header: { paddingHorizontal: space.lg, paddingBottom: space.xs },
+  headerOverlay: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 5 },
+  grabberOnCover: { backgroundColor: 'rgba(255,255,255,0.55)' },
+  coverSpacer: { height: 84 },
   grabberHit: { alignItems: 'center', paddingTop: space.sm, paddingBottom: space.xs },
   grabber: { width: 40, height: 5, borderRadius: radius.full, backgroundColor: colors.label3 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   title: { flex: 1, textAlign: 'center' },
   trailing: { minWidth: 44, alignItems: 'flex-end' },
   body: { padding: space.lg, gap: space.md },
+  bodyBleed: { padding: 0 },
   footer: { position: 'absolute', left: space.md, right: space.md, bottom: 0 },
 });

@@ -6,7 +6,7 @@ import { formatHours } from '../state/profile';
 import { AchievementsSection, SportsSection } from '../profile/PlayerSections';
 import { usePlayer } from '../profile/usePlayer';
 import { DetailLayout, useDetailNav } from '../ui/DetailLayout';
-import { Avatar, StatRow, card } from '../ui/Display';
+import { Avatar, StatRow, glassCard } from '../ui/Display';
 import { Section } from '../ui/Layout';
 import { ListGroup, ListRow } from '../ui/ListGroup';
 
@@ -51,7 +51,7 @@ export function PlayerDetail({ id }: { id: string }) {
 
       {clubs.length > 0 && (
         <Section title="Clubs">
-          <ListGroup>
+          <ListGroup glass>
             {clubs.map((club) => (
               <ListRow
                 key={club.id}
@@ -72,5 +72,5 @@ const styles = StyleSheet.create({
   identity: { alignItems: 'center', gap: space.xs, paddingTop: space.sm },
   center: { textAlign: 'center' },
   muted: { color: colors.label2 },
-  stats: { ...card, paddingVertical: space.md },
+  stats: { ...glassCard, paddingVertical: space.md },
 });

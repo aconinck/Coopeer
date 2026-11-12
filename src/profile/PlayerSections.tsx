@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { space } from '../constants/theme';
 import { sportIds } from '../state/models';
 import { achievementsFor, type PlayerStats } from '../state/profile';
-import { card } from '../ui/Display';
+import { glassCard } from '../ui/Display';
 import { Rail, Section } from '../ui/Layout';
 import { AchievementBadge } from './AchievementBadge';
 import { SPORT_CARD_WIDTH, SportStatCard } from './SportStatCard';
@@ -62,7 +62,7 @@ export function AchievementsSection({ stats, earnedOnly }: { stats: PlayerStats;
 }
 
 const styles = StyleSheet.create({
-  badges: { ...card, paddingVertical: space.lg, paddingHorizontal: space.sm, gap: space.lg },
+  badges: { ...glassCard, paddingVertical: space.lg, paddingHorizontal: space.sm, gap: space.lg },
   row: { flexDirection: 'row' },
   fill: { flex: 1 },
 });

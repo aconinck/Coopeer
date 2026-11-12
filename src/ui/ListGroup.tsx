@@ -2,18 +2,18 @@ import { Children, Fragment, type ComponentProps, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, space, type } from '../constants/theme';
-import { IconTile, card } from './Display';
+import { IconTile, card, glassCard } from './Display';
 
 /**
  * Grouped list (Uber / iOS Settings pattern): one card, rows separated by inset hairlines.
  * Optional small title above the card.
  */
-export function ListGroup({ title, children }: { title?: string; children: ReactNode }) {
+export function ListGroup({ title, glass, children }: { title?: string; glass?: boolean; children: ReactNode }) {
   const rows = Children.toArray(children).filter(Boolean);
   return (
     <View style={styles.group}>
       {title ? <Text style={styles.title}>{title.toUpperCase()}</Text> : null}
-      <View style={styles.card}>
+      <View style={[styles.card, glass && styles.glass]}>
         {rows.map((row, index) => (
           <Fragment key={index}>
             {index > 0 && <View style={styles.separator} />}
@@ -70,6 +70,7 @@ const styles = StyleSheet.create({
   group: { gap: space.sm },
   title: { ...type.caption2, color: colors.label2, paddingHorizontal: space.lg, letterSpacing: 0.6 },
   card: { ...card, overflow: 'hidden' },
+  glass: { ...glassCard, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, minHeight: 56, paddingVertical: space.sm },
   pressed: { backgroundColor: colors.fill },
   text: { flex: 1, gap: 1 },

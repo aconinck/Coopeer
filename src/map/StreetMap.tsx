@@ -1,5 +1,5 @@
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
@@ -18,8 +18,7 @@ import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
 import { colors, mapColors, shadow } from '../constants/theme';
 import { spring } from '../constants/motion';
 import type { Place } from '../state/models';
-import { PlacePin, type PlaceSummary } from './PlacePin';
-import { placeKindIllustration } from './placeIllustrations';
+import { PlaceIcon, PlacePin, type PlaceSummary } from './PlacePin';
 import { BENTONVILLE_CENTER, DEFAULT_SPAN, MAP_BOUNDS, RENDER, RENDER_HEIGHT, RENDER_WIDTH, project } from './projection';
 import { parks, pitches, WORLD, type Pitch } from './mapData';
 import { TileLayer } from './TileLayer';
@@ -547,7 +546,6 @@ function ClusterMarker({
   }));
 
   const repr = summaries[0];
-  const illustration = placeKindIllustration[repr.place.kind as keyof typeof placeKindIllustration];
 
   return (
     <Animated.View pointerEvents="box-none" style={[styles.anchor, { zIndex: selected ? 3 : 1 }, position]}>
@@ -564,8 +562,7 @@ function ClusterMarker({
             >
               <View style={styles.clusterContainer}>
                 <View style={styles.clusterWrap}>
-                  <Image source={illustration} style={styles.clusterImage} resizeMode="cover" />
-                  {selected && <View style={[StyleSheet.absoluteFill, styles.placeOverlay]} />}
+                  <PlaceIcon kind={repr.place.kind} selected={selected} size={44} />
                 </View>
                 <View style={styles.clusterBadge}>
                   <Text style={styles.clusterCount}>{summaries.length}</Text>
@@ -617,21 +614,10 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   clusterContainer: {
-    width: 56,
-    height: 56,
+    width: 44,
+    height: 44,
   },
-  clusterWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...shadow.soft,
-  },
-  clusterImage: { width: '100%', height: '100%' },
-  placeOverlay: {
-    backgroundColor: colors.brand,
-    opacity: 0.22,
-  },
+  clusterWrap: { width: 44, height: 44 },
   clusterBadge: {
     position: 'absolute',
     top: -7,

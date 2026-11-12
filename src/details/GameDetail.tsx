@@ -5,17 +5,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
 import { enter, spring, timing } from '../constants/motion';
 import { DetailLayout, useDetailNav } from '../ui/DetailLayout';
-import { gameStatus, sports, spotsLeft, type Club, type Game } from '../state/models';
+import { gameStatus, sports, spotsLeft, type Club, type RSVP } from '../state/models';
 import { useSession } from '../state/session';
 import { useStore } from '../state/store';
 import { dollars, monthDay, openDirections, shareText, time } from '../lib/format';
-import { ActionBar, IconButton, PrimaryButton, SecondaryButton, haptic } from '../ui/Buttons';
-import { AvatarStack, ClubLogo, InfoChip, KindTag, StatusBadge, gameBadge } from '../ui/Display';
+import { heroImageFor } from '../lib/heroImage';
+import { AvatarStack, ClubLogo, StatusBadge, gameBadge } from '../ui/Display';
+import { CoverImage } from '../ui/CoverImage';
+import { RSVPCapsule } from '../ui/RSVPCapsule';
+import { MoreMenu } from '../ui/Screen';
 
-/** Figma "Evento": one game, its time and place, who's going, and Decline / I'm in. */
+const COVER_HEIGHT = 480;
+
+/**
+ * One game, Apple Invites style: the cover photo runs edge to edge under the header, then fades and blurs into
+ * the screen color. Title, reply capsule, host, place and guests sit on top of that wash.
+ */
 export function GameDetail({ id }: { id: string }) {
   const nav = useDetailNav();
   const store = useStore();
+  const session = useSession();
   const game = id ? store.game(id) : undefined;
   const place = game ? store.place(game.placeId) : undefined;
 
@@ -29,71 +38,98 @@ export function GameDetail({ id }: { id: string }) {
 
   const club = game.clubId ? store.club(game.clubId) : undefined;
   const isMember = club ? store.isMember(club.id) : false;
-  const badge = gameBadge(game, isMember, store.now);
+  const status = gameStatus(game, store.now);
+  const closed = game.isCanceled || status === 'ended';
+  const full = spotsLeft(game) === 0 && game.myRSVP !== 'going';
   const progress = Math.min(game.going.length / Math.max(game.capacity, 1), 1);
+  const base = colors.white;
+  const image = heroImageFor(game, place, store.places);
+  const when = `${monthDay(game.start)} · ${time(game.start)} – ${time(game.end)}`;
+  const caption = game.isCanceled
+    ? 'This game was canceled.'
+    : status === 'ended'
+      ? 'This game has ended.'
+      : full
+        ? 'This game is full. You can still say maybe.'
+        : isMember
+          ? 'Included in your club membership.'
+          : `Drop-in ${dollars(game.dropInPrice)} · paid at the ${sports[game.sport].placeNoun}`;
+
+  const reply = (next: RSVP) => session.requireAuth(() => store.setRSVP(game.id, next));
+  const menu = [
+    { label: 'Share', icon: 'share-outline' as const, onPress: () => shareText(`${game.title} · ${monthDay(game.start)} ${time(game.start)} at ${place.name}`, `coopeer://game/${game.id}`) },
+    { label: 'Directions', icon: 'navigate-outline' as const, onPress: () => openDirections(place) },
+  ];
 
   return (
-    <DetailLayout title="Game" footer={<Footer game={game} isMember={isMember} />}>
-      <Stagger index={0}>
-        <View style={styles.topLine}>
-          <KindTag kind={club ? 'clubGame' : 'openGame'} />
-          {badge && <StatusBadge kind={badge} />}
+    <DetailLayout
+      title=""
+      trailing={<MoreMenu items={menu} />}
+      coverColor={base}
+      cover={image ? <CoverImage source={image} base={base} height={COVER_HEIGHT} /> : null}
+    >
+      <Stagger index={0} style={styles.hero}>
+        <View style={styles.heroTop}>
+          <View style={styles.kind}>
+            <Ionicons name="calendar" size={11} color={colors.white} />
+            <Text style={[type.caption2, styles.kindText]}>{club ? 'CLUB GAME' : 'OPEN GAME'}</Text>
+          </View>
+          {gameBadge(game, isMember, store.now) === 'live' && <StatusBadge kind="live" onMedia />}
         </View>
-        <Text style={[type.largeTitle, game.isCanceled && styles.strike]}>{game.title}</Text>
-        <HostRow club={club} />
-        <Text style={[type.body, styles.secondary]}>{game.details}</Text>
+        <View style={styles.heroBottom}>
+          <Text style={[type.largeTitle, styles.heroTitle, game.isCanceled && styles.strike]}>{game.title}</Text>
+          <Text style={[type.subhead, styles.heroLine]}>{when}</Text>
+          <Text style={[type.subhead, styles.heroLine]} numberOfLines={1}>
+            {place.name}
+          </Text>
+          <View style={styles.capsuleWrap}>
+            <RSVPCapsule value={game.myRSVP} onChange={reply} disabled={closed} tone="light" />
+          </View>
+          <Text style={[type.footnote, styles.heroCaption]}>{caption}</Text>
+        </View>
       </Stagger>
 
-      <View style={styles.divider} />
-
-      <Stagger index={1}>
-        <View style={styles.chips}>
-          <InfoChip text={monthDay(game.start)} />
-          <View style={styles.flex} />
-          <InfoChip text={time(game.start)} />
-          <Text style={styles.secondary}>–</Text>
-          <InfoChip text={time(game.end)} />
+      <Stagger index={1} style={styles.section}>
+        <View style={styles.glassCard}>
+          <HostRow club={club} />
+          {game.details ? <Text style={[type.subhead, styles.details]}>{game.details}</Text> : null}
         </View>
+      </Stagger>
 
-        <Pressable accessibilityRole="button" onPress={() => openDirections(place)} style={({ pressed }) => [styles.location, pressed && styles.pressed]}>
-          <Ionicons name="location-outline" size={22} color={colors.label2} />
+      <Stagger index={2} style={styles.section}>
+        <Pressable accessibilityRole="button" onPress={() => openDirections(place)} style={({ pressed }) => [styles.glassCard, styles.location, pressed && styles.pressed]}>
+          <Ionicons name="location-outline" size={22} color={colors.label} />
           <View style={styles.flex}>
-            <Text style={type.headline}>{place.name}</Text>
-            <Text style={[type.subhead, styles.secondary, styles.underline]}>{place.address}</Text>
+            <Text style={[type.headline, styles.onDark]}>{place.name}</Text>
+            <Text style={[type.subhead, styles.dim]}>{place.address}</Text>
           </View>
-          <Ionicons name="navigate" size={20} color={colors.brand} />
+          <Ionicons name="navigate" size={20} color={colors.label} />
         </Pressable>
       </Stagger>
 
-      <View style={styles.divider} />
-
-      <Stagger index={2}>
-        <View style={styles.topLine}>
-          <Text style={type.headline}>Going</Text>
-          <RollingCount value={game.going.length} suffix={` of ${game.capacity}`} />
-        </View>
-        <ProgressTrack value={progress} />
-        <View style={styles.goingRow}>
-          <AvatarStack members={game.going} size={28} limit={3} />
-          <View style={styles.flex} />
-          <Pressable accessibilityRole="button" onPress={() => nav.attendees(game.id)} style={({ pressed }) => [styles.pill, pressed && styles.pressed]}>
-            <Text style={[type.subhead, { fontWeight: '600' }]}>See who's going</Text>
+      <Stagger index={3} style={styles.section}>
+        <View style={[styles.glassCard, styles.going]}>
+          <View style={styles.topLine}>
+            <Text style={[type.headline, styles.onDark]}>Going</Text>
+            <RollingCount value={game.going.length} suffix={` of ${game.capacity}`} />
+          </View>
+          <ProgressTrack value={progress} />
+          <Pressable accessibilityRole="button" onPress={() => nav.attendees(game.id)} style={({ pressed }) => [styles.goingRow, pressed && styles.pressed]}>
+            <AvatarStack members={game.going} size={32} limit={5} />
+            <View style={styles.flex} />
+            <Text style={[type.subhead, styles.link]}>See who's going</Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.label2} />
           </Pressable>
-          <IconButton
-            icon="share-outline"
-            label="Share"
-            onPress={() => shareText(`${game.title} · ${monthDay(game.start)} ${time(game.start)} at ${place.name}`, `coopeer://game/${game.id}`)}
-          />
         </View>
       </Stagger>
     </DetailLayout>
   );
 }
 
-function Stagger({ index, children }: { index: number; children: ReactNode }) {
+function Stagger({ index, children, style }: { index: number; children: ReactNode; style?: object }) {
   const reduceMotion = useReducedMotion();
   return (
-    <Animated.View entering={reduceMotion ? undefined : enter(index)} style={styles.group}>
+    <Animated.View entering={reduceMotion ? undefined : enter(index)} style={style}>
       {children}
     </Animated.View>
   );
@@ -135,88 +171,52 @@ function HostRow({ club }: { club?: Club }) {
   if (!club) {
     return (
       <View style={styles.host}>
-        <Ionicons name="enter-outline" size={18} color={colors.label2} />
-        <Text style={[type.subhead, styles.secondary]}>Open game — anyone can join</Text>
+        <Ionicons name="enter-outline" size={22} color={colors.label} />
+        <Text style={[type.subhead, styles.onDark]}>Open game · anyone can join</Text>
       </View>
     );
   }
   return (
     <Pressable accessibilityRole="button" onPress={() => nav.club(club.id)} style={({ pressed }) => [styles.host, pressed && styles.pressed]}>
-      <ClubLogo club={club} size={28} />
-      <Text style={type.subhead}>
-        Hosted by <Text style={{ fontWeight: '700' }}>{club.name}</Text>
+      <ClubLogo club={club} size={44} neutral />
+      <Text style={[type.subhead, styles.onDark]}>
+        Hosted by <Text style={styles.bold}>{club.name}</Text>
       </Text>
-      <Ionicons name="chevron-forward" size={14} color={colors.label3} />
     </Pressable>
   );
 }
 
-function Footer({ game, isMember }: { game: Game; isMember: boolean }) {
-  const store = useStore();
-  const session = useSession();
-  const status = gameStatus(game, store.now);
-  const [celebrating, setCelebrating] = useState(false);
-
-  useEffect(() => {
-    if (!celebrating) return;
-    const timer = setTimeout(() => setCelebrating(false), 1200);
-    return () => clearTimeout(timer);
-  }, [celebrating]);
-
-  const imIn = () =>
-    session.requireAuth(() => {
-      haptic.success();
-      store.setRSVP(game.id, 'going');
-      setCelebrating(true);
-    });
-
-  if (game.isCanceled) return <ActionBar caption="This game was canceled." />;
-  if (status === 'ended') return <ActionBar caption="This game has ended." />;
-  if (celebrating) {
-    return (
-      <ActionBar caption="See you there!">
-        <PrimaryButton title="You're in" success onPress={() => undefined} />
-      </ActionBar>
-    );
-  }
-  if (game.myRSVP === 'going') {
-    return (
-      <ActionBar caption="You're in. See you there!">
-        <SecondaryButton title="Can't make it" onPress={() => store.setRSVP(game.id, 'declined')} />
-      </ActionBar>
-    );
-  }
-
-  const declined = game.myRSVP === 'declined';
-  const full = spotsLeft(game) === 0;
-  return (
-    <ActionBar caption={isMember ? 'Included in your club membership.' : `Drop-in ${dollars(game.dropInPrice)} · paid at the ${sports[game.sport].placeNoun}`}>
-      <SecondaryButton
-        title={declined ? 'Not going' : 'Decline'}
-        disabled={declined}
-        onPress={() => session.requireAuth(() => store.setRSVP(game.id, 'declined'))}
-      />
-      <PrimaryButton title={full ? 'Full' : "I'm in"} disabled={full} onPress={imIn} />
-    </ActionBar>
-  );
-}
+const GLASS = 'rgba(0,0,0,0.04)';
+const GLASS_BORDER = 'rgba(0,0,0,0.07)';
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   secondary: { color: colors.label2 },
+  onDark: { color: colors.label },
+  dim: { color: colors.label2 },
+  bold: { fontWeight: '700' },
+  link: { color: colors.label2, fontWeight: '600' },
   strike: { textDecorationLine: 'line-through' },
-  underline: { textDecorationLine: 'underline' },
   pressed: { opacity: 0.7 },
   topLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  host: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginVertical: space.xs },
-  chips: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  location: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  track: { height: 8, borderRadius: radius.full, backgroundColor: colors.fill2, overflow: 'hidden' },
-  trackFill: { height: 8, borderRadius: radius.full, backgroundColor: colors.brand },
-  group: { gap: space.md },
+  hero: { minHeight: 150, gap: space.lg, justifyContent: 'space-between' },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg },
+  kind: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 26, borderRadius: radius.full, backgroundColor: 'rgba(0,0,0,0.35)' },
+  kindText: { color: colors.white, fontWeight: '700' },
+  heroBottom: { paddingHorizontal: space.lg, gap: 4, alignItems: 'center' },
+  heroTitle: { color: colors.label, textAlign: 'center' },
+  heroLine: { color: colors.label2, textAlign: 'center' },
+  capsuleWrap: { alignSelf: 'stretch', marginTop: space.lg },
+  heroCaption: { color: colors.label2, textAlign: 'center', marginTop: space.sm },
+  section: { paddingHorizontal: space.lg, marginTop: space.md },
+  glassCard: { padding: space.lg, gap: space.md, borderRadius: 26, backgroundColor: GLASS, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: GLASS_BORDER },
+  host: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm },
+  details: { color: colors.label2, textAlign: 'center' },
+  location: { flexDirection: 'row', alignItems: 'center' },
+  going: { gap: space.md },
+  track: { height: 8, borderRadius: radius.full, backgroundColor: 'rgba(0,0,0,0.08)', overflow: 'hidden' },
+  trackFill: { height: 8, borderRadius: radius.full, backgroundColor: colors.label },
   countRow: { flexDirection: 'row', overflow: 'hidden' },
   count: { color: colors.label2, fontWeight: '600', fontVariant: ['tabular-nums'] },
   goingRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  pill: { height: 40, paddingHorizontal: space.lg, borderRadius: radius.full, backgroundColor: colors.fill, justifyContent: 'center' },
 });

@@ -3,6 +3,8 @@ import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
 import { placeKinds, sports, type Place } from '../state/models';
+import { useStore } from '../state/store';
+import { heroImageFor } from '../lib/heroImage';
 
 const HEIGHT = 196;
 
@@ -15,6 +17,15 @@ export function PlaceHero({ place }: { place: Place }) {
   const [index, setIndex] = useState(0);
   const photos = place.photos ?? [];
   const tint = place.sports[0] ? sports[place.sports[0]].color : colors.gray3;
+  const store = useStore();
+
+  if (photos.length === 0 && place.sports[0]) {
+    return (
+      <View accessibilityLabel={`${place.name} photo`} style={styles.hero}>
+        <Image source={heroImageFor({ sport: place.sports[0] }, place, store.places) ?? undefined} resizeMode="cover" style={{ width: '100%', height: HEIGHT, backgroundColor: colors.fill }} />
+      </View>
+    );
+  }
 
   if (photos.length === 0) {
     return (

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useReducedMotion } from 'react-native-reanimated';
 import { enter } from '../constants/motion';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { useStore } from '../state/store';
 import { useSession } from '../state/session';
 import { isTomorrow, time, weekday } from '../lib/format';
 import { TextButton, haptic, usePressScale } from './Buttons';
-import { AvatarStack, ClubLogo, KindTag, StatusBadge, Tag, VerifiedBadge, card } from './Display';
+import { AvatarStack, ClubLogo, KindTag, StatusBadge, Tag, VerifiedBadge, card, glassCard } from './Display';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -35,7 +35,8 @@ function PressCard({
   return (
     <Animated.View entering={entering} style={[grow && styles.grow, width !== undefined && { width }]}>
       <AnimatedPressable
-        accessibilityRole="button"
+        // On web a role of "button" becomes a <button>, and cards hold their own "I'm in" button (nested buttons are invalid HTML).
+        accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
         onPress={onPress}
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
@@ -160,7 +161,7 @@ export function ClubRow({ club, onPress, index }: { club: Club; onPress: () => v
  * Club card for grids and rails, same family as GameRow: logo + verified seal, a big name,
  * the weekly rhythm as a soft tag, and members with the next game at the bottom.
  */
-export function ClubCard({ club, onPress, index, width }: { club: Club; onPress: () => void; index?: number; width?: number }) {
+export function ClubCard({ club, onPress, index, width, glass }: { club: Club; onPress: () => void; index?: number; width?: number; glass?: boolean }) {
   const store = useStore();
   const next = store.nextGameFor(club.id);
   const status = next ? gameStatus(next, store.now) : null;
@@ -174,7 +175,7 @@ export function ClubCard({ club, onPress, index, width }: { club: Club; onPress:
         : `${weekday(next.start)} ${time(next.start)}`;
 
   return (
-    <PressCard index={index} onPress={onPress} grow={width === undefined} width={width} style={[styles.clubCard, width === undefined && styles.grow]}>
+    <PressCard index={index} onPress={onPress} grow={width === undefined} width={width} style={[styles.clubCard, glass && styles.clubGlass, width === undefined && styles.grow]}>
       <View style={styles.clubTop}>
         <ClubLogo club={club} size={44} />
         {club.isNew ? <StatusBadge kind="new" /> : club.verified ? <VerifiedBadge size={20} /> : null}
@@ -261,6 +262,7 @@ const styles = StyleSheet.create({
   ctaMuted: { backgroundColor: colors.fill },
   ctaPressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
   clubCard: { ...card, padding: space.lg, gap: space.md },
+  clubGlass: { ...glassCard, padding: space.lg, gap: space.md },
   clubTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   clubText: { gap: 2, minHeight: 64 },
   clubName: { fontSize: 18, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3, color: colors.label },

@@ -11,19 +11,18 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, radius, space, type } from '../../src/constants/theme';
+import { colors, layout, radius, space, type } from '../../src/constants/theme';
 import { enter as fadeEnter, spring } from '../../src/constants/motion';
 import { gameStatus, isToday, sportIds, sports, type Place, type SportId } from '../../src/state/models';
 import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
 import { distanceMeters, MILE_METERS } from '../../src/lib/geo';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTourTarget } from '../../src/tour/Tour';
-import { OptionRow, OptionSheet } from '../../src/create/ui';
-import { IconTile } from '../../src/ui/Display';
 import { useCurrentLocation } from '../../src/lib/useLocation';
 import { MapControls } from '../../src/map/MapControls';
-import { MapTopBar, type MapMode } from '../../src/map/MapTopBar';
+import { MapTopBar, type MapView } from '../../src/map/MapTopBar';
+import { TileFeed } from '../../src/discover/TileFeed';
 import { StreetMap, type StreetMapHandle } from '../../src/map/StreetMap';
 import { summarize } from '../../src/map/PlacePin';
 import { pitchById } from '../../src/map/pitches';
@@ -32,6 +31,8 @@ import { SectionHeader } from '../../src/ui/Display';
 import { Glass } from '../../src/ui/Glass';
 import { ClubCard, GameRow } from '../../src/ui/Rows';
 import { useTabBarSpace } from '../../src/ui/Screen';
+import { TopBlur } from '../../src/ui/TopBlur';
+import { setTabBarHidden, tabBarHidden } from '../../src/ui/tabBarVisibility';
 import { SHEET_HALF, useSheet } from '../../src/ui/Sheet';
 import { sheetController } from '../../src/ui/sheetController';
 import { sheetSwipeController } from '../../src/ui/sheetSwipeController';
@@ -40,6 +41,7 @@ const DRAWER_SPRING = spring.smooth;
 const CLUB_CARD_WIDTH = 176;
 const FIT_RADIUS_MILES = 10;
 const TOP_BAR_HEIGHT = 50;
+const TAB_BAR_DROP = layout.tabBarHeight + space.sm;
 const BENTONVILLE = { latitude: 36.3625, longitude: -94.2105 };
 
 export default function MapScreen() {
@@ -78,22 +80,20 @@ export default function MapScreen() {
     // Follow position updates only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords?.latitude, coords?.longitude]);
-  const [mode, setMode] = useState<MapMode>('all');
-  const [liveOnly, setLiveOnly] = useState(false);
+  const [view, setView] = useState<MapView>('tile');
+  const isMap = view === 'map';
+  // The Tile feed hides the tab bar while scrolling; the map never does, and leaving the tab always restores it.
+  useEffect(() => {
+    if (isMap) setTabBarHidden(false);
+    else setExpanded(false);
+  }, [isMap]);
+  useFocusEffect(
+    useCallback(() => () => setTabBarHidden(false), []),
+  );
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [drawerHeight, setDrawerHeight] = useState(150);
   const drawerTourRef = useTourTarget('drawer');
-  const createTourRef = useTourTarget('create');
-  // Close the menu first, then open the appropriate flow.
-  const createThen = (path: '/create/game' | '/create/club') => {
-    setCreating(false);
-    if (path === '/create/game') {
-      open.createGame(sport ?? undefined);
-    } else {
-      setTimeout(() => router.push('/create/club'), 250);
-    }
-  };
 
   // Whatever the sheet shows, highlight its place on the map and glide the camera to it.
   const root = sheet.isOpen ? sheet.root : null;
@@ -139,40 +139,31 @@ export default function MapScreen() {
       store.places
         .filter((place) => !sport || place.sports.includes(sport))
         .map((place) => summarize(place, store.upcomingGamesAt(place.id), store.clubsAt(place.id), sport, store.now))
-        .map((s) => {
-          // Clubs: places where a club plays (activity pills only for a club game live now). Matches: places with a game today.
-          if (mode === 'clubs') {
-            const games = s.games.filter((g) => g.clubId !== null);
-            return { ...s, games, live: games.find((g) => gameStatus(g, store.now) === 'live'), next: undefined };
-          }
-          if (mode === 'matches') return { ...s, clubs: [] };
-          return s;
-        })
-        .filter((s) => (mode === 'clubs' ? s.clubs.length > 0 : mode === 'matches' ? !!(s.live || s.next) : true))
-        .filter((s) => !liveOnly || s.live)
         .filter((s) => matches(s.place.name, s.place.address, ...s.sports.map((id) => sports[id].label), ...s.clubs.map((c) => c.name), ...s.games.map((g) => g.title))),
-    [store, sport, mode, liveOnly, matches],
+    [store, sport, matches],
   );
 
   const visiblePlaceIds = new Set(summaries.map((s) => s.place.id));
-  const games = (mode === 'clubs' ? [] : store.games)
+  const games = store.games
     .filter((g) => visiblePlaceIds.has(g.placeId) && !g.isCanceled && (!sport || g.sport === sport))
-    .filter((g) => isToday(gameStatus(g, store.now)) && (!liveOnly || gameStatus(g, store.now) === 'live'))
+    .filter((g) => isToday(gameStatus(g, store.now)))
     .filter((g) => matches(g.title, store.place(g.placeId)?.name))
     .sort((a, b) => a.start.getTime() - b.start.getTime());
   const liveGames = games.filter((g) => gameStatus(g, store.now) === 'live');
   const laterGames = games.filter((g) => gameStatus(g, store.now) !== 'live');
-  const clubs = (mode === 'matches' ? [] : store.clubs)
-    .filter((c) => visiblePlaceIds.has(c.homePlaceId) && (!sport || c.sport === sport) && matches(c.name, store.place(c.homePlaceId)?.name))
-    .filter((c) => !liveOnly || store.gamesFor(c.id).some((g) => gameStatus(g, store.now) === 'live'));
+  const clubs = store.clubs
+    .filter((c) => visiblePlaceIds.has(c.homePlaceId) && (!sport || c.sport === sport) && matches(c.name, store.place(c.homePlaceId)?.name));
+
+  const tileTop = insets.top + space.sm + TOP_BAR_HEIGHT + space.md;
 
   // Picking a sport zooms out to show every matching place within 10 miles; clearing it returns to the default view.
   const pickSport = (id: SportId | null) => {
     setSport(id);
     if (!id) {
-      locateMe();
+      if (isMap) locateMe();
       return;
     }
+    if (!isMap) return;
     setFollowing(false);
     const nearby = store.places.filter((p) => p.sports.includes(id) && distanceMeters(p, center) <= FIT_RADIUS_MILES * MILE_METERS);
     map.current?.fit(nearby, insets.top + TOP_BAR_HEIGHT + space.lg, height - tabBarSpace - 170);
@@ -217,15 +208,11 @@ export default function MapScreen() {
     );
   }, [selectedPlaceId, summaries]);
 
-  // The drawer slides down while the detail sheet is open OR the create sheet is open.
-  const creatingAnim = useSharedValue(0);
-  useEffect(() => {
-    creatingAnim.value = withTiming(creating ? 1 : 0, { duration: 220 });
-  }, [creating, creatingAnim]);
-
+  // The drawer slides down while a detail sheet is open.
   const drawerStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(sheet.isOpen || creatingAnim.value > 0 ? 0 : 1, { duration: 180 }),
-    transform: [{ translateY: withSpring((sheet.isOpen || creatingAnim.value > 0) ? 260 : 0, DRAWER_SPRING) }],
+    opacity: withTiming(sheet.isOpen ? 0 : 1, { duration: 180 }),
+    // Docked above the tab bar; when the tab bar slides away (scrolling the Tile feed) it settles to the bottom edge.
+    transform: [{ translateY: withSpring(sheet.isOpen ? 260 : 0, DRAWER_SPRING) }, { translateY: tabBarHidden.value * TAB_BAR_DROP }],
   }));
 
   // Expanding grows only the games list (a clipped height), so the search and chips never stretch.
@@ -241,6 +228,7 @@ export default function MapScreen() {
   // The drawer follows the finger (list height tracks the drag) and settles by position + velocity.
   const dragFrom = useSharedValue(0);
   const drawerPan = Gesture.Pan()
+    .enabled(isMap)
     .activeOffsetY([-6, 6])
     .onStart(() => {
       dragFrom.value = expandProgress.value;
@@ -254,6 +242,27 @@ export default function MapScreen() {
       expandProgress.value = withSpring(open ? 1 : 0, { ...spring.smooth, velocity: 0 });
       runOnJS(setExpanded)(open);
     });
+
+  const sportChips = (contentStyle: object) => (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={contentStyle} keyboardShouldPersistTaps="handled">
+      <Chip
+        title="All"
+        selected={!sport}
+        onPress={() => pickSport(null)}
+        icon={<MaterialCommunityIcons name="compass-outline" size={17} color={!sport ? colors.white : colors.label} />}
+      />
+      {sportIds.map((id) => (
+        <Chip
+          key={id}
+          title={sports[id].label}
+          color={sports[id].color}
+          selected={sport === id}
+          onPress={() => pickSport(sport === id ? null : id)}
+          icon={<MaterialCommunityIcons name={sports[id].icon} size={17} color={sport === id ? colors.white : colors.label2} />}
+        />
+      ))}
+    </ScrollView>
+  );
 
   let row = 0;
   const enter = () => fadeEnter(row++);
@@ -280,20 +289,36 @@ export default function MapScreen() {
         onClusterPress={handleClusterPress}
       />
 
+      {!isMap && (
+        <TileFeed
+          sport={sport}
+          top={tileTop}
+          matches={matches}
+          bottom={tabBarSpace + drawerHeight + space.md}
+          onOpenGame={(game) => open.game(game.id)}
+          onOpenClub={(club) => open.club(club.id)}
+          onOpenPlace={selectPlace}
+        />
+      )}
+
+      {!isMap && <TopBlur zIndex={1} height={insets.top + space.sm + TOP_BAR_HEIGHT + space.xxl} />}
+
       <View style={[styles.topBar, { top: insets.top + space.sm }]} pointerEvents="box-none">
-        <MapTopBar mode={mode} onModeChange={setMode} now={liveOnly} onNowChange={setLiveOnly} />
+        <MapTopBar view={view} onViewChange={setView} />
       </View>
 
-      <View style={[styles.controls, { top: insets.top + space.sm + TOP_BAR_HEIGHT + space.sm }]} pointerEvents="box-none">
-        <MapControls onZoomIn={() => map.current?.zoomIn()} onZoomOut={() => map.current?.zoomOut()} onRecenter={locateMe} following={following} />
-      </View>
+      {isMap && (
+        <View style={[styles.controls, { top: insets.top + space.sm + TOP_BAR_HEIGHT + space.sm }]} pointerEvents="box-none">
+          <MapControls onZoomIn={() => map.current?.zoomIn()} onZoomOut={() => map.current?.zoomOut()} onRecenter={locateMe} following={following} />
+        </View>
+      )}
 
       <Animated.View pointerEvents={sheet.isOpen ? 'none' : 'box-none'} style={[styles.drawerWrap, { bottom: tabBarSpace }, drawerStyle]}>
-        <View>
+        <View onLayout={(e) => setDrawerHeight(e.nativeEvent.layout.height)}>
           <Glass radius={radius.sheet} style={styles.drawer}>
             <GestureDetector gesture={drawerPan}>
-              <View collapsable={false} ref={drawerTourRef}>
-                <Pressable accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse list' : 'Expand list'} onPress={() => setExpanded((v) => !v)} style={styles.grabberArea}>
+              <View collapsable={false} ref={isMap ? drawerTourRef : undefined}>
+                <Pressable accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse list' : 'Expand list'} onPress={() => isMap && setExpanded((v) => !v)} style={styles.grabberArea}>
                   <View style={styles.grabber} />
                 </Pressable>
 
@@ -302,7 +327,7 @@ export default function MapScreen() {
                   <TextInput
                     value={query}
                     onChangeText={setQuery}
-                    onFocus={() => setExpanded(true)}
+                    onFocus={() => isMap && setExpanded(true)}
                     placeholder="Search places, clubs, games"
                     placeholderTextColor={colors.label2}
                     returnKeyType="search"
@@ -315,36 +340,8 @@ export default function MapScreen() {
                   ) : null}
                 </View>
 
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
-                  <Chip
-                    title="All"
-                    selected={!sport}
-                    onPress={() => pickSport(null)}
-                    icon={<MaterialCommunityIcons name="compass-outline" size={17} color={!sport ? colors.white : colors.label} />}
-                  />
-                  {sportIds.map((id) => (
-                    <Chip
-                      key={id}
-                      title={sports[id].label}
-                      color={sports[id].color}
-                      selected={sport === id}
-                      onPress={() => pickSport(sport === id ? null : id)}
-                      icon={<MaterialCommunityIcons name={sports[id].icon} size={17} color={sport === id ? colors.white : colors.label2} />}
-                    />
-                  ))}
-                </ScrollView>
+                {sportChips(styles.chips)}
 
-                <View ref={createTourRef} collapsable={false}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Create new game or club"
-                    onPress={() => setCreating(true)}
-                    style={({ pressed }) => [styles.createNew, pressed && styles.createNewPressed]}
-                  >
-                    <Ionicons name="add-circle" size={20} color={colors.brand} />
-                    <Text style={[type.subhead, styles.createNewText]}>Create new</Text>
-                  </Pressable>
-                </View>
               </View>
             </GestureDetector>
 
@@ -408,7 +405,7 @@ export default function MapScreen() {
                   <View style={styles.empty}>
                     <Ionicons name="football-outline" size={32} color={colors.label3} />
                     <Text style={type.headline}>Nothing here yet</Text>
-                    <Text style={[type.subhead, { color: colors.label2 }]}>{liveOnly ? 'Nothing is live right now. Turn off Now to see later today.' : 'Try another sport or clear your search.'}</Text>
+                    <Text style={[type.subhead, { color: colors.label2 }]}>Try another sport or clear your search.</Text>
                   </View>
                 )}
               </ScrollView>
@@ -416,21 +413,6 @@ export default function MapScreen() {
           </Glass>
         </View>
       </Animated.View>
-
-      <OptionSheet visible={creating} onClose={() => setCreating(false)} header={<Text style={[type.title3, styles.createTitle]}>Create new</Text>}>
-        <OptionRow
-          title="Create a match"
-          detail="One game at any place. No club needed."
-          leading={<IconTile icon="football-outline" color={colors.brand} background={colors.brandSoft} />}
-          onPress={() => createThen('/create/game')}
-        />
-        <OptionRow
-          title="Create a club"
-          detail="A group that plays every week."
-          leading={<IconTile icon="people-outline" color={colors.brand} background={colors.brandSoft} />}
-          onPress={() => createThen('/create/club')}
-        />
-      </OptionSheet>
     </View>
   );
 }
@@ -454,19 +436,6 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: colors.label, paddingVertical: 0, outlineStyle: 'none' } as never,
   chips: { gap: space.sm, paddingTop: space.md, paddingBottom: space.sm },
-  createNew: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    height: 44,
-    marginBottom: space.xs,
-    borderRadius: radius.full,
-    backgroundColor: colors.brandSoft,
-  },
-  createNewPressed: { opacity: 0.8 },
-  createNewText: { color: colors.brand, fontWeight: '600' },
-  createTitle: { paddingHorizontal: space.lg, paddingTop: space.xs, paddingBottom: space.sm },
   listClip: { overflow: 'hidden' },
   list: { gap: space.md, paddingBottom: space.lg },
   rail: { gap: space.md },

@@ -1,22 +1,30 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from 'expo-router/build/layouts/Tabs';
-import { colors, layout, radius, space } from '../constants/theme';
+import { colors, layout, radius, space, type } from '../constants/theme';
 import { spring } from '../constants/motion';
 import { haptic, type IconName } from './Buttons';
 import { Glass } from './Glass';
 import { useTourTarget } from '../tour/Tour';
+import { tabBarHidden } from './tabBarVisibility';
+import { OptionRow, OptionSheet } from '../create/ui';
+import { IconTile } from './Display';
+import { open } from '../lib/nav';
 
-const tabs: Record<string, { label: string; icon: IconName; activeIcon: IconName }> = {
-  map: { label: 'Map', icon: 'map-outline', activeIcon: 'map' },
+type TabInfo = { label: string; icon: IconName; activeIcon: IconName };
+
+const tabs: Record<string, TabInfo> = {
+  map: { label: 'Home', icon: 'home-outline', activeIcon: 'home' },
   clubs: { label: 'Clubs', icon: 'people-outline', activeIcon: 'people' },
-  explore: { label: 'Explore', icon: 'compass-outline', activeIcon: 'compass' },
   schedule: { label: 'Schedule', icon: 'calendar-outline', activeIcon: 'calendar' },
-  profile: { label: 'Profile', icon: 'person-circle-outline', activeIcon: 'person-circle' },
 };
+
+// Not a screen: sits between Clubs and Schedule and opens the Create new sheet (start a game or a club).
+const createTab: TabInfo = { label: 'Create new', icon: 'add-circle-outline', activeIcon: 'add-circle' };
 
 /** Floating Liquid Glass tab bar (iOS 26 style) with a sliding active pill. */
 export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
@@ -27,6 +35,15 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
   const pillW = useSharedValue(0);
   const visible = useSharedValue(0);
   const tourRef = useTourTarget('tabs');
+  const createRef = useTourTarget('create');
+  const [creating, setCreating] = useState(false);
+  // Close the sheet first, then start the chosen flow.
+  const createThen = (path: '/create/game' | '/create/club') => {
+    setCreating(false);
+    if (path === '/create/game') open.createGame();
+    else setTimeout(() => router.push('/create/club'), 250);
+  };
+  const slideStyle = useAnimatedStyle(() => ({ transform: [{ translateY: tabBarHidden.value * (layout.tabBarHeight + insets.bottom + space.xxl) }] }));
 
   const active = slots[state.index];
   useEffect(() => {
@@ -48,7 +65,7 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
   }));
 
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, space.md) }]}>
+    <Animated.View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, space.md) }, slideStyle]}>
       <View ref={tourRef} collapsable={false}>
       <Glass radius={radius.full} style={styles.bar}>
         <Animated.View pointerEvents="none" style={[styles.pill, pillStyle]} />
@@ -57,37 +74,68 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
           if (!tab) return null;
           const focused = state.index === index;
           return (
-            <Pressable
-              key={route.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: focused }}
-              accessibilityLabel={tab.label}
-              onLayout={(e) => {
-                const { x, width } = e.nativeEvent.layout;
-                setSlots((current) => (current[index]?.x === x && current[index]?.width === width ? current : { ...current, [index]: { x, width } }));
-              }}
-              onPress={() => {
-                if (!focused) {
-                  haptic.selection();
-                  navigateToTab(route.key);
-                }
-              }}
-              style={styles.item}
-            >
-              <Ionicons name={focused ? tab.activeIcon : tab.icon} size={23} color={focused ? colors.brand : colors.label} />
-              <Text style={[styles.label, { color: focused ? colors.brand : colors.label }]}>{tab.label}</Text>
-            </Pressable>
+            <Fragment key={route.key}>
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ selected: focused }}
+                accessibilityLabel={tab.label}
+                onLayout={(e) => {
+                  const { x, width } = e.nativeEvent.layout;
+                  setSlots((current) => (current[index]?.x === x && current[index]?.width === width ? current : { ...current, [index]: { x, width } }));
+                }}
+                onPress={() => {
+                  if (!focused) {
+                    haptic.selection();
+                    navigateToTab(route.key);
+                  }
+                }}
+                style={styles.item}
+              >
+                <Ionicons name={focused ? tab.activeIcon : tab.icon} size={23} color={focused ? colors.brand : colors.label} />
+                <Text style={[styles.label, { color: focused ? colors.brand : colors.label }]}>{tab.label}</Text>
+              </Pressable>
+              {route.name === 'clubs' && (
+                <Pressable
+                  ref={createRef}
+                  accessibilityRole="button"
+                  accessibilityLabel={createTab.label}
+                  onPress={() => {
+                    haptic.selection();
+                    setCreating(true);
+                  }}
+                  style={styles.item}
+                >
+                  <Ionicons name={createTab.icon} size={23} color={colors.label} />
+                  <Text style={[styles.label, { color: colors.label }]}>{createTab.label}</Text>
+                </Pressable>
+              )}
+            </Fragment>
           );
         })}
       </Glass>
       </View>
-    </View>
+      <OptionSheet visible={creating} onClose={() => setCreating(false)} header={<Text style={styles.sheetTitle}>Create new</Text>}>
+        <OptionRow
+          title="Create a match"
+          detail="One game at any place. No club needed."
+          leading={<IconTile icon="football-outline" color={colors.brand} background={colors.brandSoft} />}
+          onPress={() => createThen('/create/game')}
+        />
+        <OptionRow
+          title="Create a club"
+          detail="A group that plays every week."
+          leading={<IconTile icon="people-outline" color={colors.brand} background={colors.brandSoft} />}
+          onPress={() => createThen('/create/club')}
+        />
+      </OptionSheet>
+    </Animated.View>
   );
 }
 
 const ITEM_HEIGHT = layout.tabBarHeight - 12;
 
 const styles = StyleSheet.create({
+  sheetTitle: { ...type.title3, color: colors.label, paddingHorizontal: space.lg, paddingTop: space.xs, paddingBottom: space.sm },
   wrap: { position: 'absolute', left: space.lg, right: space.lg },
   bar: { height: layout.tabBarHeight, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6 },
   pill: {

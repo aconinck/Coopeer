@@ -15,8 +15,8 @@ and anyone can start an open game or create a club (Figma "Criando Equipe" / "Cr
   render space as everything else, so the camera, pins and illustrations line up. On top: baked park
   footprints and OpenStreetMap soccer fields / pickleball courts drawn as small illustrations
   (tap → sheet → start a game/club there). Only the parks and pitches come from `scripts/build_map.py`
-  → `src/map/mapData.ts` (Bentonville bbox); tiles cover the whole world. Controls: `MapControls` (+ − locate). Your position (`expo-location` via `src/lib/useLocation.ts`) is the blue `UserDot`; the locate arrow is filled (`navigate`) while the camera follows you and turns to an outline (`navigate-outline`) as soon as you pan/pinch/double-tap, open a place or pick a sport; tapping it glides back. Without permission it falls back to Bentonville. `/map?sport=<id>` opens on that filter. Top of the map: `MapTopBar` = one glass capsule holding a large `Segmented` (All | Clubs | Matches: which places/list sections show) and, past a hairline, an independent "Now" pill (happening now: only live games, and clubs with a game live now) that combines with any segment. The drawer, top bar and tab bar share the same side inset (`space.lg`). Search, the sport chips (All · Soccer · Pickleball · Trails) and a "Create new" pill (→ sheet: Start a game / Create a club) live in the bottom drawer above the games and clubs list.
-- `expo-video` for the welcome background, feed clips (assets/video, Mixkit free license). Only ship clips with a license that allows it — never rip YouTube/brand ads.
+  → `src/map/mapData.ts` (Bentonville bbox); tiles cover the whole world. Controls: `MapControls` (+ − locate). Your position (`expo-location` via `src/lib/useLocation.ts`) is the blue `UserDot`; the locate arrow is filled (`navigate`) while the camera follows you and turns to an outline (`navigate-outline`) as soon as you pan/pinch/double-tap, open a place or pick a sport; tapping it glides back. Without permission it falls back to Bentonville. `/map?sport=<id>` opens on that filter. The home screen (`(tabs)/map.tsx`) has two views behind one `MapTopBar` (icon-only glass `Segmented` Tile | Map on the left, your avatar on the right which opens your profile sheet; the first tab is labeled **Home**; the same avatar `ProfileButton` is the top-right control of Clubs and Schedule). **Tile** (default, `src/discover/TileFeed.tsx`) is a snapping vertical feed of `InviteCard`s (`src/ui/InviteCard.tsx`: place photo from `heroImageFor`, sport icon top-left, Live / when pill top-right, title + place + going avatars at the bottom), live first, then today, then later, with search and the sport chips docked in the bottom drawer (the tab bar slides away while you scroll down and comes back scrolling up). The bottom drawer (search, sport chips) is shared by both views; on **Map** it also expands to the games and clubs list, next to the map controls. The map stays mounted under Tile. Drawer, top bar and tab bar share the same side inset (`space.lg`).
+- `expo-video` for the welcome background (assets/video, Mixkit free license). Only ship clips with a license that allows it — never rip YouTube/brand ads.
 - `react-native-reanimated` 4 for all motion; `expo-haptics` for feedback (never on web)
 - `expo-glass-effect` (real iOS 26 Liquid Glass) with an `expo-blur` fallback — always via `src/ui/Glass.tsx`
 - `expo-camera` (QR scanning), `react-native-qrcode-svg` (invite QR), `expo-haptics`, AsyncStorage
@@ -38,13 +38,13 @@ Visual language that teaches the difference — keep it consistent:
 - Use `GameRow`, `ClubRow`, `ClubCard` from `src/ui/Rows.tsx`; never hand-roll another list item for these.
 
 Map markers keep **places** and **activity** visually apart (`src/map/PlacePin.tsx`):
-- A **place** (park, field, courts, trail, community center) is a calm neutral badge with a kind icon (`placeKinds`). Always there.
+- A **place** (park, field, courts, trail, community center) is a 40px colored circle with a white ring and the kind icon (`placeKinds[kind].icon` / `.color`), Apple Maps style, no illustrations. Always there.
 - **Activity** (a game live now or later today) is a loud pill floating above the place: a red circle with the sport icon + pulse for live (no text), brand orange pill with the time otherwise.
 Place names fade in as you zoom; the selected pin lifts and the others dim.
 Verified clubs (`Club.verified`) always show the blue `VerifiedBadge` next to the name.
 
 Places have a kind, the sports you can play there (`Place.sports`) and optional licensed `photos` (credit them;
-never invent image URLs — without photos `PlaceHero` shows an illustration). Picking a place when creating a
+never invent image URLs; park photos live in `assets/images/places` (`src/lib/placePhotos.ts`, matched by place name) so they always load; a place or game without a photo uses `heroImageFor` in `src/lib/heroImage.ts`). Picking a place when creating a
 club or game shows `src/map/PlacePickerMap.tsx` (small map with the sport's place badges: tap one to pick it, picking from the list glides the map there) above `src/ui/PlaceResults.tsx`: Coopeer places first ("On Coopeer"), then OpenStreetMap
 results from Photon (`src/lib/geocode.ts`, debounced, US only, biased to Bentonville) that `store.addPlace`
 saves as new places. Never use Nominatim for autocomplete (its policy forbids it).
@@ -68,7 +68,7 @@ References: AllTrails (map, places, badges), Strava (activity cards, stats), Air
 - **Color**: neutral by default; color carries meaning. Sport color only when a sport is selected or for sport identity on
   covers; brand orange for primary actions and upcoming activity; red only for LIVE and destructive; blue only for
   verified; gold/silver/bronze only for achievements.
-- **Profile** (yours and everyone's): identity + four numbers (Games · Hours · Places · Clubs), "Sports" rail (`SportStatCard`: games and hours), achievements (`AchievementBadge`), clubs, then account `ListGroup` on your own. Every number is DERIVED, never typed in: `computeStats()` in `src/state/profile.ts` runs over the games a player was "going" to that ended (not canceled) plus their club count; achievements are plain thresholds over that (`achievementsFor`). `usePlayer(id)` gives the same result for you and others (Supabase: `api.fetchPlayer`, which reads ended RSVPs separately because the store only keeps recent games; demo: derived from the store). "Played" = RSVP'd going to a game that ended, there is no check-in. No levels, skill trees, goals, wins, MVPs or miles: if a number cannot be computed from games already recorded, do not show it. People are tappable (`useDetailNav().player(id)` / `open.player(id)`): attendee lists, club members and feed post authors open `PlayerDetail` in the sheet; your own id goes to the Profile tab.
+- **Profile** (yours and everyone's): identity + four numbers (Games · Hours · Places · Clubs), "Sports" rail (`SportStatCard`: games and hours), achievements (`AchievementBadge`), clubs, then account `ListGroup` on your own. Every number is DERIVED, never typed in: `computeStats()` in `src/state/profile.ts` runs over the games a player was "going" to that ended (not canceled) plus their club count; achievements are plain thresholds over that (`achievementsFor`). `usePlayer(id)` gives the same result for you and others (Supabase: `api.fetchPlayer`, which reads ended RSVPs separately because the store only keeps recent games; demo: derived from the store). "Played" = RSVP'd going to a game that ended, there is no check-in. No levels, skill trees, goals, wins, MVPs or miles: if a number cannot be computed from games already recorded, do not show it. People are tappable (`useDetailNav().player(id)` / `open.player(id)`): attendee lists, club members open `PlayerDetail` in the sheet; your own id opens `ProfileDetail` (your profile plus Account settings) in the sheet. Cards that sit on the glass sheet use `glassCard` (translucent fill, bright hairline, soft lift), not the solid white `card`.
 
 ## Bottom sheet
 
@@ -84,7 +84,7 @@ Open it with `open.place/game/club(id)` from `src/lib/nav.ts`; "Your Clubs" uses
 1. A screen's main action lives in the bottom **ActionBar**: `[SecondaryButton] [PrimaryButton]`, optional caption.
    Exception, matching the Figma: hero screens and the "club found" sheet use a full-width pill with a text button below.
 2. Step-by-step flows (login, team code) use `StepScaffold`: back/close + progress bar, big title, round **NextButton** bottom-right.
-3. The top-right header holds at most **one** control: `MoreMenu` ("…", or `icon="add"` for "+").
+3. The top-right header holds at most **one** control: `MoreMenu` ("…", or `icon="add"` for "+"); main tabs use the avatar `ProfileButton`.
 4. Details open in the bottom sheet (`open.*`); inside a detail use `useDetailNav()` so navigation stays in the sheet.
 5. Destructive actions always confirm (`confirmDestructive`).
 6. Login only when acting: wrap actions in `session.requireAuth(() => ...)`.
@@ -94,10 +94,10 @@ Open it with `open.place/game/club(id)` from `src/lib/nav.ts`; "Your Clubs" uses
 ```
 app/
   _layout.tsx            Providers + Stack (sheet/modal presentation per route)
-  index.tsx              Redirect: /welcome or /explore
+  index.tsx              Redirect: /welcome or /map
   welcome.tsx            Hero (Figma Login)
   auth.tsx               Sign up: phone → code → name → birth year (13+) → favorite sports (`SportTile` grid, tap to fill, no checkboxes) → goal (find a game / join a club / start a game) as the last step: Next drops you into the app (map or Clubs) and "Start a game" opens `/create/game?sport=` on top; no club creation during sign-up. Finishing sign-up queues the guided tour (`requestTour()`) (one route, internal steps; `OptionCard` from StepFlow)
-  (tabs)/                map, clubs, explore (feed, center tab), schedule ("+" = new open game, no club), profile — custom glass TabBar
+  (tabs)/                map (labeled Home), clubs, schedule — custom glass TabBar (no Profile tab: your profile is a bottom sheet, `src/details/ProfileDetail.tsx`, opened by the avatar `ProfileButton`), which also holds a **Create new** button between Clubs and Schedule (not a screen: it opens the sheet Start a game / Create a club)
   create/club.tsx        Create a club (name → photo → sport → place → price → payout → done)
   create/game.tsx        Create a game: open or club, date/time, repeat, location, members
   place|game|club|attendees|player/[id].tsx   Thin route wrappers (deep links, Clubs tab page) around src/details/*

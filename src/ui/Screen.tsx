@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, layout, radius, space, type } from '../constants/theme';
 import { IconButton, type IconName } from './Buttons';
 import { Glass } from './Glass';
+import { TopBlur } from './TopBlur';
 
 export const useTabBarSpace = () => {
   const insets = useSafeAreaInsets();
@@ -27,27 +28,37 @@ interface ScreenProps {
   trailing?: ReactNode;
   /** Usually an <ActionBar>. */
   footer?: ReactNode;
+  /** Immersive: cover behind a transparent header, on `coverColor`. */
+  cover?: ReactNode;
+  coverColor?: string;
   children: ReactNode;
 }
 
-export function Screen({ title, variant = 'page', trailing, footer, children }: ScreenProps) {
+export function Screen({ title, variant = 'page', trailing, footer, cover, coverColor, children }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const tabBarSpace = useTabBarSpace();
   const [footerHeight, setFooterHeight] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const top = variant === 'sheet' ? space.md : insets.top;
+  // Tabs and pages: the header floats over the content on a fading blur instead of a solid block.
+  const floating = !cover && variant !== 'sheet';
   const bottomInset = variant === 'tab' ? tabBarSpace : Math.max(insets.bottom, space.md);
 
   return (
-    <View style={[styles.root, { paddingTop: top }]}>
+    <View style={[styles.root, { paddingTop: cover || floating ? 0 : top }, coverColor ? { backgroundColor: coverColor } : null]}>
+      {floating && <TopBlur height={top + headerHeight + space.xxl} />}
       {variant === 'tab' ? (
-        <View style={styles.largeHeader}>
+        <View style={[styles.largeHeader, styles.floatingHeader, { top }]} onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
           <Text style={type.largeTitle} accessibilityRole="header">
             {title}
           </Text>
           {trailing}
         </View>
       ) : (
-        <View style={styles.header}>
+        <View
+          style={[styles.header, cover ? [styles.headerOverlay, { top }] : null, floating ? [styles.floatingHeader, { top }] : null]}
+          onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+        >
           <IconButton
             icon={variant === 'sheet' ? 'close' : 'chevron-back'}
             label={variant === 'sheet' ? 'Close' : 'Back'}
@@ -62,9 +73,11 @@ export function Screen({ title, variant = 'page', trailing, footer, children }: 
 
       <ScrollView
         style={styles.flex}
-        contentContainerStyle={[styles.content, { paddingBottom: footerHeight + bottomInset + space.lg }]}
+        contentContainerStyle={[styles.content, cover ? styles.contentBleed : null, floating ? { paddingTop: top + headerHeight + space.sm } : null, { paddingBottom: footerHeight + bottomInset + space.lg }]}
         keyboardShouldPersistTaps="handled"
       >
+        {cover}
+        {cover ? <View style={{ height: top + 56 }} /> : null}
         {children}
       </ScrollView>
 
@@ -172,9 +185,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     gap: space.md,
   },
+  floatingHeader: { position: 'absolute', left: 0, right: 0, zIndex: 5 },
+  headerOverlay: { position: 'absolute', left: 0, right: 0, zIndex: 5 },
   headerTitle: { flex: 1, textAlign: 'center' },
   trailing: { minWidth: layout.iconButton, alignItems: 'flex-end' },
   content: { padding: space.lg, gap: space.md },
+  contentBleed: { padding: 0 },
   footer: { position: 'absolute', left: space.md, right: space.md },
   menu: { position: 'absolute', right: space.lg, minWidth: 240, transformOrigin: 'right top' },
   menuCard: { paddingVertical: space.xs },

@@ -1,5 +1,5 @@
-import { useEffect, useRef, type ComponentProps } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   LinearTransition,
@@ -12,6 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Circle, ClipPath, Defs, Ellipse, G, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
 import { colors, layout, radius, shadow, space, type } from '../constants/theme';
 import { spring, timing } from '../constants/motion';
 import { gameStatus, initials, sports, spotsLeft, type Club, type Game, type Member, type SportId } from '../state/models';
@@ -19,26 +20,50 @@ import { isTomorrow, time, weekday } from '../lib/format';
 
 const avatarPalette = [colors.brand, colors.soccer, colors.pickleball, '#30B0C7', '#FF2D55', '#AF52DE', '#00C7BE'];
 
-export function Avatar({ member, size = 36 }: { member: Member; size?: number }) {
+/** The picture you get until you add your own: a soft head-and-shoulders silhouette. Never text. */
+export function AvatarSilhouette({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100" accessibilityLabel="Profile picture">
+      <Defs>
+        <SvgGradient id="avatarBg" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#E4E5EA" />
+          <Stop offset="1" stopColor="#C9CBD3" />
+        </SvgGradient>
+        <ClipPath id="avatarClip">
+          <Circle cx="50" cy="50" r="50" />
+        </ClipPath>
+      </Defs>
+      <G clipPath="url(#avatarClip)">
+        <Rect width="100" height="100" fill="url(#avatarBg)" />
+        <Circle cx="50" cy="39" r="18" fill="#FFFFFF" />
+        <Ellipse cx="50" cy="96" rx="34" ry="30" fill="#FFFFFF" />
+      </G>
+    </Svg>
+  );
+}
+
+/** `silhouette`: no photo (or a photo that fails to load) shows the silhouette instead of initials. Used for yourself. */
+export function Avatar({ member, size = 36, silhouette }: { member: Member; size?: number; silhouette?: boolean }) {
   const isMe = member.id === 'me';
+  const [photoFailed, setPhotoFailed] = useState(false);
   const hash = member.id.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-  if (member.photoUri) {
+  if (member.photoUri && !photoFailed) {
     return (
       <Image
         source={{ uri: member.photoUri }}
         accessibilityLabel={member.name}
-        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: avatarPalette[hash % avatarPalette.length] }}
+        onError={() => setPhotoFailed(true)}
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.fill }}
       />
     );
   }
+  if (isMe || silhouette) return <AvatarSilhouette size={size} />;
   return (
     <View
       accessibilityLabel={member.name}
       style={[styles.center, { width: size, height: size, borderRadius: size / 2, backgroundColor: avatarPalette[hash % avatarPalette.length] }]}
     >
-      <Text style={{ color: colors.white, fontWeight: '700', fontSize: size * (isMe ? 0.3 : 0.38) }}>
-        {isMe ? 'You' : initials(member.name)}
-      </Text>
+      <Text style={{ color: colors.white, fontWeight: '700', fontSize: size * 0.38 }}>{initials(member.name)}</Text>
     </View>
   );
 }
@@ -97,10 +122,17 @@ export function SportIcon({ sport, size = 28, ring }: { sport: SportId; size?: n
 }
 
 /** Clubs are always a rounded square; games are always a date tile. */
-export function ClubLogo({ club, size = 52 }: { club: Club; size?: number }) {
+export function ClubLogo({ club, size = 52, neutral }: { club: Club; size?: number; neutral?: boolean }) {
   const info = sports[club.sport];
   if (club.photoUri) {
-    return <Image source={{ uri: club.photoUri }} style={{ width: size, height: size, borderRadius: size * 0.28, backgroundColor: info.color }} />;
+    return <Image source={{ uri: club.photoUri }} style={{ width: size, height: size, borderRadius: size * 0.28, backgroundColor: colors.fill }} />;
+  }
+  if (neutral) {
+    return (
+      <View style={[styles.center, { width: size, height: size, borderRadius: size * 0.28, backgroundColor: colors.white, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: colors.separator }]}>
+        <MaterialCommunityIcons name={info.icon} size={size * 0.5} color={colors.label} />
+      </View>
+    );
   }
   return (
     <View style={[styles.center, { width: size, height: size, borderRadius: size * 0.28, backgroundColor: info.color }]}>
@@ -147,7 +179,7 @@ function TileTop({ text, color, pulse }: { text: string; color: string; pulse: b
   return <Animated.Text style={[type.caption2, { color, fontWeight: '800' }, style]}>{text}</Animated.Text>;
 }
 
-export type BadgeKind = 'live' | 'going' | 'notGoing' | 'reply' | 'new' | 'canceled' | 'full' | 'member';
+export type BadgeKind = 'live' | 'going' | 'maybe' | 'notGoing' | 'reply' | 'new' | 'canceled' | 'full' | 'member';
 
 const tones = {
   red: { color: colors.live, bg: 'rgba(255,59,48,0.14)' },
@@ -161,6 +193,7 @@ const badgeInfo: Record<BadgeKind, { title: string; tone: keyof typeof tones }> 
   live: { title: 'Live', tone: 'red' },
   going: { title: 'Going', tone: 'green' },
   notGoing: { title: 'Not going', tone: 'orange' },
+  maybe: { title: 'Maybe', tone: 'gray' },
   reply: { title: 'Reply', tone: 'gray' },
   new: { title: 'New', tone: 'brand' },
   canceled: { title: 'Canceled', tone: 'red' },
@@ -173,6 +206,7 @@ export function gameBadge(game: Game, isMember: boolean, now: Date): BadgeKind |
   if (gameStatus(game, now) === 'live') return 'live';
   if (game.myRSVP === 'going') return 'going';
   if (game.myRSVP === 'declined') return 'notGoing';
+  if (game.myRSVP === 'maybe') return 'maybe';
   if (spotsLeft(game) === 0) return 'full';
   if (game.isNew) return 'new';
   return isMember ? 'reply' : null;
@@ -276,6 +310,20 @@ export const card = {
   backgroundColor: colors.surface,
   borderRadius: radius.card,
   ...shadow.card,
+} as const;
+
+/** Apple Liquid Glass card for content that sits on a glass sheet: a translucent fill, a bright hairline edge and a soft lift (backdrop blur on web). */
+export const glassCard = {
+  backgroundColor: 'rgba(255,255,255,0.55)',
+  borderRadius: radius.card,
+  borderWidth: StyleSheet.hairlineWidth * 2,
+  borderColor: 'rgba(255,255,255,0.9)',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.06,
+  shadowRadius: 16,
+  elevation: 2,
+  ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' } as object) : null),
 } as const;
 
 /**
