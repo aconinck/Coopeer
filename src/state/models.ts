@@ -7,16 +7,24 @@ import { colors } from '../constants/theme';
 // - Club:  a recurring group ("every Friday 8 PM"). Join once, get all its games.
 // - Game:  one occurrence at a Place and time. Hosted by a Club, or open (pickup).
 
-export type SportId = 'soccer' | 'pickleball' | 'trails';
+export type SportId = 'soccer' | 'pickleball' | 'trails' | 'basketball' | 'tennis' | 'volleyball' | 'running' | 'cycling' | 'golf' | 'swimming' | 'yoga';
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 export const sports: Record<SportId, { label: string; icon: IconName; color: string; placeNoun: string }> = {
   soccer: { label: 'Soccer', icon: 'soccer', color: colors.soccer, placeNoun: 'field' },
   pickleball: { label: 'Pickleball', icon: 'table-tennis', color: colors.pickleball, placeNoun: 'courts' },
   trails: { label: 'Trails', icon: 'hiking', color: colors.trails, placeNoun: 'trail' },
+  basketball: { label: 'Basketball', icon: 'basketball', color: colors.basketball, placeNoun: 'court' },
+  tennis: { label: 'Tennis', icon: 'tennis-ball', color: colors.tennis, placeNoun: 'courts' },
+  volleyball: { label: 'Volleyball', icon: 'volleyball', color: colors.volleyball, placeNoun: 'court' },
+  running: { label: 'Running', icon: 'run', color: colors.running, placeNoun: 'route' },
+  cycling: { label: 'Cycling', icon: 'bike', color: colors.cycling, placeNoun: 'route' },
+  golf: { label: 'Golf', icon: 'golf', color: colors.golf, placeNoun: 'course' },
+  swimming: { label: 'Swimming', icon: 'swim', color: colors.swimming, placeNoun: 'pool' },
+  yoga: { label: 'Yoga', icon: 'yoga', color: colors.yoga, placeNoun: 'studio' },
 };
 
-export const sportIds: SportId[] = ['soccer', 'pickleball', 'trails'];
+export const sportIds: SportId[] = ['soccer', 'pickleball', 'trails', 'basketball', 'tennis', 'volleyball', 'running', 'cycling', 'golf', 'swimming', 'yoga'];
 
 export interface Member {
   id: string;

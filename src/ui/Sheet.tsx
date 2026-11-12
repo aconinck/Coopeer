@@ -305,7 +305,7 @@ function SheetHost({
   });
 
   // A light blur over whatever is behind, whenever the sheet is open.
-  const blurStyle = useAnimatedStyle(() => ({ opacity: withTiming(isOpen ? 1 : 0, { duration: 220 }) }));
+  const blurStyle = useAnimatedStyle(() => ({ opacity: withTiming(isOpen ? 1 : 0, { duration: 80 }) }));
 
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: interpolate(y.value, [full, half], [1, 0], Extrapolation.CLAMP),

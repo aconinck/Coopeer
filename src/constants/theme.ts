@@ -28,6 +28,14 @@ export const colors = {
   soccer: '#30B35A',
   pickleball: '#5B5BD6',
   trails: '#1F9D8B',
+  basketball: '#E8640A',
+  tennis: '#6DAE3F',
+  volleyball: '#2E9DD4',
+  running: '#D94F7B',
+  cycling: '#5A67D8',
+  golf: '#3A9C5F',
+  swimming: '#00A8C8',
+  yoga: '#9B59B6',
   verified: '#0A84FF',
 
   // Achievement tiers

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
+  useAnimatedKeyboard,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -208,11 +209,15 @@ export default function MapScreen() {
     );
   }, [selectedPlaceId, summaries]);
 
-  // The drawer slides down while a detail sheet is open.
+  // The drawer slides down while a detail sheet is open, and lifts above the keyboard when focused.
+  const keyboard = useAnimatedKeyboard();
   const drawerStyle = useAnimatedStyle(() => ({
     opacity: withTiming(sheet.isOpen ? 0 : 1, { duration: 180 }),
-    // Docked above the tab bar; when the tab bar slides away (scrolling the Tile feed) it settles to the bottom edge.
-    transform: [{ translateY: withSpring(sheet.isOpen ? 260 : 0, DRAWER_SPRING) }, { translateY: tabBarHidden.value * TAB_BAR_DROP }],
+    transform: [
+      { translateY: withSpring(sheet.isOpen ? 260 : 0, DRAWER_SPRING) },
+      { translateY: tabBarHidden.value * TAB_BAR_DROP },
+      { translateY: -keyboard.height.value },
+    ],
   }));
 
   // Expanding grows only the games list (a clipped height), so the search and chips never stretch.
@@ -255,7 +260,6 @@ export default function MapScreen() {
         <Chip
           key={id}
           title={sports[id].label}
-          color={sports[id].color}
           selected={sport === id}
           onPress={() => pickSport(sport === id ? null : id)}
           icon={<MaterialCommunityIcons name={sports[id].icon} size={17} color={sport === id ? colors.white : colors.label2} />}

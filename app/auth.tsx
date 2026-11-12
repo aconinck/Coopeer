@@ -601,16 +601,6 @@ function AgeStep({
   );
 }
 
-const INTEREST_SPORTS: { id: string; label: string; icon: string }[] = [
-  { id: 'basketball', label: 'Basketball', icon: 'basketball' },
-  { id: 'tennis', label: 'Tennis', icon: 'tennis-ball' },
-  { id: 'volleyball', label: 'Volleyball', icon: 'volleyball' },
-  { id: 'running', label: 'Running', icon: 'run' },
-  { id: 'cycling', label: 'Cycling', icon: 'bike' },
-  { id: 'golf', label: 'Golf', icon: 'golf' },
-  { id: 'swimming', label: 'Swimming', icon: 'swim' },
-  { id: 'yoga', label: 'Yoga', icon: 'yoga' },
-];
 
 function SportsStep({
   selected,
@@ -626,10 +616,7 @@ function SportsStep({
   onDone: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
-  const [interests, setInterests] = useState<string[]>([]);
-  const allSelected =
-    sportIds.every((id) => selected.includes(id)) &&
-    INTEREST_SPORTS.every(({ id }) => interests.includes(id));
+  const allSelected = sportIds.every((id) => selected.includes(id));
 
   const toggle = (id: SportId) =>
     setSelected(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
@@ -637,22 +624,14 @@ function SportsStep({
   const toggleAll = () => {
     if (allSelected) {
       setSelected([]);
-      setInterests([]);
     } else {
       setSelected([...sportIds]);
-      setInterests(INTEREST_SPORTS.map((s) => s.id));
     }
   };
 
-  const toggleInterest = (id: string) =>
-    setInterests((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
-
   const proceed = () => {
     setBusy(true);
-    const save = interests.length > 0
-      ? AsyncStorage.setItem('coopeer.sport_interests', JSON.stringify(interests)).catch(() => {})
-      : Promise.resolve();
-    save.then(() => onDone()).catch(() => setBusy(false));
+    onDone().catch(() => setBusy(false));
   };
 
   return (
@@ -704,31 +683,6 @@ function SportsStep({
           );
         })}
 
-        {/* Interest sport pills (data gathering) */}
-        {INTEREST_SPORTS.map(({ id, label, icon }) => {
-          const active = interests.includes(id);
-          return (
-            <Pressable
-              key={id}
-              style={({ pressed }) => [
-                styles.pill,
-                active && styles.pillActive,
-                pressed && { opacity: 0.7 },
-              ]}
-              onPress={() => { if (Platform.OS !== 'web') void Haptics.selectionAsync(); toggleInterest(id); }}
-              accessibilityRole="checkbox"
-              accessibilityLabel={label}
-              accessibilityState={{ checked: active }}
-            >
-              <MaterialCommunityIcons
-                name={icon as any}
-                size={16}
-                color={active ? colors.white : colors.label2}
-              />
-              <Text style={[styles.pillText, active && styles.pillTextActive]}>{label}</Text>
-            </Pressable>
-          );
-        })}
       </View>
     </StepScaffold>
   );
