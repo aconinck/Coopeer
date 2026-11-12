@@ -5,6 +5,7 @@ import { pitchById, pitchTitle, placeForPitch as nearestPlace, type Pitch } from
 import * as mock from './mockData';
 import { withSavedPhotos } from '../lib/placePhotos';
 import * as api from './api';
+import * as localDb from './localDb';
 import { hasBackend } from '../lib/supabase';
 import { useSession } from './session';
 
@@ -96,6 +97,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(mock.paymentMethods);
   // Writes run one after another so a new place lands before the game that uses it.
   const queue = useRef<Promise<unknown>>(Promise.resolve());
+  // Guards the save effect so we don't overwrite localDb before the initial load resolves.
+  const dbLoaded = useRef(hasBackend);
 
   const refresh = useCallback(async () => {
     if (!uid) return null;
@@ -136,6 +139,51 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     [uid, refresh],
   );
+
+  // Load persisted data from localDb on first mount (demo / offline mode only).
+  useEffect(() => {
+    if (hasBackend) return;
+    localDb.load().then((data) => {
+      const snap = data ?? undefined;
+      if (snap) {
+        setPlaces(snap.places);
+        setClubs(snap.clubs);
+        setGames(snap.games);
+        setMemberships(new Set(snap.memberships));
+        setPayments(snap.payments);
+        setPaymentMethods(snap.paymentMethods);
+      } else {
+        // First run: persist the in-memory mock data so it survives restarts.
+        localDb.seed().then((seeded) => {
+          setPlaces(seeded.places);
+          setClubs(seeded.clubs);
+          setGames(seeded.games);
+          setMemberships(new Set(seeded.memberships));
+          setPayments(seeded.payments);
+          setPaymentMethods(seeded.paymentMethods);
+        });
+      }
+      dbLoaded.current = true;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist all collections back to localDb whenever they change (debounced 400 ms).
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!dbLoaded.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      localDb.save({
+        places,
+        clubs,
+        games,
+        memberships: [...memberships],
+        payments,
+        paymentMethods,
+      });
+    }, 400);
+  }, [places, clubs, games, memberships, payments, paymentMethods]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30_000);
