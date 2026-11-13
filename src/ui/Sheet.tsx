@@ -16,7 +16,6 @@ import Animated, {
   useDerivedValue,
   useSharedValue,
   withSpring,
-  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -34,7 +33,6 @@ import { ProfileDetail } from '../details/ProfileDetail';
 import { IconButton } from './Buttons';
 import { DetailHost, openPlayer, type DetailLayoutProps, type DetailNav, type SheetRoute } from './DetailLayout';
 import { Glass } from './Glass';
-import { SoftBlur } from './TopBlur';
 import { sheetController } from './sheetController';
 import { sheetSwipeController } from './sheetSwipeController';
 
@@ -304,9 +302,6 @@ function SheetHost({
     };
   });
 
-  // A light blur over whatever is behind, whenever the sheet is open.
-  const blurStyle = useAnimatedStyle(() => ({ opacity: withTiming(isOpen ? 1 : 0, { duration: 80 }) }));
-
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: interpolate(y.value, [full, half], [1, 0], Extrapolation.CLAMP),
   }));
@@ -359,7 +354,6 @@ function SheetHost({
 
   return (
     <View pointerEvents={hidden ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, styles.host, hidden && styles.hidden]} aria-hidden={hidden}>
-      <SoftBlur radius={3} style={blurStyle} />
       <Pressable
         accessibilityLabel="Close"
         pointerEvents={isOpen && !atFull ? 'auto' : 'none'}

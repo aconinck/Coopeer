@@ -5,7 +5,6 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../constants/theme';
 
-const STEPS = 6;
 
 /**
  * A blur whose strength fades out along one edge. `strong` is the edge where it is strongest.
@@ -18,17 +17,14 @@ export function FadingBlur({ strong, radius = 16, tint = 'light', style }: { str
     const web = { backdropFilter: `blur(${radius}px)`, WebkitBackdropFilter: `blur(${radius}px)`, maskImage: mask, WebkitMaskImage: mask } as unknown as ViewStyle;
     return <View pointerEvents="none" style={[StyleSheet.absoluteFill, web, style]} />;
   }
+  // Native: single BlurView — stacking multiple BlurViews compounds their effect exponentially.
   return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
-      {Array.from({ length: STEPS }, (_, i) => (
-        <BlurView
-          key={i}
-          tint={tint}
-          intensity={Math.round((radius / STEPS) * 3)}
-          style={[styles.band, strong === 'top' ? { top: 0 } : { bottom: 0 }, { height: `${(1 - i / STEPS) * 100}%` }]}
-        />
-      ))}
-    </View>
+    <BlurView
+      pointerEvents="none"
+      tint={tint}
+      intensity={Math.min(Math.round(radius * 1.5), 60)}
+      style={[StyleSheet.absoluteFill, style]}
+    />
   );
 }
 
@@ -64,5 +60,4 @@ export function TopBlur({ height, zIndex = 4 }: { height: number; zIndex?: numbe
 
 const styles = StyleSheet.create({
   root: { position: 'absolute', left: 0, right: 0, top: 0 },
-  band: { position: 'absolute', left: 0, right: 0 },
 });

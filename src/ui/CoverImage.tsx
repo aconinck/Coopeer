@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Image, Platform, StyleSheet, View, type ImageSourcePropType, type ImageStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { fill } from './Media';
-import { FadingBlur } from './TopBlur';
 
 const fallback = require('../../assets/images/hero-soccer.jpg') as ImageSourcePropType;
 
@@ -17,7 +16,14 @@ export function ProgressiveBlurImage({ source, from = 0.2, to = 0.9, radius = 28
     const copy = { filter: `blur(${radius}px)`, transform: [{ scale: 1.14 }], maskImage: mask, WebkitMaskImage: mask } as unknown as ImageStyle;
     return <Image source={source} resizeMode="cover" accessibilityIgnoresInvertColors style={[fill, copy]} />;
   }
-  return <FadingBlur strong="bottom" tint="dark" radius={radius} style={{ top: `${from * 100}%` }} />;
+  // Native: gradient scrim — stacked BlurViews compound their intensity and produce a heavy artifact.
+  return (
+    <LinearGradient
+      colors={['transparent', 'rgba(0,0,0,0.65)']}
+      locations={[from, to]}
+      style={fill}
+    />
+  );
 }
 
 /**
