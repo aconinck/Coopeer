@@ -118,7 +118,6 @@ export function ProfileDetail() {
         <Section title="Account">
           <ListGroup glass>
             <ListRow icon="person-outline" title="Personal info" subtitle="Name, phone number" onPress={() => go('/personal-info')} />
-            <ListRow icon="card-outline" title="Payments" subtitle="Memberships and payment methods" onPress={() => go('/payments')} />
             <ListRow icon="help-circle-outline" title="How Coopeer works" onPress={() => go('/how-it-works')} />
           </ListGroup>
           <ListGroup glass>

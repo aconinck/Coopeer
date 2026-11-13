@@ -11,6 +11,7 @@ import { PlaceIcon } from '../map/PlacePin';
 import { SectionHeader } from '../ui/Display';
 import { InviteCard, inviteWhen } from '../ui/InviteCard';
 import { Rail } from '../ui/Layout';
+import { ClubCard } from '../ui/Rows';
 import { PhotoCard } from '../ui/PhotoCard';
 import { setTabBarHidden } from '../ui/tabBarVisibility';
 import { consumeCascade } from '../lib/firstVisit';
@@ -75,7 +76,8 @@ export function TileFeed({
     ...upcoming.filter((g) => g.isNew && gameStatus(g, now) !== 'live').map((g) => ({ kind: 'game' as const, game: g })),
     ...store.clubs.filter((c) => c.isNew && (!sport || c.sport === sport) && matches(c.name, store.place(c.homePlaceId)?.name)).map((c) => ({ kind: 'club' as const, club: c })),
   ];
-  const comingUp = upcoming.filter((g) => gameStatus(g, now) !== 'live');
+  const weekly = upcoming.filter((g) => g.repeat === 'weekly' && gameStatus(g, now) !== 'live');
+  const comingUp = upcoming.filter((g) => gameStatus(g, now) !== 'live' && g.repeat !== 'weekly');
   const clubs = store.clubs.filter((c) => (!sport || c.sport === sport) && matches(c.name, store.place(c.homePlaceId)?.name));
   const places = store.places
     .filter((p) => (!sport || p.sports.includes(sport)) && matches(p.name, p.address))
@@ -87,7 +89,7 @@ export function TileFeed({
   const wideW = Math.min(width * 0.74, 300);
   const clubW = Math.min(width * 0.4, 168);
   const first = user?.name.split(' ')[0] ?? 'there';
-  const empty = live.length + fresh.length + comingUp.length + clubs.length + places.length === 0;
+  const empty = live.length + fresh.length + comingUp.length + weekly.length + clubs.length + places.length === 0;
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={{ paddingTop: top, paddingBottom: bottom + space.lg, paddingHorizontal: layout.gutter, gap: layout.sectionGap }} showsVerticalScrollIndicator={false}
@@ -138,19 +140,30 @@ export function TileFeed({
         </Animated.View>
       )}
 
-      {clubs.length > 0 && (
+      {weekly.length > 0 && (
         <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(600) : undefined}>
+          <SectionHeader title="Every week" caption="These games happen on a regular schedule." />
+          <Rail snap={liveW}>
+            {weekly.map((game) => (
+              <InviteCard key={game.id} game={game} place={store.place(game.placeId)} club={game.clubId ? store.club(game.clubId) : undefined} image={imageFor(game)} now={now} width={liveW} height={Math.round(liveW * 1.25)} onPress={() => onOpenGame(game)} />
+            ))}
+          </Rail>
+        </Animated.View>
+      )}
+
+      {clubs.length > 0 && (
+        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(750) : undefined}>
           <SectionHeader title="Clubs near you" caption="Groups that play every week." />
           <Rail snap={clubW}>
-            {clubs.map((club) => (
-              <PhotoCard key={club.id} image={clubImage(club)} title={club.name} subtitle={club.cadence} badge={sports[club.sport].label} width={clubW} height={clubW} onPress={() => onOpenClub(club)} />
+            {clubs.map((club, i) => (
+              <ClubCard key={club.id} club={club} index={i} width={clubW} onPress={() => onOpenClub(club)} />
             ))}
           </Rail>
         </Animated.View>
       )}
 
       {places.length > 0 && (
-        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(750) : undefined}>
+        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(900) : undefined}>
           <SectionHeader title="Places to play" caption="Parks, fields, courts and trails." />
           <View style={styles.grid}>
             {places.map((place) => (

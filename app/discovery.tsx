@@ -12,6 +12,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { heroImageFor } from '../src/lib/heroImage';
 import { triggerCascade } from '../src/lib/firstVisit';
 import { gameStatus } from '../src/state/models';
@@ -21,7 +22,9 @@ import { InviteCard } from '../src/ui/InviteCard';
 const LOOP_N = 6;
 const CARD_GAP = 14;
 const SCROLL_DURATION = 22000;
-const BG = '#0E1A0A';
+// Dusk-to-night gradient: cool oceanic top → dark warm amber bottom
+const GRADIENT = ['#0C1520', '#181412', '#241A0A'] as const;
+const BOTTOM_COLOR = '#241A0A';
 
 export default function DiscoveryScreen() {
   const { width, height } = useWindowDimensions();
@@ -31,6 +34,7 @@ export default function DiscoveryScreen() {
   const CARD_H = Math.round(CARD_W * 1.3);
   const CARD_UNIT = CARD_W + CARD_GAP;
   const loopW = useRef(LOOP_N * CARD_UNIT);
+  const cardsZoneH = Math.round(height * 0.52);
 
   const baseGames = store.games
     .filter((g) => !g.isCanceled && gameStatus(g, store.now) !== 'ended')
@@ -40,7 +44,6 @@ export default function DiscoveryScreen() {
     baseGames.length > 0
       ? Array.from({ length: LOOP_N }, (_, i) => baseGames[i % baseGames.length])
       : [];
-  // Duplicate for seamless horizontal loop
   const cardGames = [...padded, ...padded];
 
   const scrollX = useSharedValue(0);
@@ -78,54 +81,57 @@ export default function DiscoveryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false, animation: 'fade' }} />
-      <Animated.View style={[StyleSheet.absoluteFill, screenStyle]}>
-        {/* Cards strip — outer view handles exit animation (fly up), inner clips horizontal scroll */}
-        <Animated.View style={[styles.stripOuter, { marginTop: 28 }, cardsStyle]}>
-          <View style={[styles.stripInner, { height: CARD_H + 48 }]}>
-            <Animated.View style={[styles.track, trackStyle]}>
-              {cardGames.map((game, i) => {
-                const place = store.place(game.placeId);
-                return (
-                  <InviteCard
-                    key={`${game.id}-${i}`}
-                    game={game}
-                    place={place}
-                    club={game.clubId ? store.club(game.clubId) : undefined}
-                    image={place ? heroImageFor(game, place, store.places) : null}
-                    now={store.now}
-                    width={CARD_W}
-                    height={CARD_H}
-                    onPress={() => {}}
-                  />
-                );
-              })}
-            </Animated.View>
+      <LinearGradient colors={GRADIENT} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+        <Animated.View style={[StyleSheet.absoluteFill, screenStyle]}>
+          {/* Upper half — auto-scrolling cards */}
+          <Animated.View style={[{ height: cardsZoneH, justifyContent: 'center' }, cardsStyle]}>
+            <View style={[styles.stripInner, { height: CARD_H + 48 }]}>
+              <Animated.View style={[styles.track, trackStyle]}>
+                {cardGames.map((game, i) => {
+                  const place = store.place(game.placeId);
+                  return (
+                    <InviteCard
+                      key={`${game.id}-${i}`}
+                      game={game}
+                      place={place}
+                      club={game.clubId ? store.club(game.clubId) : undefined}
+                      image={place ? heroImageFor(game, place, store.places) : null}
+                      now={store.now}
+                      width={CARD_W}
+                      height={CARD_H}
+                      onPress={() => {}}
+                    />
+                  );
+                })}
+              </Animated.View>
+            </View>
+          </Animated.View>
+
+          {/* Lower half — copy and CTA, centered */}
+          <View style={[styles.bottom, { height: height - cardsZoneH }]}>
+            <Text style={styles.headline}>{'Find games.\nBuild your crew.\nHave fun.'}</Text>
+            <Text style={styles.subhead}>Sports near you, every day.</Text>
+            <Pressable
+              onPress={handleExplore}
+              style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Explore"
+            >
+              <Text style={styles.ctaText}>Explore</Text>
+            </Pressable>
           </View>
         </Animated.View>
-
-        {/* Copy and CTA */}
-        <View style={styles.bottom}>
-          <Text style={styles.headline}>{'Find games.\nBuild your crew.\nHave fun.'}</Text>
-          <Text style={styles.subhead}>Sports near you, every day.</Text>
-          <Pressable
-            onPress={handleExplore}
-            style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Explore"
-          >
-            <Text style={styles.ctaText}>Explore</Text>
-          </Pressable>
-        </View>
-      </Animated.View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: BG },
-  stripOuter: {},
+  root: { flex: 1, backgroundColor: BOTTOM_COLOR },
+  safe: { flex: 1 },
   stripInner: {
     overflow: 'hidden',
     justifyContent: 'center',
@@ -137,9 +143,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bottom: {
-    flex: 1,
-    paddingHorizontal: 28,
-    paddingTop: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
     gap: 10,
   },
   headline: {
@@ -148,19 +154,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.8,
     lineHeight: 48,
+    textAlign: 'center',
   },
   subhead: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.58)',
     fontWeight: '400',
+    textAlign: 'center',
   },
   cta: {
-    marginTop: 18,
+    marginTop: 20,
     backgroundColor: '#FFFFFF',
     borderRadius: 50,
     paddingVertical: 16,
-    paddingHorizontal: 48,
-    alignSelf: 'flex-start',
+    paddingHorizontal: 52,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.28,
@@ -169,7 +176,7 @@ const styles = StyleSheet.create({
   },
   ctaPressed: { opacity: 0.86 },
   ctaText: {
-    color: BG,
+    color: BOTTOM_COLOR,
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 0.2,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
@@ -67,33 +67,6 @@ export function GameDetail({ id }: { id: string }) {
           : `Drop-in ${dollars(game.dropInPrice)} · paid at the ${sports[game.sport].placeNoun}`;
 
   const reply = (next: RSVP) => session.requireAuth(() => store.setRSVP(game.id, next));
-  const payAndGo = () =>
-    session.requireAuth(() => {
-      if (game.dropInPrice === 0 || isMember) { reply('going'); return; }
-      const isRecurring = (game.repeat && game.repeat !== 'never') || !!club;
-      if (isRecurring && club && club.monthlyPrice > 0) {
-        Alert.alert(
-          game.title,
-          `${repeatLabel ?? 'Recurring game'} · ${dollars(game.dropInPrice)} drop-in`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: `Pay ${dollars(game.dropInPrice)} · just this game`, onPress: () => store.setRSVP(game.id, 'going') },
-            { text: `Join ${club.name} · ${dollars(club.monthlyPrice)}/mo`, onPress: () => store.setRSVP(game.id, 'going') },
-          ],
-          { cancelable: true },
-        );
-      } else {
-        Alert.alert(
-          'Pay with Apple Pay',
-          `${dollars(game.dropInPrice)} drop-in · ${game.title}`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: `Pay ${dollars(game.dropInPrice)}`, onPress: () => store.setRSVP(game.id, 'going') },
-          ],
-          { cancelable: true },
-        );
-      }
-    });
   const menu = [
     { label: 'Share', icon: 'share-outline' as const, onPress: () => shareText(`${game.title} · ${monthDay(game.start)} ${time(game.start)} at ${place.name}`, `coopeer://game/${game.id}`) },
     { label: 'Directions', icon: 'navigate-outline' as const, onPress: () => openDirections(place) },
@@ -125,16 +98,7 @@ export function GameDetail({ id }: { id: string }) {
             </View>
           ) : null}
           <View style={styles.capsuleWrap}>
-            {game.dropInPrice > 0 && !isMember && !closed ? (
-              <PayButton
-                price={game.dropInPrice}
-                going={game.myRSVP === 'going'}
-                onPay={payAndGo}
-                onCancel={() => reply('none')}
-              />
-            ) : (
-              <RSVPCapsule value={game.myRSVP} onChange={reply} disabled={closed} tone="light" />
-            )}
+            <RSVPCapsule value={game.myRSVP} onChange={reply} disabled={closed} tone="light" />
           </View>
           <Text style={[type.footnote, styles.heroCaption]}>{caption}</Text>
         </View>
@@ -182,37 +146,6 @@ export function GameDetail({ id }: { id: string }) {
   );
 }
 
-function PayButton({ price, going, onPay, onCancel }: { price: number; going: boolean; onPay: () => void; onCancel: () => void }) {
-  if (going) {
-    return (
-      <View style={payStyles.row}>
-        <View style={payStyles.youreIn}>
-          <Ionicons name="checkmark-circle" size={18} color={colors.brand} />
-          <Text style={[type.headline, payStyles.youreInText]}>You're in</Text>
-        </View>
-        <Pressable onPress={onCancel} style={({ pressed }) => [payStyles.cancelBtn, pressed && styles.pressed]}>
-          <Text style={[type.footnote, payStyles.cancelText]}>Cancel</Text>
-        </Pressable>
-      </View>
-    );
-  }
-  return (
-    <Pressable onPress={onPay} style={({ pressed }) => [payStyles.payBtn, pressed && styles.pressed]}>
-      <Ionicons name="logo-apple" size={18} color={colors.white} />
-      <Text style={[type.headline, payStyles.payText]}>Pay {dollars(price)} · I'm in</Text>
-    </Pressable>
-  );
-}
-
-const payStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  youreIn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.xs },
-  youreInText: { color: colors.brand, fontWeight: '700' },
-  cancelBtn: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.full, backgroundColor: 'rgba(0,0,0,0.08)' },
-  cancelText: { color: colors.label2 },
-  payBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, backgroundColor: colors.label, borderRadius: radius.full, paddingVertical: 16, paddingHorizontal: space.xl },
-  payText: { color: colors.white, fontWeight: '700' },
-});
 
 function Stagger({ index, children, style }: { index: number; children: ReactNode; style?: object }) {
   const reduceMotion = useReducedMotion();
