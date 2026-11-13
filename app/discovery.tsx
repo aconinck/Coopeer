@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import Animated, {
   Easing,
@@ -22,19 +22,22 @@ import { InviteCard } from '../src/ui/InviteCard';
 const LOOP_N = 6;
 const CARD_GAP = 14;
 const SCROLL_DURATION = 22000;
-// Dusk-to-night gradient: cool oceanic top → dark warm amber bottom
-const GRADIENT = ['#0C1520', '#181412', '#241A0A'] as const;
-const BOTTOM_COLOR = '#241A0A';
+// Blue-sky gradient: deep midnight → rich ocean blue → open sky
+const GRADIENT = ['#060F1F', '#0C3270', '#1A73C8'] as const;
+const BOTTOM_COLOR = '#071630';
 
 export default function DiscoveryScreen() {
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const store = useStore();
 
   const CARD_W = Math.round(width * 0.55);
   const CARD_H = Math.round(CARD_W * 1.3);
   const CARD_UNIT = CARD_W + CARD_GAP;
   const loopW = useRef(LOOP_N * CARD_UNIT);
-  const cardsZoneH = Math.round(height * 0.52);
+  // Use the actual visible content height (subtracting safe area) for proportions
+  const contentH = height - insets.top - insets.bottom;
+  const cardsZoneH = Math.round(contentH * 0.52);
 
   const baseGames = store.games
     .filter((g) => !g.isCanceled && gameStatus(g, store.now) !== 'ended')
@@ -111,7 +114,7 @@ export default function DiscoveryScreen() {
           </Animated.View>
 
           {/* Lower half — copy and CTA, centered */}
-          <View style={[styles.bottom, { height: height - cardsZoneH }]}>
+          <View style={[styles.bottom, { height: contentH - cardsZoneH }]}>
             <Text style={styles.headline}>{'Find games.\nBuild your crew.\nHave fun.'}</Text>
             <Text style={styles.subhead}>Sports near you, every day.</Text>
             <Pressable
