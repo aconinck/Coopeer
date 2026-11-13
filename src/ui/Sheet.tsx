@@ -299,6 +299,8 @@ function SheetHost({
       left: side,
       right: side,
       marginBottom: floatProgress.value * (insets.bottom + FLOAT_BOTTOM),
+      // Fade the glass (and its blur) out fast as it starts sliding down — blur disappears before the spring settles.
+      opacity: interpolate(y.value, [half + 50, half + 180], [1, 0], Extrapolation.CLAMP),
     };
   });
 

@@ -10,7 +10,6 @@ import { colors, radius, space, type } from '../src/constants/theme';
 import { formatUSPhone } from '../src/lib/format';
 import { useSession, type ContactKind } from '../src/state/session';
 import { PhotoPicker } from '../src/ui/PhotoPicker';
-import { requestTour } from '../src/tour/Tour';
 import { SportTile, StepScaffold, UnderlineField } from '../src/ui/StepFlow';
 import { Segmented } from '../src/ui/Segmented';
 import { Glass } from '../src/ui/Glass';
@@ -118,9 +117,8 @@ export default function Auth() {
           onBack={() => go('age', 'back')}
           onDone={async () => {
             await session.completeProfile({ name: fullName.trim(), birthYear, sports: favorites, goal: 'play', photoUri: photoUri ?? undefined });
-            await requestTour();
             session.finishAuth();
-            router.replace(favorites[0] ? `/map?sport=${favorites[0]}` : '/map');
+            router.replace('/discovery');
           }}
         />
       );

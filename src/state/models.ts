@@ -146,6 +146,7 @@ export interface Game {
   myRSVP: RSVP;
   isCanceled?: boolean;
   isNew?: boolean;
+  repeat?: Repeat;
 }
 
 export type CardBrand = 'visa' | 'mastercard' | 'amex' | 'discover' | 'applepay' | 'googlepay';

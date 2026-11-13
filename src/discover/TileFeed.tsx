@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ImageSourcePropType } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, layout, radius, space, type } from '../constants/theme';
 import { heroImageFor } from '../lib/heroImage';
@@ -12,6 +13,7 @@ import { InviteCard, inviteWhen } from '../ui/InviteCard';
 import { Rail } from '../ui/Layout';
 import { PhotoCard } from '../ui/PhotoCard';
 import { setTabBarHidden } from '../ui/tabBarVisibility';
+import { consumeCascade } from '../lib/firstVisit';
 
 const greeting = (now: Date) => (now.getHours() < 12 ? 'Good morning,' : now.getHours() < 18 ? 'Good afternoon,' : 'Good evening,');
 
@@ -42,6 +44,8 @@ export function TileFeed({
   const now = store.now;
   const lastY = useRef(0);
   const hidden = useRef(false);
+  // Consumed once on first mount after the discovery screen; drives section stagger.
+  const cascade = useRef(consumeCascade()).current;
   // Scrolling down slides the tab bar away; scrolling back up (or reaching the top) brings it back.
   const onScroll = (y: number) => {
     const dy = y - lastY.current;
@@ -90,26 +94,26 @@ export function TileFeed({
       scrollEventThrottle={16}
       onScroll={(e) => onScroll(e.nativeEvent.contentOffset.y)}
     >
-      <View style={styles.hello}>
+      <Animated.View style={styles.hello} entering={cascade ? FadeIn.duration(400) : undefined}>
         <View>
           <Text style={[type.title, styles.helloLight]}>{greeting(now)}</Text>
           <Text style={[type.title, styles.helloName]}>{first}</Text>
         </View>
-      </View>
+      </Animated.View>
 
       {live.length > 0 && (
-        <View style={styles.section}>
+        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(150) : undefined}>
           <SectionHeader title="Happening now" caption="Live games you can still jump into." />
           <Rail snap={liveW}>
             {live.map((game) => (
               <InviteCard key={game.id} game={game} place={store.place(game.placeId)} club={game.clubId ? store.club(game.clubId) : undefined} image={imageFor(game)} now={now} width={liveW} height={Math.round(liveW * 1.25)} onPress={() => onOpenGame(game)} />
             ))}
           </Rail>
-        </View>
+        </Animated.View>
       )}
 
       {fresh.length > 0 && (
-        <View style={styles.section}>
+        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(300) : undefined}>
           <SectionHeader title="New near you" caption="Just created games and clubs." />
           <Rail snap={freshW}>
             {fresh.map((item) =>
@@ -120,33 +124,33 @@ export function TileFeed({
               ),
             )}
           </Rail>
-        </View>
+        </Animated.View>
       )}
 
       {comingUp.length > 0 && (
-        <View style={styles.section}>
+        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(450) : undefined}>
           <SectionHeader title="Coming up" caption="Games and events on the calendar." />
           <Rail snap={wideW}>
             {comingUp.map((game) => (
               <PhotoCard key={game.id} image={imageFor(game)} title={game.title} subtitle={`${where(game)} · ${game.clubId ? store.club(game.clubId)?.name : 'Open game'}`} badge={isToday(gameStatus(game, now)) ? inviteWhen(game, now) : inviteWhen(game, now)} width={wideW} height={Math.round(wideW * 0.6)} onPress={() => onOpenGame(game)} />
             ))}
           </Rail>
-        </View>
+        </Animated.View>
       )}
 
       {clubs.length > 0 && (
-        <View style={styles.section}>
+        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(600) : undefined}>
           <SectionHeader title="Clubs near you" caption="Groups that play every week." />
           <Rail snap={clubW}>
             {clubs.map((club) => (
               <PhotoCard key={club.id} image={clubImage(club)} title={club.name} subtitle={club.cadence} badge={sports[club.sport].label} width={clubW} height={clubW} onPress={() => onOpenClub(club)} />
             ))}
           </Rail>
-        </View>
+        </Animated.View>
       )}
 
       {places.length > 0 && (
-        <View style={styles.section}>
+        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(750) : undefined}>
           <SectionHeader title="Places to play" caption="Parks, fields, courts and trails." />
           <View style={styles.grid}>
             {places.map((place) => (
@@ -158,15 +162,15 @@ export function TileFeed({
               </Pressable>
             ))}
           </View>
-        </View>
+        </Animated.View>
       )}
 
       {empty && (
-        <View style={styles.empty}>
+        <Animated.View style={styles.empty} entering={cascade ? FadeIn.duration(400).delay(150) : undefined}>
           <Ionicons name="calendar-outline" size={32} color={colors.label3} />
           <Text style={type.headline}>Nothing around you yet</Text>
           <Text style={[type.subhead, styles.emptyText]}>Start a game or a club with Create new.</Text>
-        </View>
+        </Animated.View>
       )}
     </ScrollView>
   );
