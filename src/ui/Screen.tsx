@@ -31,10 +31,12 @@ interface ScreenProps {
   /** Immersive: cover behind a transparent header, on `coverColor`. */
   cover?: ReactNode;
   coverColor?: string;
+  /** Extra styles merged into the ScrollView contentContainerStyle. */
+  contentStyle?: object;
   children: ReactNode;
 }
 
-export function Screen({ title, variant = 'page', trailing, footer, cover, coverColor, children }: ScreenProps) {
+export function Screen({ title, variant = 'page', trailing, footer, cover, coverColor, contentStyle, children }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const tabBarSpace = useTabBarSpace();
   const [footerHeight, setFooterHeight] = useState(0);
@@ -73,7 +75,7 @@ export function Screen({ title, variant = 'page', trailing, footer, cover, cover
 
       <ScrollView
         style={styles.flex}
-        contentContainerStyle={[styles.content, cover ? styles.contentBleed : null, floating ? { paddingTop: top + headerHeight + space.sm } : null, { paddingBottom: footerHeight + bottomInset + space.lg }]}
+        contentContainerStyle={[styles.content, cover ? styles.contentBleed : null, floating ? { paddingTop: top + headerHeight + space.sm } : null, { paddingBottom: footerHeight + bottomInset + space.lg }, contentStyle ?? null]}
         keyboardShouldPersistTaps="handled"
       >
         {cover}

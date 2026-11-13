@@ -1,19 +1,20 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, type ListRenderItemInfo, useWindowDimensions } from 'react-native';
-import { FlatList } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ListRenderItemInfo, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
+import Animated, { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, radius, shadow, space, type } from '../../src/constants/theme';
+import { colors, radius, space, type } from '../../src/constants/theme';
+import { spring, timing } from '../../src/constants/motion';
 import { useSession } from '../../src/state/session';
 import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
 import { useCurrentLocation } from '../../src/lib/useLocation';
 import { sports, sportIds, type Club, type SportId } from '../../src/state/models';
-import { ProfileButton } from '../../src/ui/ProfileButton';
 import { ClubCard, ClubRow } from '../../src/ui/Rows';
-import { Screen } from '../../src/ui/Screen';
+import { Screen, MoreMenu } from '../../src/ui/Screen';
 import { Rail, Section } from '../../src/ui/Layout';
 
+const createGame = () => router.push('/create/game');
 const createClub = () => router.push('/create/club');
 const joinScan = () => router.push('/join?mode=scan');
 
@@ -29,18 +30,25 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 
 type SortKey = 'nearby' | 'members' | 'games';
 
+function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && { opacity: 0.75 }]}
+    >
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function SportChip({ id, active, onPress }: { id: SportId | null; active: boolean; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.sportChip, active && styles.sportChipActive, pressed && { opacity: 0.75 }]}
+      style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && { opacity: 0.75 }]}
     >
       {id ? (
-        <MaterialCommunityIcons
-          name={sports[id].icon}
-          size={14}
-          color={active ? colors.white : colors.label2}
-        />
+        <MaterialCommunityIcons name={sports[id].icon} size={14} color={active ? colors.white : colors.label2} />
       ) : (
         <Ionicons name="apps" size={14} color={active ? colors.white : colors.label2} />
       )}
@@ -51,13 +59,43 @@ function SportChip({ id, active, onPress }: { id: SportId | null; active: boolea
   );
 }
 
-/** Bottom sheet listing all clubs with sport filter + sort. */
+/** Explore all clubs — sport filter + sort, standard modal style. */
 function ExploreSheet({ onClose }: { onClose: () => void }) {
   const store = useStore();
   const { coords } = useCurrentLocation();
   const session = useSession();
+  const reduceMotion = useReducedMotion();
   const [sportFilter, setSportFilter] = useState<SportId | null>(null);
   const [sort, setSort] = useState<SortKey>('nearby');
+
+  const progress = useSharedValue(0);
+  const pending = useRef<(() => void) | null>(null);
+
+  // Animate in on mount
+  useEffect(() => {
+    progress.value = 0;
+    progress.value = reduceMotion ? 1 : withSpring(1, spring.smooth);
+  }, []);
+
+  const runPending = () => {
+    const action = pending.current;
+    pending.current = null;
+    action?.();
+  };
+
+  const hide = (then?: () => void) => {
+    pending.current = then ?? null;
+    progress.value = withTiming(0, { duration: 220 }, (finished) => {
+      if (!finished) return;
+      runOnJS(onClose)();
+      runOnJS(runPending)();
+    });
+  };
+
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value * 0.35 }));
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: (1 - progress.value) * 420 }],
+  }));
 
   const sorted = useMemo(() => {
     let list = sportFilter ? store.clubs.filter((c) => c.sport === sportFilter) : [...store.clubs];
@@ -76,7 +114,6 @@ function ExploreSheet({ onClose }: { onClose: () => void }) {
       list = list.sort((a, b) => store.gamesFor(b.id).length - store.gamesFor(a.id).length);
     }
 
-    // Verified clubs float to top within any sort
     return list.sort((a, b) => Number(!!b.verified) - Number(!!a.verified));
   }, [store, sportFilter, sort, coords]);
 
@@ -84,36 +121,34 @@ function ExploreSheet({ onClose }: { onClose: () => void }) {
     <ClubRow
       club={item}
       onPress={() => {
-        onClose();
-        open.club(item.id);
+        hide(() => open.club(item.id));
       }}
     />
   );
 
   return (
-    <View style={styles.sheetOverlay}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      <View style={styles.sheet}>
+    <Modal transparent visible animationType="none" onRequestClose={() => hide()} onDismiss={runPending}>
+      <Animated.View style={[StyleSheet.absoluteFill, styles.sheetScrim, backdropStyle]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => hide()} accessibilityLabel="Close" />
+      </Animated.View>
+      <Animated.View style={[styles.sheetWrap, sheetStyle]}>
         <View style={styles.sheetHandle} />
         <View style={styles.sheetHeader}>
           <Text style={type.title3}>All clubs</Text>
-          <Pressable onPress={onClose} hitSlop={12}>
+          <Pressable onPress={() => hide()} hitSlop={12}>
             <Ionicons name="close" size={22} color={colors.label2} />
           </Pressable>
         </View>
 
-        {/* Sort pills */}
+        {/* Sort */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
           {(['nearby', 'members', 'games'] as SortKey[]).map((key) => (
-            <Pressable
+            <FilterChip
               key={key}
+              label={key === 'nearby' ? 'Nearby' : key === 'members' ? 'Most members' : 'Most active'}
+              active={sort === key}
               onPress={() => setSort(key)}
-              style={[styles.sortChip, sort === key && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, sort === key && styles.chipTextActive]}>
-                {key === 'nearby' ? 'Nearby' : key === 'members' ? 'Most members' : 'Most active'}
-              </Text>
-            </Pressable>
+            />
           ))}
         </ScrollView>
 
@@ -146,13 +181,13 @@ function ExploreSheet({ onClose }: { onClose: () => void }) {
         )}
 
         {session.isSignedIn && (
-          <Pressable onPress={() => { onClose(); createClub(); }} style={styles.createBtn}>
+          <Pressable onPress={() => hide(createClub)} style={styles.sheetCreateBtn}>
             <Ionicons name="add-circle-outline" size={18} color={colors.brand} />
             <Text style={[type.subhead, { color: colors.brand, fontWeight: '600' }]}>Start your own club</Text>
           </Pressable>
         )}
-      </View>
-    </View>
+      </Animated.View>
+    </Modal>
   );
 }
 
@@ -161,15 +196,12 @@ export default function ClubsScreen() {
   const session = useSession();
   const { coords } = useCurrentLocation();
   const { width } = useWindowDimensions();
-  const [sportFilter, setSportFilter] = useState<SportId | null>(null);
   const [showExplore, setShowExplore] = useState(false);
 
   const myClubs = session.isSignedIn ? store.myClubs : [];
-  const myClubsFiltered = sportFilter ? myClubs.filter((c) => c.sport === sportFilter) : myClubs;
 
   const nearbyClubs = useMemo(() => {
     let list = store.clubs.filter((c) => !store.isMember(c.id));
-    if (sportFilter) list = list.filter((c) => c.sport === sportFilter);
     if (coords) {
       list = [...list].sort((a, b) => {
         const pa = store.place(a.homePlaceId);
@@ -180,10 +212,10 @@ export default function ClubsScreen() {
       });
     }
     return list;
-  }, [store, sportFilter, coords]);
+  }, [store, coords]);
 
-  const rows: (typeof myClubsFiltered)[] = [];
-  for (let i = 0; i < myClubsFiltered.length; i += 2) rows.push(myClubsFiltered.slice(i, i + 2));
+  const rows: (typeof myClubs)[] = [];
+  for (let i = 0; i < myClubs.length; i += 2) rows.push(myClubs.slice(i, i + 2));
 
   const clubW = Math.min(Math.round(width * 0.42), 172);
 
@@ -191,93 +223,77 @@ export default function ClubsScreen() {
     <Screen
       variant="tab"
       title="Your Clubs"
-      trailing={<ProfileButton />}
+      trailing={
+        <MoreMenu
+          icon="add"
+          label="Create"
+          items={[
+            { label: 'Start a game', icon: 'football-outline', onPress: createGame },
+            { label: 'Create a club', icon: 'people-outline', onPress: createClub },
+            { label: 'Join via code', icon: 'qr-code-outline', onPress: joinScan },
+          ]}
+        />
+      }
+      contentStyle={styles.screenContent}
     >
-      {/* Sport filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[styles.filterRow, styles.filterBarContent]}
-        style={styles.filterBar}
-      >
-        <SportChip id={null} active={sportFilter === null} onPress={() => setSportFilter(null)} />
-        {sportIds.map((id) => (
-          <SportChip
-            key={id}
-            id={id}
-            active={sportFilter === id}
-            onPress={() => setSportFilter(sportFilter === id ? null : id)}
-          />
-        ))}
-      </ScrollView>
+      {/* Flex container: "Your clubs" fills middle, "Clubs near you" docks at bottom */}
+      <View style={styles.flex}>
+        {/* Your clubs — grows to fill available space */}
+        <View style={styles.clubsSection}>
+          {myClubs.length > 0 ? (
+            <Section first title="Your clubs">
+              {rows.map((row, rowIndex) => (
+                <View key={row.map((c) => c.id).join('-')} style={styles.gridRow}>
+                  {row.map((club, col) => (
+                    <ClubCard
+                      key={club.id}
+                      index={rowIndex * 2 + col}
+                      club={club}
+                      onPress={() => open.clubPage(club.id)}
+                    />
+                  ))}
+                  {row.length === 1 && <View style={styles.gridFlex} />}
+                </View>
+              ))}
+            </Section>
+          ) : (
+            <View style={styles.empty}>
+              <Ionicons name="people" size={52} color={colors.label3} />
+              <Text style={type.title2}>No clubs yet</Text>
+              <Text style={[type.subhead, styles.emptyText]}>
+                Join a club and their games will show up in your schedule.
+              </Text>
+              <Pressable
+                onPress={joinScan}
+                style={({ pressed }) => [styles.joinBtn, pressed && { opacity: 0.75 }]}
+              >
+                <Ionicons name="qr-code-outline" size={18} color={colors.label} />
+                <Text style={[type.subhead, { fontWeight: '600' }]}>Join via code or QR</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
 
-      {/* Your clubs */}
-      {myClubsFiltered.length > 0 ? (
-        <Section
-          first
-          title="Your clubs"
-          caption={`${myClubsFiltered.length} ${myClubsFiltered.length === 1 ? 'club' : 'clubs'} · games land in your schedule`}
-        >
-          {rows.map((row, rowIndex) => (
-            <View key={row.map((c) => c.id).join('-')} style={styles.gridRow}>
-              {row.map((club, col) => (
+        {/* Clubs near you — docked at bottom, no caption, "Explore more" top-right */}
+        {nearbyClubs.length > 0 && (
+          <Section
+            title="Clubs near you"
+            action={{ label: 'Explore more', onPress: () => setShowExplore(true) }}
+          >
+            <Rail snap={clubW}>
+              {nearbyClubs.slice(0, 10).map((club, i) => (
                 <ClubCard
                   key={club.id}
-                  index={rowIndex * 2 + col}
                   club={club}
-                  onPress={() => open.clubPage(club.id)}
+                  index={i}
+                  width={clubW}
+                  onPress={() => open.club(club.id)}
                 />
               ))}
-              {row.length === 1 && <View style={styles.flex} />}
-            </View>
-          ))}
-        </Section>
-      ) : myClubs.length === 0 ? (
-        <View style={styles.empty}>
-          <Ionicons name="people" size={44} color={colors.label3} />
-          <Text style={type.title2}>No clubs yet</Text>
-          <Text style={[type.subhead, styles.emptyText]}>
-            Join a club and their games will show up in your schedule.
-          </Text>
-          <Pressable
-            onPress={joinScan}
-            style={({ pressed }) => [styles.joinBtn, pressed && { opacity: 0.75 }]}
-          >
-            <Ionicons name="qr-code-outline" size={18} color={colors.label} />
-            <Text style={[type.subhead, { fontWeight: '600' }]}>Join via code or QR</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {/* Clubs near you — horizontal rail */}
-      {nearbyClubs.length > 0 && (
-        <Section
-          title="Clubs near you"
-          caption="Groups that play every week."
-        >
-          <Rail snap={clubW}>
-            {nearbyClubs.slice(0, 10).map((club, i) => (
-              <ClubCard
-                key={club.id}
-                club={club}
-                index={i}
-                width={clubW}
-                onPress={() => open.club(club.id)}
-              />
-            ))}
-          </Rail>
-          <Pressable
-            onPress={() => setShowExplore(true)}
-            style={({ pressed }) => [styles.exploreMoreBtn, pressed && { opacity: 0.75 }]}
-          >
-            <Ionicons name="compass-outline" size={16} color={colors.brand} />
-            <Text style={[type.subhead, { color: colors.brand, fontWeight: '600' }]}>
-              Explore more{store.clubs.length > 10 ? ` · ${store.clubs.length} clubs total` : ''}
-            </Text>
-            <Ionicons name="chevron-forward" size={15} color={colors.brand} />
-          </Pressable>
-        </Section>
-      )}
+            </Rail>
+          </Section>
+        )}
+      </View>
 
       {showExplore && <ExploreSheet onClose={() => setShowExplore(false)} />}
     </Screen>
@@ -285,9 +301,21 @@ export default function ClubsScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
+  screenContent: { flexGrow: 1 },
+  flex: { flex: 1, gap: space.xl },
+  // ─── Your clubs ──────────────────────────────────────────────────────────────
+  clubsSection: { flex: 1 },
   gridRow: { flexDirection: 'row', gap: space.md },
-  empty: { alignItems: 'center', gap: space.md, paddingVertical: space.xl },
+  gridFlex: { flex: 1 },
+  // ─── Empty state ─────────────────────────────────────────────────────────────
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.md,
+    paddingVertical: space.xxl,
+    minHeight: 320,
+  },
   emptyText: { color: colors.label2, textAlign: 'center', paddingHorizontal: space.lg },
   joinBtn: {
     flexDirection: 'row',
@@ -301,15 +329,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.separator,
   },
-  // ─── Sport filter chips ──────────────────────────────────────────────────────
-  filterBar: { marginBottom: space.sm },
-  filterBarContent: { gap: space.sm },
+  // ─── Filter chips (inside ExploreSheet) ──────────────────────────────────────
   filterRow: {
     flexDirection: 'row',
     gap: space.sm,
+    paddingHorizontal: space.lg,
     paddingBottom: space.sm,
   },
-  sportChip: {
+  chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -320,39 +347,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.separator,
   },
-  sportChipActive: {
-    backgroundColor: colors.label,
-    borderColor: colors.label,
-  },
-  chipText: {
-    ...type.footnote,
-    color: colors.label2,
-    fontWeight: '500',
-  },
+  chipActive: { backgroundColor: colors.label, borderColor: colors.label },
+  chipText: { ...type.footnote, color: colors.label2, fontWeight: '500' },
   chipTextActive: { color: colors.white },
-  // ─── Explore more button ─────────────────────────────────────────────────────
-  exploreMoreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-    marginTop: space.sm,
-    paddingVertical: space.sm,
-    paddingHorizontal: 2,
-  },
-  // ─── Explore sheet ──────────────────────────────────────────────────────────
-  sheetOverlay: {
+  // ─── Explore sheet ────────────────────────────────────────────────────────────
+  sheetScrim: { backgroundColor: colors.label },
+  sheetWrap: {
     position: 'absolute',
-    inset: 0,
-    zIndex: 200,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  sheet: {
+    left: 0,
+    right: 0,
+    bottom: 0,
+    maxHeight: '90%',
     backgroundColor: colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: space.sm,
-    maxHeight: '90%',
   },
   sheetHandle: {
     alignSelf: 'center',
@@ -369,22 +378,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingBottom: space.md,
   },
-  sortChip: {
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: radius.full,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.separator,
-  },
-  chipActive: {
-    backgroundColor: colors.label,
-    borderColor: colors.label,
-  },
   sheetList: { paddingHorizontal: space.lg, paddingBottom: space.xl },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginVertical: 2 },
   sheetEmpty: { padding: space.xl, alignItems: 'center' },
-  createBtn: {
+  sheetCreateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

@@ -21,6 +21,7 @@ const tabs: Record<string, TabInfo> = {
   map: { label: 'Home', icon: 'home-outline', activeIcon: 'home' },
   clubs: { label: 'Clubs', icon: 'people-outline', activeIcon: 'people' },
   schedule: { label: 'Schedule', icon: 'calendar-outline', activeIcon: 'calendar' },
+  profile: { label: 'Profile', icon: 'person-outline', activeIcon: 'person' },
 };
 
 // Not a screen: sits between Clubs and Schedule and opens the Create new sheet (start a game or a club).

@@ -50,6 +50,7 @@ export default function MapScreen() {
   const sheet = useSheet();
   const insets = useSafeAreaInsets();
   const tabBarSpace = useTabBarSpace();
+  const tabBarSpaceSV = useSharedValue(tabBarSpace);
   const { height } = useWindowDimensions();
   const map = useRef<StreetMapHandle>(null);
   const reduceMotion = useReducedMotion();
@@ -216,7 +217,7 @@ export default function MapScreen() {
     transform: [
       { translateY: withSpring(sheet.isOpen ? 260 : 0, DRAWER_SPRING) },
       { translateY: tabBarHidden.value * TAB_BAR_DROP },
-      { translateY: -keyboard.height.value },
+      { translateY: -Math.max(keyboard.height.value - tabBarSpaceSV.value, 0) },
     ],
   }));
 

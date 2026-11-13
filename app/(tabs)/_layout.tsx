@@ -9,6 +9,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="map" />
       <Tabs.Screen name="clubs" />
       <Tabs.Screen name="schedule" />
+      <Tabs.Screen name="profile" />
     </Tabs>
     </TourProvider>
   );

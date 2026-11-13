@@ -6,10 +6,9 @@ import { gameStatus, isToday } from '../../src/state/models';
 import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
 import { PrimaryButton } from '../../src/ui/Buttons';
-import { ProfileButton } from '../../src/ui/ProfileButton';
 import { Section } from '../../src/ui/Layout';
 import { GameRow } from '../../src/ui/Rows';
-import { Screen } from '../../src/ui/Screen';
+import { Screen, MoreMenu } from '../../src/ui/Screen';
 
 /** Figma "Hoje": games from your clubs plus games you said you're in for. */
 export default function ScheduleScreen() {
@@ -20,7 +19,11 @@ export default function ScheduleScreen() {
   const upcoming = games.filter((g) => gameStatus(g, store.now) === 'later');
 
   return (
-    <Screen variant="tab" title="Schedule" trailing={<ProfileButton />}>
+    <Screen variant="tab" title="Schedule" trailing={<MoreMenu icon="add" label="Create" items={[
+        { label: 'Start a game', icon: 'football-outline', onPress: () => router.push('/create/game') },
+        { label: 'Create a club', icon: 'people-outline', onPress: () => router.push('/create/club') },
+        { label: 'Join via code', icon: 'qr-code-outline', onPress: () => router.push('/join?mode=scan') },
+      ]} />}>
       {games.length === 0 && (
         <Empty
           title="Nothing scheduled"
