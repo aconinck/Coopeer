@@ -126,11 +126,14 @@ export function HeroVideo({
   poster,
   mono,
   shadeFrom = 0,
+  shade = true,
 }: {
   source: VideoSource;
   poster: ImageSourcePropType;
   mono?: boolean;
   shadeFrom?: number;
+  /** The Figma dark shade over the clip. Off when the clip sits on a light screen. */
+  shade?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   const [ready, setReady] = useState(false);
@@ -174,7 +177,7 @@ export function HeroVideo({
         </Animated.View>
         {mono && <View style={[styles.fill, styles.mono]} />}
       </View>
-      <HeroShade shadeFrom={shadeFrom} />
+      {shade && <HeroShade shadeFrom={shadeFrom} />}
     </View>
   );
 }

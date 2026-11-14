@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ME, gameStatus, type Club, type Game, type NewClub, type NewGame, type Payment, type PaymentMethod, type Place, type RSVP } from './models';
+import { ME, applyWeekly, gameStatus, isInvited, type Club, type ClubInvite, type Game, type NewClub, type NewGame, type Payment, type PaymentMethod, type Place, type RSVP } from './models';
 import { time, weekday } from '../lib/format';
 import { pitchById, pitchTitle, placeForPitch as nearestPlace, type Pitch } from '../map/pitches';
 import * as mock from './mockData';
@@ -14,6 +14,8 @@ import { useSession } from './session';
 // events. Without keys it runs on the in-memory demo data. Screens only use useStore().
 
 interface Store {
+  /** False until the first load finished, so screens can tell "still loading" from "nothing here". */
+  ready: boolean;
   now: Date;
   places: Place[];
   clubs: Club[];
@@ -35,6 +37,15 @@ interface Store {
   isAdmin: (clubId: string) => boolean;
   myClubs: Club[];
   mySchedule: Game[];
+  /** Personal invitations you have not answered: to join a club, and to play a game. */
+  clubInvites: ClubInvite[];
+  gameInvites: Game[];
+  acceptClubInvite: (inviteId: string) => void;
+  dismissClubInvite: (inviteId: string) => void;
+  /** True when you joined this game's series every week. One-time games are never weekly. */
+  isWeekly: (game: Game) => boolean;
+  /** Join or leave a series every week. Your own answers to single games are kept. */
+  setWeekly: (seriesId: string, on: boolean) => void;
   join: (clubId: string) => void;
   leave: (clubId: string) => void;
   setRSVP: (gameId: string, rsvp: RSVP) => void;
@@ -87,11 +98,14 @@ const StoreContext = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => new Date());
+  const [ready, setReady] = useState(false);
   const session = useSession();
   const uid = hasBackend ? (session.user?.id ?? null) : null;
   const [places, setPlaces] = useState<Place[]>(hasBackend ? [] : mock.places.map(withSavedPhotos));
   const [clubs, setClubs] = useState<Club[]>(hasBackend ? [] : mock.clubs);
-  const [games, setGames] = useState<Game[]>(() => (hasBackend ? [] : mock.makeGames(new Date())));
+  const [games, setGames] = useState<Game[]>(() => (hasBackend ? [] : applyWeekly(mock.makeGames(new Date()), mock.defaultWeekly)));
+  const [weekly, setWeeklySeries] = useState<Set<string>>(() => new Set(hasBackend ? [] : mock.defaultWeekly));
+  const [clubInvites, setClubInvites] = useState<ClubInvite[]>(hasBackend ? [] : mock.clubInvites);
   const [memberships, setMemberships] = useState<Set<string>>(() => new Set(hasBackend ? [] : ['c1', 'c4']));
   const [payments, setPayments] = useState(mock.payments);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(mock.paymentMethods);
@@ -122,7 +136,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Load on sign-in, then stay live: any change by anyone triggers a refresh.
   useEffect(() => {
     if (!uid) return;
-    refresh();
+    refresh().finally(() => setReady(true));
     return api.subscribe(refresh);
   }, [uid, refresh]);
 
@@ -152,6 +166,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setMemberships(new Set(snap.memberships));
         setPayments(snap.payments);
         setPaymentMethods(snap.paymentMethods);
+        setWeeklySeries(new Set(snap.weekly));
+        setClubInvites(snap.clubInvites);
+        setReady(true);
       } else {
         // First run: persist the in-memory mock data so it survives restarts.
         localDb.seed().then((seeded) => {
@@ -161,6 +178,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setMemberships(new Set(seeded.memberships));
           setPayments(seeded.payments);
           setPaymentMethods(seeded.paymentMethods);
+          setWeeklySeries(new Set(seeded.weekly));
+          setClubInvites(seeded.clubInvites);
+          setReady(true);
         });
       }
       dbLoaded.current = true;
@@ -171,7 +191,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Persist all collections back to localDb whenever they change (debounced 400 ms).
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!dbLoaded.current) return;
+    // Only the on-device database is written here; with Supabase on, the server holds the data.
+    if (hasBackend || !dbLoaded.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       localDb.save({
@@ -181,9 +202,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         memberships: [...memberships],
         payments,
         paymentMethods,
+        weekly: [...weekly],
+        clubInvites,
       });
     }, 400);
-  }, [places, clubs, games, memberships, payments, paymentMethods]);
+  }, [places, clubs, games, memberships, payments, paymentMethods, weekly, clubInvites]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30_000);
@@ -202,6 +225,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [memberships, sync],
   );
 
+  const acceptClubInvite = useCallback(
+    (inviteId: string) => {
+      const invite = clubInvites.find((i) => i.id === inviteId);
+      if (!invite) return;
+      join(invite.clubId);
+      setClubInvites((list) => list.filter((i) => i.id !== inviteId));
+    },
+    [clubInvites, join],
+  );
+
   const leave = useCallback(
     (clubId: string) => {
       if (!memberships.has(clubId)) return;
@@ -218,14 +251,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [memberships, sync],
   );
 
-  const setRSVP = useCallback((gameId: string, rsvp: RSVP) => {
-    sync((id) => api.setRSVP(id, gameId, rsvp));
+  const setRSVP = useCallback((gameId: string, requested: RSVP) => {
+    sync((id) => api.setRSVP(id, gameId, requested));
     setGames((list) =>
       list.map((g) => {
         if (g.id !== gameId) return g;
+        // Joined every week: clearing the answer goes back to "in"; skipping a week takes an explicit Not going.
+        const rsvp: RSVP = requested === 'none' && g.seriesId && weekly.has(g.seriesId) ? 'going' : requested;
         const without = (members: typeof g.going) => members.filter((m) => m.id !== ME.id);
         return {
           ...g,
+          viaWeekly: rsvp === 'going' && requested === 'none',
           myRSVP: rsvp,
           going: rsvp === 'going' ? [ME, ...without(g.going)] : without(g.going),
           declined: rsvp === 'declined' ? [ME, ...without(g.declined)] : without(g.declined),
@@ -234,7 +270,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
       }),
     );
-  }, [sync]);
+  }, [sync, weekly]);
+
+  const setWeekly = useCallback((seriesId: string, on: boolean) => {
+    setWeeklySeries((current) => {
+      const next = new Set(current);
+      if (on) next.add(seriesId);
+      else next.delete(seriesId);
+      return next;
+    });
+    setGames((list) => {
+      if (on) return applyWeekly(list, [seriesId]);
+      // Leaving the series drops only the games that were in because of it; ones you confirmed yourself stay.
+      return list.map((g) => {
+        if (g.seriesId !== seriesId || !g.viaWeekly) return g;
+        return { ...g, viaWeekly: false, myRSVP: 'none' as const, going: g.going.filter((m) => m.id !== ME.id) };
+      });
+    });
+  }, []);
+
+  const dismissClubInvite = useCallback((inviteId: string) => setClubInvites((list) => list.filter((i) => i.id !== inviteId)), []);
 
   const createClub = useCallback(
     (input: NewClub): Club => {
@@ -293,8 +348,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         level: club?.level ?? 'All levels',
         myRSVP: 'going',
         isNew: true,
+        seriesId: input.repeat === 'never' ? undefined : stamp,
+        repeat: input.repeat === 'never' ? undefined : input.repeat,
       }));
       setGames((list) => [...list, ...created]);
+      // The host of a recurring game is in every week of it.
+      if (input.repeat !== 'never') setWeeklySeries((current) => new Set(current).add(stamp));
       // Create the game first, then the club cadence (it depends on nothing else).
       sync((id) => api.createGames(id, created, invited.map((m) => m.id)));
       if (club && input.repeat !== 'never') {
@@ -338,6 +397,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const gamesFor = (clubId: string) => games.filter((g) => g.clubId === clubId && active(g)).sort(byStart);
 
     return {
+      ready,
       now,
       places,
       clubs,
@@ -352,6 +412,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       nextGameFor: (clubId) => gamesFor(clubId).find((g) => !g.isCanceled),
       isMember: (clubId) => memberships.has(clubId),
       isAdmin: (clubId) => clubs.find((c) => c.id === clubId)?.adminIds?.includes(ME.id) ?? false,
+      clubInvites: clubInvites.filter((i) => !memberships.has(i.clubId) && clubs.some((c) => c.id === i.clubId)),
+      gameInvites: games.filter((g) => isInvited(g) && active(g)).sort(byStart),
+      acceptClubInvite,
+      dismissClubInvite,
+      isWeekly: (game) => !!game.seriesId && weekly.has(game.seriesId),
+      setWeekly,
       myClubs: clubs.filter((c) => memberships.has(c.id)),
       mySchedule: games
         .filter((g) => active(g) && (g.myRSVP === 'going' || (g.clubId !== null && memberships.has(g.clubId))))
@@ -389,7 +455,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       placeForPitch,
       addPlace,
     };
-  }, [now, places, clubs, games, payments, paymentMethods, memberships, join, leave, setRSVP, createClub, createGame, placeForPitch, addPlace, uid, refresh]);
+  }, [weekly, clubInvites, acceptClubInvite, dismissClubInvite, setWeekly, ready, now, places, clubs, games, payments, paymentMethods, memberships, join, leave, setRSVP, createClub, createGame, placeForPitch, addPlace, uid, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

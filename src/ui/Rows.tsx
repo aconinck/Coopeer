@@ -64,6 +64,7 @@ export function GameRow({ game, showPlace = true, onPress, index }: { game: Game
   const sport = sports[game.sport];
   const day = isLive ? 'Started' : status === 'soon' || status === 'today' ? 'Today' : isTomorrow(game.start, store.now) ? 'Tomorrow' : weekday(game.start);
   const going = game.myRSVP === 'going';
+  const weekly = store.isWeekly(game);
   const ended = status === 'ended' || game.isCanceled;
   const tone = isLive ? colors.live : sport.color;
 
@@ -81,7 +82,7 @@ export function GameRow({ game, showPlace = true, onPress, index }: { game: Game
           icon={sport.icon}
           iconColor={sport.color}
           color={tone}
-          segments={[isLive ? 'Live' : sport.label, club ? 'Club game' : 'Open game']}
+          segments={[isLive ? 'Live' : sport.label, game.seriesId ? 'Weekly game' : club ? 'Club game' : 'Open game']}
         />
         <AvatarStack members={game.going} total={game.going.length} size={32} limit={3} />
       </View>
@@ -110,8 +111,8 @@ export function GameRow({ game, showPlace = true, onPress, index }: { game: Game
           <StatusBadge kind={game.isCanceled ? 'canceled' : 'full'} />
         ) : going ? (
           <View style={[styles.cta, styles.ctaDone]}>
-            <Ionicons name="checkmark" size={16} color={colors.going} />
-            <Text style={[styles.ctaText, { color: colors.going }]}>You're in</Text>
+            <Ionicons name={weekly ? 'repeat' : 'checkmark'} size={16} color={colors.going} />
+            <Text style={[styles.ctaText, { color: colors.going }]}>{weekly ? "You're in · Weekly" : "You're in"}</Text>
           </View>
         ) : left === 0 ? (
           <View style={[styles.cta, styles.ctaMuted]}>
@@ -213,7 +214,7 @@ export function LinkRow({ title, subtitle, icon, onPress, index }: { title: stri
   );
 }
 
-/** Teaches the core concept: games are one-time, clubs are recurring. */
+/** Teaches the core concept: a game is one day, a club plays every week. */
 export function GamesVsClubsCard({ onDismiss }: { onDismiss?: () => void }) {
   return (
     <View style={[card, { padding: space.lg, gap: space.md }]}>
@@ -222,8 +223,8 @@ export function GamesVsClubsCard({ onDismiss }: { onDismiss?: () => void }) {
         {onDismiss && <TextButton title="Got it" onPress={onDismiss} />}
       </View>
       <View style={{ flexDirection: 'row', gap: space.md }}>
-        <Explainer icon="calendar" title="Game" text="Happens once. Tap “I'm in”, show up, play. No commitment." />
-        <Explainer icon="people" title="Club" text="Plays every week. Join once and all its games land in your schedule." />
+        <Explainer icon="calendar" title="Game" text="One day at one place. Tap “I'm in”, show up, play." />
+        <Explainer icon="people" title="Club" text="Plays every week. Join once, then confirm each game or join every week." />
       </View>
       <View style={[styles.topLine, { justifyContent: 'flex-start', gap: space.sm }]}>
         <Ionicons name="location" size={14} color={colors.label2} />

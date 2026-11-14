@@ -39,6 +39,7 @@ export function StepScaffold({
   onBack,
   backIcon = 'arrow-back',
   direction = 'forward',
+  transparent,
   children,
 }: {
   title: string;
@@ -53,6 +54,8 @@ export function StepScaffold({
   backIcon?: 'arrow-back' | 'close';
   /** Which way the content slides in. */
   direction?: 'forward' | 'back';
+  /** Let a backdrop (FlowBackground) behind the step show through instead of the solid surface. */
+  transparent?: boolean;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -63,7 +66,7 @@ export function StepScaffold({
     : (direction === 'forward' ? FadeInRight : FadeInLeft).springify().mass(1).stiffness(spring.smooth.stiffness).damping(spring.smooth.damping);
 
   return (
-    <KeyboardAvoidingView style={[styles.root, { paddingTop: insets.top + flow.headerTop }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={[styles.root, transparent && styles.transparent, { paddingTop: insets.top + flow.headerTop }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
@@ -381,6 +384,7 @@ function Digit({ char, gap, color, isNext }: { char?: string; gap: boolean; colo
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
+  transparent: { backgroundColor: 'transparent' },
   header: {
     height: flow.headerHeight,
     flexDirection: 'row',

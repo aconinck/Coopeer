@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ListRenderItemInfo, useWindowDimensions } from 'react-native';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItemInfo, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,12 +9,13 @@ import { useSession } from '../../src/state/session';
 import { useStore } from '../../src/state/store';
 import { open } from '../../src/lib/nav';
 import { useCurrentLocation } from '../../src/lib/useLocation';
-import { sports, sportIds, type Club, type SportId } from '../../src/state/models';
+import { sports, sportIds, type Club, type SkillLevel, type SportId } from '../../src/state/models';
 import { ClubCard, ClubRow } from '../../src/ui/Rows';
-import { Screen, MoreMenu } from '../../src/ui/Screen';
+import { Screen } from '../../src/ui/Screen';
+import { IconButton } from '../../src/ui/Buttons';
+import { Invitations } from '../../src/ui/Invitations';
 import { Rail, Section } from '../../src/ui/Layout';
 
-const createGame = () => router.push('/create/game');
 const createClub = () => router.push('/create/club');
 const joinScan = () => router.push('/join?mode=scan');
 
@@ -29,6 +30,7 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 }
 
 type SortKey = 'nearby' | 'members' | 'games';
+const levels: SkillLevel[] = ['Casual', 'All levels', 'Competitive'];
 
 function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
@@ -67,6 +69,8 @@ function ExploreSheet({ onClose }: { onClose: () => void }) {
   const reduceMotion = useReducedMotion();
   const [sportFilter, setSportFilter] = useState<SportId | null>(null);
   const [sort, setSort] = useState<SortKey>('nearby');
+  const [level, setLevel] = useState<SkillLevel | null>(null);
+  const [query, setQuery] = useState('');
 
   const progress = useSharedValue(0);
   const pending = useRef<(() => void) | null>(null);
@@ -98,7 +102,13 @@ function ExploreSheet({ onClose }: { onClose: () => void }) {
   }));
 
   const sorted = useMemo(() => {
-    let list = sportFilter ? store.clubs.filter((c) => c.sport === sportFilter) : [...store.clubs];
+    const text = query.trim().toLowerCase();
+    let list = store.clubs.filter(
+      (c) =>
+        (!sportFilter || c.sport === sportFilter) &&
+        (!level || c.level === level) &&
+        (!text || c.name.toLowerCase().includes(text) || (store.place(c.homePlaceId)?.name.toLowerCase().includes(text) ?? false)),
+    );
 
     if (sort === 'nearby' && coords) {
       list = list.sort((a, b) => {
@@ -115,7 +125,7 @@ function ExploreSheet({ onClose }: { onClose: () => void }) {
     }
 
     return list.sort((a, b) => Number(!!b.verified) - Number(!!a.verified));
-  }, [store, sportFilter, sort, coords]);
+  }, [store, sportFilter, level, query, sort, coords]);
 
   const renderItem = ({ item }: ListRenderItemInfo<Club>) => (
     <ClubRow
@@ -134,14 +144,38 @@ function ExploreSheet({ onClose }: { onClose: () => void }) {
       <Animated.View style={[styles.sheetWrap, sheetStyle]}>
         <View style={styles.sheetHandle} />
         <View style={styles.sheetHeader}>
-          <Text style={type.title3}>All clubs</Text>
-          <Pressable onPress={() => hide()} hitSlop={12}>
-            <Ionicons name="close" size={22} color={colors.label2} />
-          </Pressable>
+          <Text style={type.title3}>Find a club</Text>
+          <View style={styles.sheetActions}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Scan a club QR code" onPress={() => hide(joinScan)} hitSlop={10} style={styles.scanBtn}>
+              <Ionicons name="qr-code-outline" size={18} color={colors.label} />
+              <Text style={[type.footnote, { fontWeight: '600', color: colors.label }]}>Scan QR</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => hide()} hitSlop={12}>
+              <Ionicons name="close" size={22} color={colors.label2} />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.search}>
+          <Ionicons name="search" size={18} color={colors.label2} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search clubs by name or place"
+            placeholderTextColor={colors.label2}
+            returnKeyType="search"
+            autoCorrect={false}
+            style={[type.body, styles.searchInput]}
+          />
+          {query ? (
+            <Pressable accessibilityLabel="Clear search" onPress={() => setQuery('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.label2} />
+            </Pressable>
+          ) : null}
         </View>
 
         {/* Sort */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterRow}>
           {(['nearby', 'members', 'games'] as SortKey[]).map((key) => (
             <FilterChip
               key={key}
@@ -153,7 +187,7 @@ function ExploreSheet({ onClose }: { onClose: () => void }) {
         </ScrollView>
 
         {/* Sport filter */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterRow}>
           <SportChip id={null} active={sportFilter === null} onPress={() => setSportFilter(null)} />
           {sportIds.map((id) => (
             <SportChip
@@ -165,9 +199,17 @@ function ExploreSheet({ onClose }: { onClose: () => void }) {
           ))}
         </ScrollView>
 
+        {/* Level */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterRow}>
+          <FilterChip label="Any level" active={level === null} onPress={() => setLevel(null)} />
+          {levels.map((l) => (
+            <FilterChip key={l} label={l} active={level === l} onPress={() => setLevel(level === l ? null : l)} />
+          ))}
+        </ScrollView>
+
         {sorted.length === 0 ? (
           <View style={styles.sheetEmpty}>
-            <Text style={[type.subhead, { color: colors.label2 }]}>No clubs match this filter.</Text>
+            <Text style={[type.subhead, { color: colors.label2 }]}>No clubs match. Try another name or filter.</Text>
           </View>
         ) : (
           <FlatList
@@ -224,20 +266,17 @@ export default function ClubsScreen() {
       variant="tab"
       title="Your Clubs"
       trailing={
-        <MoreMenu
-          icon="add"
-          label="Create"
-          items={[
-            { label: 'Start a game', icon: 'football-outline', onPress: createGame },
-            { label: 'Create a club', icon: 'people-outline', onPress: createClub },
-            { label: 'Join via code', icon: 'qr-code-outline', onPress: joinScan },
-          ]}
-        />
+        <View style={styles.headerActions}>
+          <IconButton icon="enter-outline" label="Find or join a club" onPress={() => setShowExplore(true)} />
+          <IconButton icon="add" label="Create a club" onPress={createClub} />
+        </View>
       }
       contentStyle={styles.screenContent}
     >
       {/* Flex container: "Your clubs" fills middle, "Clubs near you" docks at bottom */}
       <View style={styles.flex}>
+        <Invitations clubsOnly onOpenClub={(club) => open.club(club.id)} onOpenGame={(game) => open.game(game.id)} />
+
         {/* Your clubs — grows to fill available space */}
         <View style={styles.clubsSection}>
           {myClubs.length > 0 ? (
@@ -264,11 +303,11 @@ export default function ClubsScreen() {
                 Join a club and their games will show up in your schedule.
               </Text>
               <Pressable
-                onPress={joinScan}
+                onPress={() => setShowExplore(true)}
                 style={({ pressed }) => [styles.joinBtn, pressed && { opacity: 0.75 }]}
               >
-                <Ionicons name="qr-code-outline" size={18} color={colors.label} />
-                <Text style={[type.subhead, { fontWeight: '600' }]}>Join via code or QR</Text>
+                <Ionicons name="enter-outline" size={18} color={colors.label} />
+                <Text style={[type.subhead, { fontWeight: '600' }]}>Find a club</Text>
               </Pressable>
             </View>
           )}
@@ -302,6 +341,11 @@ export default function ClubsScreen() {
 
 const styles = StyleSheet.create({
   screenContent: { flexGrow: 1 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  sheetActions: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  scanBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.full, backgroundColor: colors.fill },
+  search: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginHorizontal: space.lg, marginBottom: space.sm, paddingHorizontal: space.md, height: 44, borderRadius: radius.full, backgroundColor: colors.fill },
+  searchInput: { flex: 1, color: colors.label, padding: 0 },
   flex: { flex: 1, gap: space.xl },
   // ─── Your clubs ──────────────────────────────────────────────────────────────
   clubsSection: { flex: 1 },
@@ -330,6 +374,7 @@ const styles = StyleSheet.create({
     borderColor: colors.separator,
   },
   // ─── Filter chips (inside ExploreSheet) ──────────────────────────────────────
+  filterScroll: { flexGrow: 0, flexShrink: 0 },
   filterRow: {
     flexDirection: 'row',
     gap: space.sm,

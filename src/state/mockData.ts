@@ -1,4 +1,4 @@
-import type { Club, Game, Member, Payment, PaymentMethod, Place } from './models';
+import type { Club, ClubInvite, Game, Member, Payment, PaymentMethod, Place } from './models';
 
 // Same as ME in models.ts (not imported: scripts/make_seed.ts loads this file straight in Node).
 const ME: Member = { id: 'me', name: 'You' };
@@ -312,13 +312,13 @@ export function makeGames(now: Date): Game[] {
     ...history,
     { ...base, id: 'g1', sport: 'soccer', placeId: 'p1', clubId: 'c1', title: 'Friday Night Soccer',
       details: 'Weekly 7v7. Bring a light and a dark shirt.', start: at(-25), end: at(65), capacity: 14,
-      going: crowd(11), declined: crowd(2, 12), noResponse: crowd(3, 14), dropInPrice: 7, level: 'Casual', repeat: 'weekly' as const },
+      going: crowd(11), declined: crowd(2, 12), noResponse: crowd(3, 14), dropInPrice: 7, level: 'Casual', repeat: 'weekly' as const, seriesId: 's-c1-fri' },
     { ...base, id: 'g2', sport: 'pickleball', placeId: 'p4', clubId: null, title: 'Open Play · Doubles',
       details: 'Rotating doubles, winners stay on. Balls provided.', start: at(40), end: at(160), capacity: 8,
       going: crowd(5, 4), dropInPrice: 7, level: 'All levels', isNew: true },
     { ...base, id: 'g3', sport: 'pickleball', placeId: 'p2', clubId: 'c4', title: 'Doubles Ladder',
       details: 'Ladder night. Check in 10 minutes early.', start: at(180), end: at(300), capacity: 12,
-      going: crowd(6, 7), declined: crowd(1, 2), noResponse: crowd(4, 9), dropInPrice: 7, level: 'All levels', repeat: 'weekly' as const },
+      going: crowd(6, 7), declined: crowd(1, 2), noResponse: crowd(4, 9), dropInPrice: 7, level: 'All levels', repeat: 'weekly' as const, seriesId: 's-c4-ladder' },
     { ...base, id: 'g4', sport: 'soccer', placeId: 'p5', clubId: null, title: 'Pickup 7v7',
       details: 'Open pickup game. Teams picked on the spot.', start: at(300), end: at(390), capacity: 14,
       going: crowd(9, 1), dropInPrice: 7, level: 'All levels' },
@@ -335,11 +335,11 @@ export function makeGames(now: Date): Game[] {
       details: '5v5, 8-minute games.', start: day(1, 20), end: day(1, 22), capacity: 15,
       going: crowd(8, 11), noResponse: crowd(2, 1), dropInPrice: 8, level: 'Competitive' },
     { ...base, id: 'g9', sport: 'soccer', placeId: 'p1', clubId: 'c1', title: 'Friday Night Soccer',
-      details: 'Weekly 7v7. Bring a light and a dark shirt.', start: day(7, 20), end: day(7, 22), capacity: 14,
-      going: crowd(4), noResponse: crowd(8, 4), dropInPrice: 7, level: 'Casual', isNew: true, repeat: 'weekly' as const },
+      details: 'Weekly 7v7. Bring a light and a dark shirt.', start: at(-25 + 7 * 1440), end: at(65 + 7 * 1440), capacity: 14,
+      going: crowd(4), noResponse: crowd(8, 4), dropInPrice: 7, level: 'Casual', isNew: true, repeat: 'weekly' as const, seriesId: 's-c1-fri' },
     { ...base, id: 'g10', sport: 'pickleball', placeId: 'p2', clubId: 'c4', title: 'Doubles Ladder',
-      details: 'Ladder night.', start: day(2, 18), end: day(2, 20), capacity: 12,
-      going: crowd(3, 7), noResponse: crowd(6, 2), dropInPrice: 7, level: 'All levels', isCanceled: true },
+      details: 'Ladder night.', start: at(180 + 7 * 1440), end: at(300 + 7 * 1440), capacity: 12,
+      going: crowd(3, 7), noResponse: crowd(6, 2), dropInPrice: 7, level: 'All levels', isCanceled: true, seriesId: 's-c4-ladder' },
     { ...base, id: 'g11', sport: 'trails', placeId: 'p7', clubId: 'c8', title: 'Sunrise Group Hike',
       details: '4 mile loop at a conversational pace. Bring water.', start: at(90), end: at(210), capacity: 20,
       going: crowd(8, 4), dropInPrice: 0, level: 'All levels' },
@@ -351,7 +351,7 @@ export function makeGames(now: Date): Game[] {
       going: crowd(6, 5), noResponse: crowd(4, 1), dropInPrice: 0, level: 'All levels' },
     { ...base, id: 'g14', sport: 'soccer', placeId: 'p11', clubId: null, title: 'Pickup Soccer · Town Branch',
       details: 'Open pickup at the Town Branch field. 5v5, teams picked on the spot.', start: at(240), end: at(360), capacity: 12,
-      going: crowd(5, 3), dropInPrice: 7, level: 'Casual', isNew: true },
+      going: crowd(5, 3), dropInPrice: 7, level: 'Casual', isNew: true, invitedBy: people[3] },
     { ...base, id: 'g15', sport: 'soccer', placeId: 'p12', clubId: null, title: 'Morning Pickup',
       details: 'Casual 7v7 at Park Springs. Good turf, good vibes.', start: day(3, 9), end: day(3, 11), capacity: 14,
       going: crowd(7, 8), noResponse: crowd(3, 2), dropInPrice: 7, level: 'All levels' },
@@ -360,6 +360,10 @@ export function makeGames(now: Date): Game[] {
       going: crowd(8, 11), dropInPrice: 7, level: 'Casual' },
   ];
 }
+
+/** Demo profile: you joined the Doubles Ladder every week, and two people invited you to things. */
+export const defaultWeekly: string[] = ['s-c4-ladder'];
+export const clubInvites: ClubInvite[] = [{ id: 'inv1', clubId: 'c8', from: people[9] }];
 
 export const paymentMethods: PaymentMethod[] = [
   { id: 'mth1', brand: 'visa',       last4: '2315', expMonth: 9,  expYear: 2027, isDefault: true  },

@@ -1,10 +1,12 @@
 import { Image, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radius, shadow, space, type } from '../constants/theme';
 import { gameStatus, spotsLeft, type Club, type Game, type Place } from '../state/models';
 import { isTomorrow, monthDay, time } from '../lib/format';
+import { useStore } from '../state/store';
 import { AvatarStack, SportIcon } from './Display';
 import { ProgressiveBlurImage } from './CoverImage';
+import { SportBackdrop } from './SportBackdrop';
 
 /** Short, human date line for a card: "Today · 7:00 PM", "Tomorrow · 7:00 PM", "Fri, Nov 13 · 7:00 PM". */
 export function inviteWhen(game: Game, now: Date) {
@@ -35,7 +37,10 @@ export function InviteCard({
   height: number;
   onPress: () => void;
 }) {
+  const store = useStore();
   const live = gameStatus(game, now) === 'live';
+  const going = game.myRSVP === 'going';
+  const weekly = store.isWeekly(game);
   const left = spotsLeft(game);
   const where = place ? place.name : '';
   return (
@@ -45,7 +50,7 @@ export function InviteCard({
       onPress={onPress}
       style={({ pressed }) => [styles.card, { width, height }, pressed && styles.pressed]}
     >
-      {image ? <Image source={image} resizeMode="cover" accessibilityIgnoresInvertColors style={styles.image} /> : null}
+      {image ? <Image source={image} resizeMode="cover" accessibilityIgnoresInvertColors style={styles.image} /> : <SportBackdrop sport={game.sport} />}
       {image ? <ProgressiveBlurImage source={image} from={0.4} to={1} radius={22} /> : null}
 
       <View style={styles.top}>
@@ -69,7 +74,17 @@ export function InviteCard({
         </View>
         <View style={styles.footer}>
           {game.going.length > 0 ? <AvatarStack members={game.going} total={game.going.length} size={26} limit={4} /> : <View />}
-          <Text style={[type.footnote, styles.spots]}>{left === 0 ? 'Full' : `${left} spots left`}</Text>
+          {going ? (
+            <View style={styles.reply}>
+              <Ionicons name={weekly ? 'repeat' : 'checkmark'} size={14} color={colors.white} />
+              <Text style={[type.footnote, styles.pillText]}>{weekly ? "You're in · Weekly" : "You're in"}</Text>
+            </View>
+          ) : (
+            <Text style={[type.footnote, styles.spots]}>
+              {game.seriesId ? 'Weekly · ' : ''}
+              {left === 0 ? 'Full' : `${left} spots left`}
+            </Text>
+          )}
         </View>
       </View>
     </Pressable>
@@ -84,6 +99,7 @@ const styles = StyleSheet.create({
   pill: { height: 32, paddingHorizontal: 14, borderRadius: radius.full, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.38)' },
   pillLive: { backgroundColor: colors.live },
   pillText: { color: colors.white, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  reply: { height: 28, paddingHorizontal: 12, borderRadius: radius.full, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.going },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.white },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: space.lg, gap: 6 },
   title: { color: colors.white, textShadowColor: 'rgba(0,0,0,0.3)', textShadowRadius: 10 },

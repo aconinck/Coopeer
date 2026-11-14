@@ -1,4 +1,6 @@
 import { Stack } from 'expo-router';
+import { useFonts } from 'expo-font';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { colors } from '../src/constants/theme';
@@ -27,7 +29,10 @@ export default function RootLayout() {
 // their route files only serve deep links, so they present as plain modals.
 function AppStack() {
   const session = useSession();
-  if (!session.isReady) return null;
+  // Icon fonts are loaded up front: otherwise a screen that is the first to use one (sign-up's sport pills) can
+  // paint blank icons until the font arrives.
+  const [fontsLoaded, fontError] = useFonts({ ...Ionicons.font, ...MaterialCommunityIcons.font });
+  if (!session.isReady || !(fontsLoaded || fontError)) return null;
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>

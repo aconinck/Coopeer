@@ -1,5 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { colors, radius, shadow, space, type } from '../constants/theme';
+import type { SportId } from '../state/models';
+import { SportBackdrop } from './SportBackdrop';
 
 /** Photo on top, caption underneath (the Explore rails): one badge on the photo, a title and one quiet line below. */
 export function PhotoCard({
@@ -8,6 +10,7 @@ export function PhotoCard({
   subtitle,
   badge,
   live,
+  sport,
   width,
   height,
   onPress,
@@ -17,6 +20,8 @@ export function PhotoCard({
   subtitle: string;
   badge?: string;
   live?: boolean;
+  /** Sport shown on the backdrop while there is no photo. */
+  sport?: SportId;
   width: number;
   height: number;
   onPress: () => void;
@@ -29,7 +34,7 @@ export function PhotoCard({
       style={({ pressed }) => [{ width }, pressed && styles.pressed]}
     >
       <View style={[styles.photo, { width, height }]}>
-        {image ? <Image source={image} resizeMode="cover" accessibilityIgnoresInvertColors style={styles.image} /> : null}
+        {image ? <Image source={image} resizeMode="cover" accessibilityIgnoresInvertColors style={styles.image} /> : sport ? <SportBackdrop sport={sport} /> : null}
         {badge ? (
           <View style={[styles.badge, live && styles.badgeLive]}>
             {live ? <View style={styles.liveDot} /> : null}

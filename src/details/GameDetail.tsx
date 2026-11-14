@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space, type } from '../constants/theme';
@@ -53,18 +53,30 @@ export function GameDetail({ id }: { id: string }) {
   const full = spotsLeft(game) === 0 && game.myRSVP !== 'going';
   const progress = Math.min(game.going.length / Math.max(game.capacity, 1), 1);
   const base = colors.white;
-  const image = heroImageFor(game, place, store.places);
+  const image = heroImageFor(game, place);
   const when = `${monthDay(game.start)} · ${time(game.start)} – ${time(game.end)}`;
   const repeatLabel = repeatText(game.repeat, game.start);
+  const weekly = store.isWeekly(game);
+  const day = DAY_NAMES[game.start.getDay()];
+  const invited = game.invitedBy && game.myRSVP === 'none' && !closed ? game.invitedBy : undefined;
   const caption = game.isCanceled
     ? 'This game was canceled.'
     : status === 'ended'
       ? 'This game has ended.'
-      : full
-        ? 'This game is full. You can still say maybe.'
-        : isMember
-          ? 'Included in your club membership.'
-          : `Drop-in ${dollars(game.dropInPrice)} · paid at the ${sports[game.sport].placeNoun}`;
+      : game.myRSVP === 'going'
+        ? weekly
+          ? `You're in this game, and in every ${day} game.`
+          : "You're in this game only."
+        : weekly && game.myRSVP === 'declined'
+          ? `You're skipping this one. Every other ${day} still counts.`
+          : full
+            ? 'This game is full. You can still say maybe.'
+            : isMember
+              ? 'Included in your club membership.'
+              : `Drop-in ${dollars(game.dropInPrice)} · paid at the ${sports[game.sport].placeNoun}`;
+  const setWeekly = (on: boolean) => {
+    if (game.seriesId) session.requireAuth(() => store.setWeekly(game.seriesId as string, on));
+  };
 
   const reply = (next: RSVP) => session.requireAuth(() => store.setRSVP(game.id, next));
   const menu = [
@@ -83,7 +95,7 @@ export function GameDetail({ id }: { id: string }) {
         <View style={styles.heroTop}>
           <View style={styles.kind}>
             <Ionicons name="calendar" size={11} color={colors.white} />
-            <Text style={[type.caption2, styles.kindText]}>{club ? 'CLUB GAME' : 'OPEN GAME'}</Text>
+            <Text style={[type.caption2, styles.kindText]}>{`${club ? 'CLUB' : 'OPEN'} GAME${game.seriesId ? ' · WEEKLY' : ''}`}</Text>
           </View>
           {gameBadge(game, isMember, store.now) === 'live' && <StatusBadge kind="live" onMedia />}
         </View>
@@ -97,12 +109,32 @@ export function GameDetail({ id }: { id: string }) {
               <Text style={[type.caption2, styles.repeatText]}>{repeatLabel}</Text>
             </View>
           ) : null}
+          {invited ? (
+            <Text style={[type.subhead, styles.invited]}>{invited.name.split(' ')[0]} invited you to this game</Text>
+          ) : null}
           <View style={styles.capsuleWrap}>
             <RSVPCapsule value={game.myRSVP} onChange={reply} disabled={closed} tone="light" />
           </View>
           <Text style={[type.footnote, styles.heroCaption]}>{caption}</Text>
         </View>
       </Stagger>
+
+      {game.seriesId && !closed ? (
+        <Stagger index={1} style={styles.section}>
+          <View style={[styles.glassCard, styles.weeklyCard]}>
+            <View style={styles.weeklyIcon}>
+              <Ionicons name="repeat" size={20} color={colors.brand} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={[type.headline, styles.onDark]}>Every {day}</Text>
+              <Text style={[type.footnote, styles.dim]}>
+                {weekly ? "You're in each week automatically. Choose Not going above to skip one." : 'Join every week and skip any one you cannot make.'}
+              </Text>
+            </View>
+            <Switch accessibilityLabel={`Join every ${day}`} value={weekly} onValueChange={setWeekly} trackColor={{ true: colors.brand }} />
+          </View>
+        </Stagger>
+      ) : null}
 
       <Stagger index={1} style={styles.section}>
         <HostRow club={club} nav={nav} />
@@ -234,6 +266,9 @@ const styles = StyleSheet.create({
   heroLine: { color: 'rgba(0,0,0,0.72)', textAlign: 'center' },
   repeatPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, backgroundColor: colors.brandSoft, marginTop: 2 },
   repeatText: { color: colors.brand, fontWeight: '600' },
+  invited: { color: colors.brand, textAlign: 'center', fontWeight: '600', marginTop: space.sm },
+  weeklyCard: { flexDirection: 'row', alignItems: 'center' },
+  weeklyIcon: { width: 40, height: 40, borderRadius: radius.full, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
   capsuleWrap: { alignSelf: 'stretch', marginTop: space.lg },
   // Use label (black) base with 60% opacity — legible on the near-white bg below the button.
   heroCaption: { color: 'rgba(0,0,0,0.60)', textAlign: 'center', marginTop: space.sm },

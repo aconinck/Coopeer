@@ -1,18 +1,18 @@
 import { useState } from 'react';
-import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
+import Animated, { useReducedMotion } from 'react-native-reanimated';
 import { colors, flow, radius, space, type } from '../../src/constants/theme';
 import { enter } from '../../src/constants/motion';
 import { dollars, shareText } from '../../src/lib/format';
 import { COOPEER_FEE, inviteUrl, memberPrice, sportIds, sports, type Club, type ClubLink, type SportId } from '../../src/state/models';
 import { pitchPlace, useStore } from '../../src/state/store';
 import { pitchById } from '../../src/map/pitches';
+import { RingPhotoPicker } from '../../src/ui/ProfilePhotoPicker';
 import { PlaceResults } from '../../src/ui/PlaceResults';
 import { HeroButton } from '../../src/ui/Hero';
 import { SportTile, StepScaffold, UnderlineField } from '../../src/ui/StepFlow';
@@ -119,7 +119,7 @@ export default function CreateClub() {
     case 'photo':
       return (
         <StepScaffold {...common} title="Club photo" canContinue onNext={() => go(1)}>
-          <PhotoPicker name={name.trim()} uri={photoUri} onChange={setPhotoUri} />
+          <RingPhotoPicker name={name.trim()} uri={photoUri} onChange={setPhotoUri} emptyName="Your club" filledCaption="This is how your club appears when people search for it." />
           {!photoUri && (
             <View style={styles.center}>
               <Pressable accessibilityRole="button" onPress={() => go(1)} hitSlop={10}>
@@ -197,43 +197,6 @@ export default function CreateClub() {
         </StepScaffold>
       );
   }
-}
-
-/** Figma "Foto do Clube": name over concentric rings, a circle to add (or edit) the image. */
-function PhotoPicker({ name, uri, onChange }: { name: string; uri?: string; onChange: (uri: string) => void }) {
-  const pick = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7 });
-    if (!result.canceled && result.assets[0]) {
-      haptics.selection();
-      onChange(result.assets[0].uri);
-    }
-  };
-
-  return (
-    <View style={styles.photoArea}>
-      {[420, 300, 210].map((size) => (
-        <View key={size} pointerEvents="none" style={[styles.ring, { width: size, height: size, borderRadius: size / 2 }, uri && styles.ringFilled]} />
-      ))}
-      <Text style={[flow.input, styles.photoName, uri && { color: colors.brand }]} numberOfLines={1}>
-        {name || 'Your club'}
-      </Text>
-      <Pressable accessibilityRole="button" accessibilityLabel={uri ? 'Change image' : 'Add an image'} onPress={pick} style={({ pressed }) => [styles.photoCircle, pressed && { opacity: 0.7 }]}>
-        {uri ? (
-          <Animated.View entering={FadeIn.duration(260)}>
-            <Image source={{ uri }} style={styles.photo} />
-            <View style={styles.editBadge}>
-              <Ionicons name="pencil" size={14} color={colors.label} />
-            </View>
-          </Animated.View>
-        ) : (
-          <Ionicons name="add" size={32} color={colors.brand} />
-        )}
-      </Pressable>
-      <Text style={[type.footnote, styles.photoCaption]}>
-        {uri ? 'This is how your club appears when people search for it.' : 'Add an image'}
-      </Text>
-    </View>
-  );
 }
 
 function PlaceList({ sport, selectedId, onSelect }: { sport: SportId | null; selectedId: string | null; onSelect: (id: string) => void }) {
@@ -371,35 +334,6 @@ const styles = StyleSheet.create({
   fields: { gap: 26 },
   field: { gap: space.sm },
   tiles: { flexDirection: 'row', gap: space.sm },
-  photoArea: { height: 380, alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
-  ring: { position: 'absolute', borderWidth: 1, borderColor: colors.brandSoft },
-  ringFilled: { backgroundColor: colors.brandSoft, opacity: 0.45 },
-  photoName: { position: 'absolute', top: 40, maxWidth: 260, textAlign: 'center' },
-  photoCircle: {
-    width: 132,
-    height: 132,
-    borderRadius: 66,
-    borderWidth: 1.5,
-    borderColor: colors.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-  },
-  photo: { width: 116, height: 116, borderRadius: 58 },
-  editBadge: {
-    position: 'absolute',
-    bottom: -8,
-    alignSelf: 'center',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-  },
-  photoCaption: { position: 'absolute', bottom: 24, textAlign: 'center', color: colors.label2, maxWidth: 300 },
   places: { gap: space.sm },
   placeRow: {
     flexDirection: 'row',

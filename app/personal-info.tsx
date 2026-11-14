@@ -52,7 +52,7 @@ export default function PersonalInfoScreen() {
           <Text style={[type.title3, styles.readOnly]}>{session.user.email}</Text>
         </View>
       ) : null}
-      <Text style={[type.footnote, styles.label]}>This is how you sign in. No password needed.</Text>
+      <Text style={[type.footnote, styles.label]}>This is how you sign in, together with your password.</Text>
     </Screen>
   );
 }

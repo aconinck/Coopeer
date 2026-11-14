@@ -19,7 +19,7 @@ const steps: TourStep[] = [
   { target: 'modes', title: 'Tile or Map', body: 'Tile shows games and clubs as photo cards. Tap the map icon to see where everything is.' },
   { title: 'On the map, every pin is a place', body: 'Parks, fields, courts and trails. Orange shows a game later today, a red circle means it is live. Tap one to see it.' },
   { target: 'drawer', title: 'Search and filter', body: 'Pick a sport or search a place, club or game. Drag up for the full list.' },
-  { target: 'create', title: 'Create new', body: 'The middle tab starts a game at any place, or sets up a club that plays every week.' },
+  { target: 'create', title: 'New match', body: 'The middle tab starts a match at any place. Clubs are created from the Clubs tab.' },
   { target: 'tabs', title: 'Everything else', body: 'Home, your clubs and your schedule. Your picture, top right, opens your profile.' },
 ];
 

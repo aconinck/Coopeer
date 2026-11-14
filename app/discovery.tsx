@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import Animated, {
@@ -8,33 +8,43 @@ import Animated, {
   cancelAnimation,
   interpolate,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { heroImageFor } from '../src/lib/heroImage';
 import { triggerCascade } from '../src/lib/firstVisit';
 import { gameStatus } from '../src/state/models';
 import { useStore } from '../src/state/store';
+import { PrimaryButton } from '../src/ui/Buttons';
+import { FlowBackground } from '../src/ui/FlowBackground';
 import { InviteCard } from '../src/ui/InviteCard';
 
-const LOOP_N = 6;
 const CARD_GAP = 14;
-const SCROLL_DURATION = 22000;
-// Blue-sky gradient: deep midnight → rich ocean blue → open sky
-const GRADIENT = ['#060F1F', '#0C3270', '#1A73C8'] as const;
-const BOTTOM_COLOR = '#071630';
+// The cards ride one big invisible wheel: each card's center sits on the circle, upright toward the outside, and
+// the whole wheel turns as a single piece (one rotation drives every card, so they never move on their own).
+const WHEEL_RADIUS = 1.8; // × the layout width; its center is far below the cards
+const SECONDS_PER_CARD = 3.6;
+const WHEEL_TOP = 36;
+// The wheel sits this share of the screen height lower than the top of its area.
+const WHEEL_OFFSET = 0.1;
+const INK = '#1C1C1E';
 
 export default function DiscoveryScreen() {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const store = useStore();
+  const reduceMotion = useReducedMotion();
 
-  const CARD_W = Math.round(width * 0.55);
+  const layoutW = Math.min(width, 560);
+  const CARD_W = Math.round(layoutW * 0.55);
   const CARD_H = Math.round(CARD_W * 1.3);
-  const CARD_UNIT = CARD_W + CARD_GAP;
-  const loopW = useRef(LOOP_N * CARD_UNIT);
+  const R = Math.round(layoutW * WHEEL_RADIUS);
+  // Cards as many as fit around the circle without their inner edges touching; spaced evenly over 360°.
+  const stepGuess = (CARD_W + CARD_GAP) / (R - CARD_H / 2);
+  const count = Math.max(8, Math.floor((2 * Math.PI) / stepGuess));
+  const step = 360 / count;
   // Use the actual visible content height (subtracting safe area) for proportions
   const contentH = height - insets.top - insets.bottom;
   const cardsZoneH = Math.round(contentH * 0.52);
@@ -42,28 +52,22 @@ export default function DiscoveryScreen() {
   const baseGames = store.games
     .filter((g) => !g.isCanceled && gameStatus(g, store.now) !== 'ended')
     .sort((a, b) => a.start.getTime() - b.start.getTime())
-    .slice(0, LOOP_N);
-  const padded =
-    baseGames.length > 0
-      ? Array.from({ length: LOOP_N }, (_, i) => baseGames[i % baseGames.length])
-      : [];
-  const cardGames = [...padded, ...padded];
+    .slice(0, 8);
+  const wheelGames = baseGames.length > 0 ? Array.from({ length: count }, (_, i) => baseGames[i % baseGames.length]) : [];
 
-  const scrollX = useSharedValue(0);
+  const spin = useSharedValue(0);
   const cardsY = useSharedValue(0);
   const screenOpacity = useSharedValue(1);
 
   useEffect(() => {
-    scrollX.value = withRepeat(
-      withTiming(loopW.current, { duration: SCROLL_DURATION, easing: Easing.linear }),
-      -1,
-      false,
-    );
-    return () => cancelAnimation(scrollX);
-  }, []);
+    if (reduceMotion) return;
+    spin.value = 0;
+    spin.value = withRepeat(withTiming(-360, { duration: count * SECONDS_PER_CARD * 1000, easing: Easing.linear }), -1, false);
+    return () => cancelAnimation(spin);
+  }, [count, reduceMotion, spin]);
 
-  const trackStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: -scrollX.value }],
+  const wheelStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${spin.value}deg` }],
   }));
 
   const cardsStyle = useAnimatedStyle(() => ({
@@ -76,37 +80,61 @@ export default function DiscoveryScreen() {
   }));
 
   const handleExplore = () => {
-    cancelAnimation(scrollX);
+    cancelAnimation(spin);
     triggerCascade();
     cardsY.value = withTiming(-height * 0.35, { duration: 360, easing: Easing.in(Easing.quad) });
     screenOpacity.value = withTiming(0, { duration: 300, easing: Easing.in(Easing.cubic) });
     setTimeout(() => router.replace('/map'), 290);
   };
 
+  // How far the wheel's sides sink below its top, so the strip is tall enough not to clip the cards.
+  const sink = R * (1 - Math.cos((Math.PI / 180) * step * 1.2)) + CARD_H * 0.15;
+
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false, animation: 'fade' }} />
-      <LinearGradient colors={GRADIENT} style={StyleSheet.absoluteFill} />
+      <FlowBackground progress={1} reach={0.9} />
       <SafeAreaView style={styles.safe}>
         <Animated.View style={[StyleSheet.absoluteFill, screenStyle]}>
-          {/* Upper half — auto-scrolling cards */}
-          <Animated.View style={[{ height: cardsZoneH, justifyContent: 'center' }, cardsStyle]}>
-            <View style={[styles.stripInner, { height: CARD_H + 48 }]}>
-              <Animated.View style={[styles.track, trackStyle]}>
-                {cardGames.map((game, i) => {
+          {/* Upper half — the wheel of cards */}
+          <Animated.View style={[{ height: cardsZoneH, justifyContent: 'center', top: Math.round(height * WHEEL_OFFSET) }, cardsStyle]}>
+            <View style={[styles.strip, { height: WHEEL_TOP + CARD_H + sink }]}>
+              <Animated.View
+                style={[
+                  styles.wheel,
+                  { width: 2 * R, height: 2 * R, left: width / 2 - R, top: WHEEL_TOP + CARD_H / 2 },
+                  wheelStyle,
+                ]}
+              >
+                {wheelGames.map((game, i) => {
                   const place = store.place(game.placeId);
+                  const angle = i * step;
+                  const rad = (angle * Math.PI) / 180;
                   return (
-                    <InviteCard
+                    <View
                       key={`${game.id}-${i}`}
-                      game={game}
-                      place={place}
-                      club={game.clubId ? store.club(game.clubId) : undefined}
-                      image={place ? heroImageFor(game, place, store.places) : null}
-                      now={store.now}
-                      width={CARD_W}
-                      height={CARD_H}
-                      onPress={() => {}}
-                    />
+                      style={[
+                        styles.slot,
+                        {
+                          width: CARD_W,
+                          height: CARD_H,
+                          left: R + R * Math.sin(rad) - CARD_W / 2,
+                          top: R - R * Math.cos(rad) - CARD_H / 2,
+                          transform: [{ rotate: `${angle}deg` }],
+                        },
+                      ]}
+                    >
+                      <InviteCard
+                        game={game}
+                        place={place}
+                        club={game.clubId ? store.club(game.clubId) : undefined}
+                        image={place ? heroImageFor(game, place) : null}
+                        now={store.now}
+                        width={CARD_W}
+                        height={CARD_H}
+                        onPress={() => {}}
+                      />
+                    </View>
                   );
                 })}
               </Animated.View>
@@ -117,14 +145,9 @@ export default function DiscoveryScreen() {
           <View style={[styles.bottom, { height: contentH - cardsZoneH }]}>
             <Text style={styles.headline}>{'Find games.\nBuild your crew.\nHave fun.'}</Text>
             <Text style={styles.subhead}>Sports near you, every day.</Text>
-            <Pressable
-              onPress={handleExplore}
-              style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-              accessibilityRole="button"
-              accessibilityLabel="Explore"
-            >
-              <Text style={styles.ctaText}>Explore</Text>
-            </Pressable>
+            <View style={styles.cta}>
+              <PrimaryButton title="Explore" onPress={handleExplore} />
+            </View>
           </View>
         </Animated.View>
       </SafeAreaView>
@@ -133,18 +156,11 @@ export default function DiscoveryScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BOTTOM_COLOR },
+  root: { flex: 1, backgroundColor: '#FFFBF7' },
   safe: { flex: 1 },
-  stripInner: {
-    overflow: 'hidden',
-    justifyContent: 'center',
-  },
-  track: {
-    flexDirection: 'row',
-    gap: CARD_GAP,
-    paddingHorizontal: CARD_GAP,
-    alignItems: 'center',
-  },
+  strip: { overflow: 'hidden' },
+  wheel: { position: 'absolute' },
+  slot: { position: 'absolute' },
   bottom: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -154,34 +170,16 @@ const styles = StyleSheet.create({
   headline: {
     fontSize: 38,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: INK,
     letterSpacing: -0.8,
     lineHeight: 48,
     textAlign: 'center',
   },
   subhead: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.58)',
+    color: 'rgba(28,28,30,0.6)',
     fontWeight: '400',
     textAlign: 'center',
   },
-  cta: {
-    marginTop: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 50,
-    paddingVertical: 16,
-    paddingHorizontal: 52,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  ctaPressed: { opacity: 0.86 },
-  ctaText: {
-    color: BOTTOM_COLOR,
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
+  cta: { alignSelf: 'stretch', flexDirection: 'row', marginTop: 20 },
 });

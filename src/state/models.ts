@@ -147,7 +147,36 @@ export interface Game {
   isCanceled?: boolean;
   isNew?: boolean;
   repeat?: Repeat;
+  /** Games of one recurring series (every Friday...) share this id. Absent for one-time games. */
+  seriesId?: string;
+  /** Someone asked you to this game personally. It only counts as an invitation while you have not replied. */
+  invitedBy?: Member;
+  /** Your "going" came from joining the series every week, not from a reply to this game. */
+  viaWeekly?: boolean;
 }
+
+/** A personal invitation to join a club. Gone once you join or turn it down. */
+export interface ClubInvite {
+  id: string;
+  clubId: string;
+  from: Member;
+}
+
+/**
+ * Joining a series every week puts you in each of its upcoming games you have not answered. A game you declined
+ * stays declined. Run it whenever games are loaded; it never changes an answer you gave yourself.
+ */
+export function applyWeekly(games: Game[], weekly: Iterable<string>, now = new Date()): Game[] {
+  const series = new Set(weekly);
+  if (series.size === 0) return games;
+  return games.map((g) => {
+    if (!g.seriesId || !series.has(g.seriesId) || g.myRSVP !== 'none' || g.isCanceled || g.end < now) return g;
+    return { ...g, myRSVP: 'going' as const, viaWeekly: true, going: g.going.some((m) => m.id === ME.id) ? g.going : [ME, ...g.going] };
+  });
+}
+
+/** True while the game is a personal invitation you have not answered. */
+export const isInvited = (game: Game) => !!game.invitedBy && game.myRSVP === 'none' && !game.isCanceled;
 
 export type CardBrand = 'visa' | 'mastercard' | 'amex' | 'discover' | 'applepay' | 'googlepay';
 
