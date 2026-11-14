@@ -62,7 +62,8 @@ export function TileFeed({
 
   const imageFor = (game: Game): ImageSourcePropType | null => {
     const place = store.place(game.placeId);
-    return place ? heroImageFor(game, place) : null;
+    const club = game.clubId ? store.club(game.clubId) : null;
+    return place ? heroImageFor(game, place, club) : null;
   };
   const where = (game: Game) => store.place(game.placeId)?.name ?? '';
 
@@ -80,11 +81,12 @@ export function TileFeed({
     .sort((a, b) => (b.photos?.length ?? 0) - (a.photos?.length ?? 0))
     .slice(0, 8);
 
-  const liveW = Math.min(width * 0.74, 300);
-  const freshW = Math.min(width * 0.52, 220);
-  const wideW = Math.min(width * 0.74, 300);
-  const clubW = Math.min(width * 0.4, 168);
-  const placeW = Math.min(width * 0.46, 190);
+  // Fixed card widths — consistent across screen sizes, not percentage-based.
+  const liveW = 220;      // live / nearby InviteCard rail
+  const wideW = 220;      // from-clubs PhotoCard rail (same size)
+  const clubW = 148;      // ClubCard rail
+  const placeW = 165;     // places PhotoCard rail
+  const nextW = Math.min(width - layout.gutter * 2, 300);  // "Up next" — bleeds edge-to-edge up to 300
   const first = user?.name.split(' ')[0] ?? 'there';
   const empty = store.ready && !next && store.clubInvites.length + store.gameInvites.length + live.length + fromClubs.length + nearby.length + clubs.length + places.length === 0;
 
@@ -103,7 +105,7 @@ export function TileFeed({
       {next && (
         <Animated.View style={styles.section} entering={cascade ? FadeInDown.duration(380).delay(80).springify() : undefined}>
           <SectionHeader title="Up next" action={{ label: 'Schedule', onPress: () => router.push('/schedule') }} />
-          <InviteCard game={next} place={store.place(next.placeId)} club={next.clubId ? store.club(next.clubId) : undefined} image={imageFor(next)} now={now} width={Math.min(width - layout.gutter * 2, 560)} height={Math.round(Math.min(width - layout.gutter * 2, 560) * 0.65)} onPress={() => onOpenGame(next)} />
+          <InviteCard game={next} place={store.place(next.placeId)} club={next.clubId ? store.club(next.clubId) : undefined} image={imageFor(next)} now={now} width={nextW} height={Math.round(nextW * 0.65)} onPress={() => onOpenGame(next)} />
         </Animated.View>
       )}
 
@@ -123,9 +125,9 @@ export function TileFeed({
       {fromClubs.length > 0 && (
         <Animated.View style={styles.section} entering={cascade ? FadeInDown.duration(380).delay(160).springify() : undefined}>
           <SectionHeader title="From your clubs" />
-          <Rail snap={freshW}>
+          <Rail snap={wideW}>
             {fromClubs.map((game) => (
-              <PhotoCard key={game.id} image={imageFor(game)} sport={game.sport} title={game.title} subtitle={`${where(game)} · ${game.clubId ? store.club(game.clubId)?.name : ''}`} badge={inviteWhen(game, now)} width={wideW} height={Math.round(wideW * 0.6)} onPress={() => onOpenGame(game)} />
+              <PhotoCard key={game.id} image={imageFor(game)} sport={game.sport} title={game.title} subtitle={`${where(game)} · ${game.clubId ? store.club(game.clubId)?.name : ''}`} badge={inviteWhen(game, now)} width={wideW} height={Math.round(wideW * 0.72)} onPress={() => onOpenGame(game)} />
             ))}
           </Rail>
         </Animated.View>

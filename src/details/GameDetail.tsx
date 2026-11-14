@@ -12,7 +12,7 @@ import { dollars, monthDay, openDirections, shareText, time } from '../lib/forma
 import { heroImageFor } from '../lib/heroImage';
 import { AvatarStack, ClubLogo, StatusBadge, VerifiedBadge, gameBadge } from '../ui/Display';
 import { CoverImage } from '../ui/CoverImage';
-import { PrimaryButton, SecondaryButton } from '../ui/Buttons';
+import { ActionBar, PrimaryButton, SecondaryButton } from '../ui/Buttons';
 import { MoreMenu } from '../ui/Screen';
 
 const COVER_HEIGHT = 480;
@@ -53,7 +53,7 @@ export function GameDetail({ id }: { id: string }) {
   const full = spotsLeft(game) === 0 && game.myRSVP !== 'going';
   const progress = Math.min(game.going.length / Math.max(game.capacity, 1), 1);
   const base = colors.white;
-  const image = heroImageFor(game, place);
+  const image = heroImageFor(game, place, club);
   const when = `${monthDay(game.start)} · ${time(game.start)} – ${time(game.end)}`;
   const repeatLabel = repeatText(game.repeat, game.start);
   const weekly = store.isWeekly(game);
@@ -85,9 +85,12 @@ export function GameDetail({ id }: { id: string }) {
   ];
 
   const footerJoin = !closed ? (
-    game.myRSVP === 'going'
-      ? <SecondaryButton title="You're in" onPress={() => reply('none')} />
-      : <PrimaryButton title={full ? 'Join waitlist' : 'Join game'} onPress={() => reply('going')} disabled={false} />
+    <ActionBar caption={caption}>
+      {game.myRSVP === 'going'
+        ? <SecondaryButton title="You're in" onPress={() => reply('none')} />
+        : <PrimaryButton title={full ? 'Full' : 'Join game'} onPress={() => reply('going')} disabled={full} />
+      }
+    </ActionBar>
   ) : null;
 
   return (
@@ -119,11 +122,10 @@ export function GameDetail({ id }: { id: string }) {
           {invited ? (
             <Text style={[type.subhead, styles.invited]}>{invited.name.split(' ')[0]} invited you to this game</Text>
           ) : null}
-          <Text style={[type.footnote, styles.heroCaption]}>{caption}</Text>
         </View>
       </Stagger>
 
-      {game.seriesId && !closed && game.myRSVP === 'going' ? (
+      {game.seriesId && !closed ? (
         <Stagger index={1} style={styles.section}>
           <View style={[styles.glassCard, styles.weeklyCard]}>
             <View style={styles.weeklyIcon}>
@@ -132,7 +134,7 @@ export function GameDetail({ id }: { id: string }) {
             <View style={styles.flex}>
               <Text style={[type.headline, styles.onDark]}>Every {day}</Text>
               <Text style={[type.footnote, styles.dim]}>
-                {weekly ? "You're in each week automatically. Choose Not going above to skip one." : 'Join every week and skip any one you cannot make.'}
+                {weekly ? `You're in every ${day}. Tap Not going to skip one week.` : 'Join every week and skip any one you cannot make.'}
               </Text>
             </View>
             <Switch accessibilityLabel={`Join every ${day}`} value={weekly} onValueChange={setWeekly} trackColor={{ true: colors.brand }} />
@@ -273,8 +275,6 @@ const styles = StyleSheet.create({
   invited: { color: colors.brand, textAlign: 'center', fontWeight: '600', marginTop: space.sm },
   weeklyCard: { flexDirection: 'row', alignItems: 'center' },
   weeklyIcon: { width: 40, height: 40, borderRadius: radius.full, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  // Use label (black) base with 60% opacity — legible on the near-white bg below the button.
-  heroCaption: { color: 'rgba(0,0,0,0.60)', textAlign: 'center', marginTop: space.sm },
   section: { paddingHorizontal: space.lg, marginTop: space.md },
   glassCard: { padding: space.lg, gap: space.md, borderRadius: 26, backgroundColor: GLASS, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: GLASS_BORDER },
   details: { color: colors.label2, textAlign: 'center' },

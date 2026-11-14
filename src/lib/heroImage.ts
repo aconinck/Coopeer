@@ -11,7 +11,15 @@ export function placeImageFor(place: Place): ImageSourcePropType | null {
   return own ? { uri: own } : null;
 }
 
-export function heroImageFor(game: Pick<Game, 'sport'>, place: Place): ImageSourcePropType | null {
+export function heroImageFor(
+  game: Pick<Game, 'sport'>,
+  place: Place,
+  club?: { photoUri?: string } | null,
+): ImageSourcePropType | null {
   if (game.sport === 'soccer') return soccerPhoto;
-  return placeImageFor(place);
+  const placeImg = placeImageFor(place);
+  if (placeImg) return placeImg;
+  // Fall back to the club's photo (avatar) so pickleball/trails games always have an image in the feed.
+  if (club?.photoUri) return { uri: club.photoUri };
+  return null;
 }

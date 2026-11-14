@@ -59,10 +59,10 @@ export function InviteCard({
       {/* Progressive blur from the mid-point down */}
       {image ? <ProgressiveBlurImage source={image} from={0.38} to={0.82} radius={26} /> : null}
 
-      {/* Dissolve into page background at the bottom so dark text reads clearly */}
+      {/* Dissolve into page background — starts early, strong mid wash so dark text always reads */}
       <LinearGradient
-        colors={['transparent', colors.bg]}
-        locations={[0.52, 0.94]}
+        colors={['transparent', 'rgba(243,242,238,0.72)', colors.bg]}
+        locations={[0.18, 0.55, 0.82]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />

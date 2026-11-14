@@ -129,7 +129,7 @@ export default function DiscoveryScreen() {
                         game={game}
                         place={place}
                         club={game.clubId ? store.club(game.clubId) : undefined}
-                        image={place ? heroImageFor(game, place) : null}
+                        image={place ? heroImageFor(game, place, game.clubId ? store.club(game.clubId) : null) : null}
                         now={store.now}
                         width={CARD_W}
                         height={CARD_H}
