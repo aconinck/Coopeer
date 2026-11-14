@@ -12,7 +12,7 @@ import { dollars, monthDay, openDirections, shareText, time } from '../lib/forma
 import { heroImageFor } from '../lib/heroImage';
 import { AvatarStack, ClubLogo, StatusBadge, VerifiedBadge, gameBadge } from '../ui/Display';
 import { CoverImage } from '../ui/CoverImage';
-import { RSVPCapsule } from '../ui/RSVPCapsule';
+import { PrimaryButton, SecondaryButton } from '../ui/Buttons';
 import { MoreMenu } from '../ui/Screen';
 
 const COVER_HEIGHT = 480;
@@ -84,12 +84,19 @@ export function GameDetail({ id }: { id: string }) {
     { label: 'Directions', icon: 'navigate-outline' as const, onPress: () => openDirections(place) },
   ];
 
+  const footerJoin = !closed ? (
+    game.myRSVP === 'going'
+      ? <SecondaryButton title="You're in" onPress={() => reply('none')} />
+      : <PrimaryButton title={full ? 'Join waitlist' : 'Join game'} onPress={() => reply('going')} disabled={false} />
+  ) : null;
+
   return (
     <DetailLayout
       title=""
       trailing={<MoreMenu items={menu} />}
       coverColor={base}
       cover={image ? <CoverImage source={image} base={base} height={COVER_HEIGHT} /> : null}
+      footer={footerJoin}
     >
       <Stagger index={0} style={styles.hero}>
         <View style={styles.heroTop}>
@@ -103,7 +110,7 @@ export function GameDetail({ id }: { id: string }) {
           <Text style={[type.largeTitle, styles.heroTitle, game.isCanceled && styles.strike]}>{game.title}</Text>
           <Text style={[type.subhead, styles.heroLine]}>{when}</Text>
           <Text style={[type.subhead, styles.heroLine]} numberOfLines={1}>{place.name}</Text>
-          {repeatLabel ? (
+          {repeatLabel && game.myRSVP === 'going' ? (
             <View style={styles.repeatPill}>
               <Ionicons name="repeat" size={12} color={colors.brand} />
               <Text style={[type.caption2, styles.repeatText]}>{repeatLabel}</Text>
@@ -112,14 +119,11 @@ export function GameDetail({ id }: { id: string }) {
           {invited ? (
             <Text style={[type.subhead, styles.invited]}>{invited.name.split(' ')[0]} invited you to this game</Text>
           ) : null}
-          <View style={styles.capsuleWrap}>
-            <RSVPCapsule value={game.myRSVP} onChange={reply} disabled={closed} tone="light" />
-          </View>
           <Text style={[type.footnote, styles.heroCaption]}>{caption}</Text>
         </View>
       </Stagger>
 
-      {game.seriesId && !closed ? (
+      {game.seriesId && !closed && game.myRSVP === 'going' ? (
         <Stagger index={1} style={styles.section}>
           <View style={[styles.glassCard, styles.weeklyCard]}>
             <View style={styles.weeklyIcon}>
@@ -269,7 +273,6 @@ const styles = StyleSheet.create({
   invited: { color: colors.brand, textAlign: 'center', fontWeight: '600', marginTop: space.sm },
   weeklyCard: { flexDirection: 'row', alignItems: 'center' },
   weeklyIcon: { width: 40, height: 40, borderRadius: radius.full, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  capsuleWrap: { alignSelf: 'stretch', marginTop: space.lg },
   // Use label (black) base with 60% opacity — legible on the near-white bg below the button.
   heroCaption: { color: 'rgba(0,0,0,0.60)', textAlign: 'center', marginTop: space.sm },
   section: { paddingHorizontal: space.lg, marginTop: space.md },

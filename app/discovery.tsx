@@ -5,6 +5,7 @@ import { Stack, router } from 'expo-router';
 import Animated, {
   Easing,
   Extrapolation,
+  FadeInDown,
   cancelAnimation,
   interpolate,
   useAnimatedStyle,
@@ -142,13 +143,13 @@ export default function DiscoveryScreen() {
           </Animated.View>
 
           {/* Lower half — copy and CTA, centered */}
-          <View style={[styles.bottom, { height: contentH - cardsZoneH }]}>
+          <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(500).delay(300).springify()} style={[styles.bottom, { height: contentH - cardsZoneH }]}>
             <Text style={styles.headline}>{'Find games.\nBuild your crew.\nHave fun.'}</Text>
             <Text style={styles.subhead}>Sports near you, every day.</Text>
             <View style={styles.cta}>
               <PrimaryButton title="Explore" onPress={handleExplore} />
             </View>
-          </View>
+          </Animated.View>
         </Animated.View>
       </SafeAreaView>
     </View>

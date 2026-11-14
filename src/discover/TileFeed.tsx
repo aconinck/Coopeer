@@ -1,14 +1,14 @@
 import { useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ImageSourcePropType } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions, type ImageSourcePropType } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, layout, radius, space, type } from '../constants/theme';
+import { colors, layout, space, type } from '../constants/theme';
 import { heroImageFor } from '../lib/heroImage';
 import { router } from 'expo-router';
 import { gameStatus, isInvited, type Club, type Game, type Place, type SportId } from '../state/models';
 import { useSession } from '../state/session';
 import { useStore } from '../state/store';
-import { PlaceIcon } from '../map/PlacePin';
+import { placeImageFor } from '../lib/heroImage';
 import { SectionHeader } from '../ui/Display';
 import { InviteCard, inviteWhen } from '../ui/InviteCard';
 import { Invitations } from '../ui/Invitations';
@@ -84,15 +84,16 @@ export function TileFeed({
   const freshW = Math.min(width * 0.52, 220);
   const wideW = Math.min(width * 0.74, 300);
   const clubW = Math.min(width * 0.4, 168);
+  const placeW = Math.min(width * 0.46, 190);
   const first = user?.name.split(' ')[0] ?? 'there';
   const empty = store.ready && !next && store.clubInvites.length + store.gameInvites.length + live.length + fromClubs.length + nearby.length + clubs.length + places.length === 0;
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={{ paddingTop: top, paddingBottom: bottom + space.lg, paddingHorizontal: layout.gutter, gap: layout.sectionGap }} showsVerticalScrollIndicator={false}
+    <ScrollView style={styles.root} contentContainerStyle={{ paddingTop: top + space.lg, paddingBottom: bottom + space.lg, paddingHorizontal: layout.gutter, gap: layout.sectionGap }} showsVerticalScrollIndicator={false}
       scrollEventThrottle={16}
       onScroll={(e) => onScroll(e.nativeEvent.contentOffset.y)}
     >
-      <Animated.View style={styles.hello} entering={cascade ? FadeIn.duration(400) : undefined}>
+      <Animated.View style={styles.hello} entering={cascade ? FadeInDown.duration(400).springify() : undefined}>
         <View>
           <Text style={[type.title, styles.helloLight]}>{greeting(now)}</Text>
           <Text style={[type.title, styles.helloName]}>{first}</Text>
@@ -100,28 +101,28 @@ export function TileFeed({
       </Animated.View>
 
       {next && (
-        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(100) : undefined}>
-          <SectionHeader title="Your next" caption={`${store.isWeekly(next) ? "You're in every week" : "You're in this game"} · ${inviteWhen(next, now)}`} action={{ label: 'Schedule', onPress: () => router.push('/schedule') }} />
-          <InviteCard game={next} place={store.place(next.placeId)} club={next.clubId ? store.club(next.clubId) : undefined} image={imageFor(next)} now={now} width={Math.min(width - layout.gutter * 2, 560)} height={Math.round(Math.min(width - layout.gutter * 2, 560) * 0.72)} onPress={() => onOpenGame(next)} />
+        <Animated.View style={styles.section} entering={cascade ? FadeInDown.duration(380).delay(80).springify() : undefined}>
+          <SectionHeader title="Up next" action={{ label: 'Schedule', onPress: () => router.push('/schedule') }} />
+          <InviteCard game={next} place={store.place(next.placeId)} club={next.clubId ? store.club(next.clubId) : undefined} image={imageFor(next)} now={now} width={Math.min(width - layout.gutter * 2, 560)} height={Math.round(Math.min(width - layout.gutter * 2, 560) * 0.65)} onPress={() => onOpenGame(next)} />
         </Animated.View>
       )}
 
       <Invitations onOpenClub={onOpenClub} onOpenGame={onOpenGame} />
 
       {live.length > 0 && (
-        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(150) : undefined}>
-          <SectionHeader title="Happening now" caption="Live games you can still jump into." />
+        <Animated.View style={styles.section} entering={cascade ? FadeInDown.duration(380).delay(120).springify() : undefined}>
+          <SectionHeader title="Happening now" />
           <Rail snap={liveW}>
             {live.map((game) => (
-              <InviteCard key={game.id} game={game} place={store.place(game.placeId)} club={game.clubId ? store.club(game.clubId) : undefined} image={imageFor(game)} now={now} width={liveW} height={Math.round(liveW * 1.25)} onPress={() => onOpenGame(game)} />
+              <InviteCard key={game.id} game={game} place={store.place(game.placeId)} club={game.clubId ? store.club(game.clubId) : undefined} image={imageFor(game)} now={now} width={liveW} height={Math.round(liveW * 1.1)} onPress={() => onOpenGame(game)} />
             ))}
           </Rail>
         </Animated.View>
       )}
 
       {fromClubs.length > 0 && (
-        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(300) : undefined}>
-          <SectionHeader title="From your clubs" caption="Tap a game to say if you're in." />
+        <Animated.View style={styles.section} entering={cascade ? FadeInDown.duration(380).delay(160).springify() : undefined}>
+          <SectionHeader title="From your clubs" />
           <Rail snap={freshW}>
             {fromClubs.map((game) => (
               <PhotoCard key={game.id} image={imageFor(game)} sport={game.sport} title={game.title} subtitle={`${where(game)} · ${game.clubId ? store.club(game.clubId)?.name : ''}`} badge={inviteWhen(game, now)} width={wideW} height={Math.round(wideW * 0.6)} onPress={() => onOpenGame(game)} />
@@ -131,19 +132,19 @@ export function TileFeed({
       )}
 
       {nearby.length > 0 && (
-        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(450) : undefined}>
-          <SectionHeader title="Games near you" caption="Open to everyone." />
+        <Animated.View style={styles.section} entering={cascade ? FadeInDown.duration(380).delay(200).springify() : undefined}>
+          <SectionHeader title="Games near you" />
           <Rail snap={liveW}>
             {nearby.map((game) => (
-              <InviteCard key={game.id} game={game} place={store.place(game.placeId)} club={game.clubId ? store.club(game.clubId) : undefined} image={imageFor(game)} now={now} width={liveW} height={Math.round(liveW * 1.25)} onPress={() => onOpenGame(game)} />
+              <InviteCard key={game.id} game={game} place={store.place(game.placeId)} club={game.clubId ? store.club(game.clubId) : undefined} image={imageFor(game)} now={now} width={liveW} height={Math.round(liveW * 1.1)} onPress={() => onOpenGame(game)} />
             ))}
           </Rail>
         </Animated.View>
       )}
 
       {clubs.length > 0 && (
-        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(750) : undefined}>
-          <SectionHeader title="Clubs near you" caption="Join a group that plays together." />
+        <Animated.View style={styles.section} entering={cascade ? FadeInDown.duration(380).delay(240).springify() : undefined}>
+          <SectionHeader title="Clubs near you" />
           <Rail snap={clubW}>
             {clubs.map((club, i) => (
               <ClubCard key={club.id} club={club} index={i} width={clubW} onPress={() => onOpenClub(club)} />
@@ -153,18 +154,25 @@ export function TileFeed({
       )}
 
       {places.length > 0 && (
-        <Animated.View style={styles.section} entering={cascade ? FadeIn.duration(400).delay(900) : undefined}>
-          <SectionHeader title="Places to play" caption="Parks, fields, courts and trails." />
-          <View style={styles.grid}>
-            {places.map((place) => (
-              <Pressable key={place.id} accessibilityRole="button" accessibilityLabel={place.name} onPress={() => onOpenPlace(place)} style={({ pressed }) => [styles.placeTile, pressed && styles.pressed]}>
-                <PlaceIcon kind={place.kind} size={44} />
-                <Text style={[type.subhead, styles.placeName]} numberOfLines={2}>
-                  {place.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+        <Animated.View style={styles.section} entering={cascade ? FadeInDown.duration(380).delay(280).springify() : undefined}>
+          <SectionHeader title="Places to play" />
+          <Rail snap={placeW}>
+            {places.map((place) => {
+              const placeImg = placeImageFor(place);
+              return (
+                <PhotoCard
+                  key={place.id}
+                  image={placeImg}
+                  sport={place.sports[0] ?? null}
+                  title={place.name}
+                  subtitle={place.address ?? ''}
+                  width={placeW}
+                  height={Math.round(placeW * 1.0)}
+                  onPress={() => onOpenPlace(place)}
+                />
+              );
+            })}
+          </Rail>
         </Animated.View>
       )}
 
@@ -185,9 +193,6 @@ const styles = StyleSheet.create({
   helloLight: { color: colors.label3 },
   helloName: { color: colors.label },
   section: { gap: space.md },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
-  placeTile: { width: '47.5%', flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.sm, borderRadius: radius.card, backgroundColor: colors.fill },
-  placeName: { flex: 1, color: colors.label, fontWeight: '600' },
   pressed: { opacity: 0.85 },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.xxl },
   emptyText: { color: colors.label2, textAlign: 'center' },

@@ -439,6 +439,11 @@ function SheetLayout({ title, trailing, footer, cover, coverColor, children }: D
     [chrome],
   );
 
+  // As the sheet drags to full, the cover spacer grows to reveal more of the photo.
+  const coverSpacerStyle = useAnimatedStyle(() => ({
+    height: interpolate(chrome?.y.value ?? 0, [0, chrome?.half ?? 300], [200, 60], Extrapolation.CLAMP),
+  }));
+
   // Horizontal swipe on the header to navigate between nearby places (only when at half snap).
   const floatProgress = chrome?.floatProgress;
   const swipeGesture = useMemo(
@@ -488,7 +493,7 @@ function SheetLayout({ title, trailing, footer, cover, coverColor, children }: D
           showsVerticalScrollIndicator={false}
         >
           {cover}
-          {cover ? <View style={styles.coverSpacer} /> : null}
+          {cover ? <Animated.View style={coverSpacerStyle} /> : null}
           {children}
         </Animated.ScrollView>
       </GestureDetector>
